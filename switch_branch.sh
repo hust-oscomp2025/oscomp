@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Set the target branch name here. Modify as needed.
-TARGET_BRANCH="lab1_2_exception"
+TARGET_BRANCH="lab1_3_irq"
 
 # Check if the working directory is clean (no uncommitted changes)
 if [ -n "$(git status --porcelain)" ]; then
