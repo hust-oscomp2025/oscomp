@@ -1,0 +1,1 @@
+spike -d ./obj/riscv-pke ./obj/app_helloworld
