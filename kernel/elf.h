@@ -37,6 +37,8 @@ typedef struct elf_prog_header_t {
   uint64 align;  /* Segment alignment */
 } elf_prog_header;
 
+
+
 #define ELF_MAGIC 0x464C457FU  // "\x7FELF" in little endian
 #define ELF_PROG_LOAD 1
 
@@ -59,5 +61,16 @@ elf_status elf_init(elf_ctx *ctx, void *info);
 elf_status elf_load(elf_ctx *ctx);
 
 void load_bincode_from_host_elf(process *p);
+
+// elf符号项，lab1_challenge1加入
+typedef struct elf_symbol_t{
+    char *name;     // 符号名称
+    uint64 value;   // 符号值（地址）
+    uint32 size;    // 符号大小
+    uint8 type;     // 符号类型（例如函数、变量等）
+    uint8 bind;     // 绑定信息
+    uint16 section; // 所属段索引
+} elf_symbol;
+
 
 #endif

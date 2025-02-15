@@ -124,8 +124,7 @@ void load_bincode_from_host_elf(process *p) {
   if (IS_ERR_VALUE(info.f)) panic("Fail on openning the input application program.\n");
 
   // init elfloader context. elf_init() is defined above.
-  if (elf_init(&elfloader, &info) != EL_OK)
-    panic("fail to init elfloader.\n");
+  if (elf_init(&elfloader, &info) != EL_OK) panic("fail to init elfloader.\n");
 
   // load elf. elf_load() is defined above.
   if (elf_load(&elfloader) != EL_OK) panic("Fail on loading elf.\n");
@@ -138,3 +137,5 @@ void load_bincode_from_host_elf(process *p) {
 
   sprint("Application program entry point (virtual address): 0x%lx\n", p->trapframe->epc);
 }
+
+
