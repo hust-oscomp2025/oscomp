@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # Set the target branch name here. Modify as needed.
-TARGET_BRANCH="lab1_3_irq"
+CURRENT_BRANCH="lab1_3_irq"
+TARGET_BRANCH="lab1_challenge1_backtrace"
 
 # Check if the working directory is clean (no uncommitted changes)
 if [ -n "$(git status --porcelain)" ]; then
@@ -31,3 +32,5 @@ else
 fi
 
 echo "Successfully switched to branch '$TARGET_BRANCH'."
+git merge "$CURRENT_BRANCH"
+echo "Successfully merged branch '$CURRENT_BRANCH'."
