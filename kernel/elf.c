@@ -200,9 +200,11 @@ endop:;
 elf_status elf_load(elf_ctx *ctx) {
   // elf_prog_header structure is defined in kernel/elf.h
   elf_prog_header ph_addr;
+  
   int i, off;
 
   // traverse the elf program segment headers
+  //sprint("%x\n", ctx->ehdr.phoff);
   for (i = 0, off = ctx->ehdr.phoff; i < ctx->ehdr.phnum; i++, off += sizeof(ph_addr)) {
     // read segment headers
     if (elf_fpread(ctx, (void *)&ph_addr, sizeof(ph_addr), off) != sizeof(ph_addr)) return EL_EIO;
@@ -212,12 +214,17 @@ elf_status elf_load(elf_ctx *ctx) {
     if (ph_addr.vaddr + ph_addr.memsz < ph_addr.vaddr) return EL_ERR;
 
     // allocate memory block before elf loading
+    //sprint("%x\n", ph_addr.vaddr);
     void *dest = elf_alloc_mb(ctx, ph_addr.vaddr, ph_addr.vaddr, ph_addr.memsz);
 
     // actual loading
     if (elf_fpread(ctx, dest, ph_addr.memsz, ph_addr.off) != ph_addr.memsz)
       return EL_EIO;
   }
+  /*lab1_challenge1*/
+  int ret;
+  if((ret = load_function_name(ctx)) != EL_OK) return ret;
+
 
   return EL_OK;
 }
@@ -271,8 +278,7 @@ void load_bincode_from_host_elf(process *p) {
   if (IS_ERR_VALUE(info.f)) panic("Fail on openning the input application program.\n");
 
   // init elfloader context. elf_init() is defined above.
-  if (elf_init(&elfloader, &info) != EL_OK)
-    panic("fail to init elfloader.\n");
+  if (elf_init(&elfloader, &info) != EL_OK) panic("fail to init elfloader.\n");
 
   // load elf. elf_load() is defined above.
   if (elf_load(&elfloader) != EL_OK) panic("Fail on loading elf.\n");
@@ -284,4 +290,90 @@ void load_bincode_from_host_elf(process *p) {
   spike_file_close( info.f );
 
   sprint("Application program entry point (virtual address): 0x%lx\n", p->trapframe->epc);
+}
+
+// lab1_challenge1
+elf_symbol function_symbols[SYMBOL_NUM];
+char function_names[SYMBOL_NUM][SYMBOL_LENGTH];
+int function_count;
+elf_status load_function_name(elf_ctx *ctx){
+  elf_section_header symbol_section_header;
+  elf_section_header string_section_header;
+  elf_section_header shstr_section_header;
+  uint64 shstr_offset;
+
+  shstr_offset = ctx->ehdr.shoff + ctx->ehdr.shstrndx * sizeof(elf_section_header);
+  elf_fpread(ctx, (void*)&shstr_section_header, sizeof(shstr_section_header), shstr_offset);
+
+  char tmp_str[256*100];
+  elf_fpread(ctx, &tmp_str, shstr_section_header.size, shstr_section_header.offset);
+
+  elf_section_header temp_sh;
+  for(int i = 0; i < ctx->ehdr.shnum; i++) {
+    elf_fpread(ctx, (void*)&temp_sh, sizeof(temp_sh), ctx->ehdr.shoff+i*ctx->ehdr.shentsize);
+    uint32 type = temp_sh.type;
+    if(type == ELF_SHT_SYMTAB){
+      symbol_section_header = temp_sh;
+    } else if(type == ELF_SHT_STRTAB && strcmp(tmp_str+temp_sh.name,".strtab")==0){
+      string_section_header = temp_sh;
+    }
+  }
+  int count = 0;
+  int symbol_num = symbol_section_header.size / sizeof(elf_symbol);
+  for(int i = 0;i < symbol_num; i++){
+    elf_symbol symbol;
+    elf_fpread(ctx, (void*)&symbol, sizeof(symbol), symbol_section_header.offset + i * sizeof(elf_symbol));
+    if(symbol.name == 0) continue;
+    if(symbol.info == 18){
+      char symbol_name[256];
+      elf_fpread(ctx,
+                 (void*)symbol_name,
+                 sizeof(symbol_name),
+                 string_section_header.offset + symbol.name
+      );
+      function_symbols[count] = symbol;
+      strcpy(function_names[count++],symbol_name);
+      print_elf_symbol(&symbol,count - 1);
+    }
+   
+  }
+  function_count = count; 
+
+  return EL_OK;
+}
+
+char* locate_function_name(uint64 epc){
+  int find_index = 0;
+  uint64 closest_entry = 0x0;
+  for(int i = 0;i < function_count;i++){
+    uint64 function_entry = function_symbols[i].value;
+    if(function_entry < epc && function_entry > closest_entry){
+      closest_entry = function_entry;
+      find_index = i;
+    }
+  }
+  return function_names[find_index];
+}
+
+
+//debug函数，查看elf符号信息
+void print_elf_symbol(const elf_symbol *symbol, int index) {
+    if (symbol == NULL) {
+        sprint("Invalid symbol\n");
+        return;
+    }
+
+
+    // 分解 info 字段为类型和绑定属性
+    unsigned char type = symbol->info & 0x0F;  // 低 4 位为类型
+    unsigned char binding = symbol->info >> 4; // 高 4 位为绑定
+
+    // 打印符号信息
+    sprint("Symbol name: %s\n", function_names[index]);
+    sprint("Type:          0x%lx\n", type);
+    sprint("Binding:       0x%lx\n", binding);
+    sprint("Other:         0x%lx\n", symbol->other);
+    sprint("Section Index: 0x%lx\n", symbol->shndx);
+    sprint("Value:         0x%lx\n", symbol->value);
+    sprint("Size:          0x%lx\n", symbol->size);
 }

@@ -42,9 +42,10 @@ void handle_mtrap() {
       handle_store_access_fault();
       break;
     case CAUSE_ILLEGAL_INSTRUCTION:
+      handle_illegal_instruction();
       // TODO (lab1_2): call handle_illegal_instruction to implement illegal instruction
       // interception, and finish lab1_2.
-      panic( "call handle_illegal_instruction to accomplish illegal instruction interception for lab1_2.\n" );
+      //panic( "call handle_illegal_instruction to accomplish illegal instruction interception for lab1_2.\n" );
 
       break;
     case CAUSE_MISALIGNED_LOAD:
@@ -55,7 +56,7 @@ void handle_mtrap() {
       break;
 
     default:
-      sprint("machine trap(): unexpected mscause %p\n", mcause);
+      sprint("machine trap(): unexpected m %p\n", mcause);
       sprint("            mepc=%p mtval=%p\n", read_csr(mepc), read_csr(mtval));
       panic( "unexpected exception happened in M-mode.\n" );
       break;
