@@ -47,121 +47,53 @@ int printu(const char* s, ...) {
   return do_user_call(SYS_user_print, (uint64)buf, n, 0, 0, 0, 0, 0);
 }
 
+
+//lab1_challenge1
+int print_backtrace(int depth){
+  return do_user_call(SYS_user_print_backtrace, depth, 0, 0, 0, 0, 0, 0); 
+}
+
+
 void printRegs(){
   printu("========printing reg status========\n");
   uint64 reg_value;
-    // 手动读取并打印每个寄存器的值
-    __asm__ volatile("mv %0, x0" : "=r"(reg_value));
-    printu("x0  = 0x%lx\n", reg_value);
-    
-    __asm__ volatile("mv %0, x1" : "=r"(reg_value));
-    printu("x1  = 0x%lx\n", reg_value);
+  
+  // 输出寄存器的值及别名
+  #define PRINT_REG(reg, alias) \
+    __asm__ volatile("mv %0, " #reg : "=r"(reg_value)); \
+    printu(#alias " = 0x%lx\n", reg_value);
 
-    __asm__ volatile("mv %0, x2" : "=r"(reg_value));
-    printu("x2  = 0x%lx\n", reg_value);
+  // 打印常用寄存器并使用别名
+  PRINT_REG(x0, zero);
+  PRINT_REG(x1, ra);
+  PRINT_REG(x2, sp);
+  PRINT_REG(x3, gp);
+  PRINT_REG(x4, tp);
+  PRINT_REG(x5, t0);
+  PRINT_REG(x6, t1);
+  PRINT_REG(x7, t2);
+  PRINT_REG(x8, s0); // s0 或 fp
+  PRINT_REG(x9, s1);
+  PRINT_REG(x10, a0);
+  PRINT_REG(x11, a1);
+  PRINT_REG(x12, a2);
+  PRINT_REG(x13, a3);
+  PRINT_REG(x14, a4);
+  PRINT_REG(x15, a5);
+  PRINT_REG(x16, a6);
+  PRINT_REG(x17, a7);
+  PRINT_REG(x28, t3);
+  PRINT_REG(x29, t4);
+  PRINT_REG(x30, t5);
+  PRINT_REG(x31, t6);
 
-    __asm__ volatile("mv %0, x3" : "=r"(reg_value));
-    printu("x3  = 0x%lx\n", reg_value);
+  // 打印栈指针（SP）、栈帧指针（FP）
+  uint64 sp, fp;
+  __asm__ volatile("mv %0, sp" : "=r"(sp));
+  __asm__ volatile("mv %0, fp" : "=r"(fp));
 
-    __asm__ volatile("mv %0, x4" : "=r"(reg_value));
-    printu("x4  = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x5" : "=r"(reg_value));
-    printu("x5  = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x6" : "=r"(reg_value));
-    printu("x6  = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x7" : "=r"(reg_value));
-    printu("x7  = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x8" : "=r"(reg_value));
-    printu("x8  = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x9" : "=r"(reg_value));
-    printu("x9  = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x10" : "=r"(reg_value));
-    printu("x10 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x11" : "=r"(reg_value));
-    printu("x11 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x12" : "=r"(reg_value));
-    printu("x12 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x13" : "=r"(reg_value));
-    printu("x13 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x14" : "=r"(reg_value));
-    printu("x14 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x15" : "=r"(reg_value));
-    printu("x15 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x16" : "=r"(reg_value));
-    printu("x16 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x17" : "=r"(reg_value));
-    printu("x17 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x18" : "=r"(reg_value));
-    printu("x18 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x19" : "=r"(reg_value));
-    printu("x19 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x20" : "=r"(reg_value));
-    printu("x20 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x21" : "=r"(reg_value));
-    printu("x21 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x22" : "=r"(reg_value));
-    printu("x22 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x23" : "=r"(reg_value));
-    printu("x23 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x24" : "=r"(reg_value));
-    printu("x24 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x25" : "=r"(reg_value));
-    printu("x25 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x26" : "=r"(reg_value));
-    printu("x26 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x27" : "=r"(reg_value));
-    printu("x27 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x28" : "=r"(reg_value));
-    printu("x28 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x29" : "=r"(reg_value));
-    printu("x29 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x30" : "=r"(reg_value));
-    printu("x30 = 0x%lx\n", reg_value);
-
-    __asm__ volatile("mv %0, x31" : "=r"(reg_value));
-    printu("x31 = 0x%lx\n", reg_value);
-
-    // 打印栈指针（SP）、栈帧指针（FP）和程序计数器（PC）
-    uint64 sp, fp, pc;
-    __asm__ volatile (
-        "mv %0, sp" : "=r"(sp)
-    );
-    __asm__ volatile (
-        "mv %0, fp" : "=r"(fp)
-    );
-    //__asm__ volatile (
-    //    "mv %0, ra" : "=r"(pc) // ra 寄存器作为程序计数器
-    //);
-
-    printu("SP = 0x%lx\n", sp);
-    printu("FP = 0x%lx\n", fp);
-    printu("PC = 0x%lx\n", getRa());
+  printu("SP = 0x%lx\n", sp);
+  printu("FP = 0x%lx\n", fp);
 }
 
 // 获取调用 print_registers 的程序计数器（PC）

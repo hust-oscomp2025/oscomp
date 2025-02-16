@@ -2,7 +2,7 @@
 #define _PROC_H_
 
 #include "riscv.h"
-#include "elf.h"
+
 typedef struct trapframe_t {
   // space to store context (all common registers)
   /* offset:0   */ riscv_regs regs;
@@ -23,10 +23,10 @@ typedef struct process_t {
   trapframe* trapframe;
 
   // lab1_challenge1加入
-  elf_symbol* symbol_table;
+  void* symbol_table; //elf_symbol
   char* strtab;
 
-  
+
 }process;
 
 void switch_to(process*);

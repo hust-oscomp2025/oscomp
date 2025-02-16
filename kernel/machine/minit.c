@@ -125,7 +125,8 @@ void m_start(uintptr_t hartid, uintptr_t dtb) {
   write_csr(sie, read_csr(sie) | SIE_SEIE | SIE_STIE | SIE_SSIE);
 
   // init timing. added @lab1_3
-  timerinit(hartid);
+  // lab1_challenge1 为了调试便利，禁用了外部时钟中断：
+  // timerinit(hartid);
 
   // switch to supervisor mode (S mode) and jump to s_start(), i.e., set pc to mepc
   asm volatile("mret");
