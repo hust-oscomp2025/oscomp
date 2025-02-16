@@ -297,18 +297,18 @@ elf_symbol function_symbols[SYMBOL_NUM];
 char function_names[SYMBOL_NUM][SYMBOL_LENGTH];
 int function_count;
 elf_status load_function_name(elf_ctx *ctx){
-  elf_section_header symbol_section_header;
-  elf_section_header string_section_header;
-  elf_section_header shstr_section_header;
+  elf_sect_header symbol_section_header;
+  elf_sect_header string_section_header;
+  elf_sect_header shstr_section_header;
   uint64 shstr_offset;
 
-  shstr_offset = ctx->ehdr.shoff + ctx->ehdr.shstrndx * sizeof(elf_section_header);
+  shstr_offset = ctx->ehdr.shoff + ctx->ehdr.shstrndx * sizeof(elf_sect_header);
   elf_fpread(ctx, (void*)&shstr_section_header, sizeof(shstr_section_header), shstr_offset);
 
   char tmp_str[256*100];
   elf_fpread(ctx, &tmp_str, shstr_section_header.size, shstr_section_header.offset);
 
-  elf_section_header temp_sh;
+  elf_sect_header temp_sh;
   for(int i = 0; i < ctx->ehdr.shnum; i++) {
     elf_fpread(ctx, (void*)&temp_sh, sizeof(temp_sh), ctx->ehdr.shoff+i*ctx->ehdr.shentsize);
     uint32 type = temp_sh.type;

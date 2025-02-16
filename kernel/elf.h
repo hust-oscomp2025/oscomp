@@ -95,7 +95,7 @@ typedef struct elf_section_header_t {
   uint32 info;        /* 附加信息（具体含义取决于节的类型） */
   uint64 addralign;   /* 节的对齐要求（通常是2的幂，用于内存对齐） */
   uint64 entsize;     /* 每个条目的大小（如果节包含多个条目，如符号表） */
-} elf_section_header;
+} elf_sect_header;
 
 // 定义 ELF 节类型
 #define ELF_SHT_NULL       0x0    // Null 节，表示节头表中的空节
