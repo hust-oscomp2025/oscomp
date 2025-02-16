@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Set the target branch name here. Modify as needed.
-CURRENT_BRANCH="lab1_3_irq"
-TARGET_BRANCH="lab1_challenge1_backtrace"
+CURRENT_BRANCH="lab1_challenge1_backtrace"
+TARGET_BRANCH="lab1_challenge2_errorline"
 
 # Check if the working directory is clean (no uncommitted changes)
 if [ -n "$(git status --porcelain)" ]; then
