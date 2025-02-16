@@ -1,10 +1,12 @@
 #!/bin/bash
+# 释放资源
 lsof -ti:9824 | xargs kill -9
 lsof -ti:3333 | xargs kill -9
 lsof -ti:6666 | xargs kill -9
 pkill spike -9
 pkill openocd -9
 pkill cpptools-srv -9
+# 执行make clean和make任务，可以直接换成对应的命令
 source ./compile.sh
 # 设置变量
 PKE="./obj/riscv-pke"

@@ -21,12 +21,6 @@ typedef struct process_t {
   uint64 kstack;
   // trapframe storing the context of a (User mode) process.
   trapframe* trapframe;
-
-  // lab1_challenge1加入
-  void* symbol_table; //elf_symbol
-  char* strtab;
-
-
 }process;
 
 void switch_to(process*);
