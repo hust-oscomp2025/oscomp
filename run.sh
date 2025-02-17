@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # 读取 Makefile 中的 USER_TARGET 变量
-USER_TARGET=$(make -f Makefile -s -C . print_user_target)
+SPIKE_COMMAND=$(make -f Makefile -s -C . print_spike_command)
 
 # 检查 USER_TARGET 是否为空
-if [ -z "$USER_TARGET" ]; then
+if [ -z "$SPIKE_COMMAND" ]; then
     echo "Error: USER_TARGET is not defined in Makefile"
     exit 1
 fi
@@ -13,8 +13,8 @@ fi
 > ./logs/run.log
 
 # 使用 spike 运行并替换目标文件
-spike ./obj/riscv-pke "$USER_TARGET" >> ./logs/run.log
+spike "$SPIKE_COMMAND" >> ./logs/run.log
 
-echo "Successfully executed the target: $USER_TARGET"
+echo "Successfully executed the target: $SPIKE_COMMAND"
 # 提示用户编译输出已重定向到 make.log 文件
 echo "Program output is being redirected to './logs/run.log'."
