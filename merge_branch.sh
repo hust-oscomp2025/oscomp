@@ -3,7 +3,8 @@
 # 用法提示函数
 usage() {
     echo "Usage: $0 <branch_to_merge>"
-    echo "  <branch_to_merge>   The branch you want to merge into the current branch."
+    echo "  <branch_to_merge>   合并的目标分支."
+    git branch -r
     exit 1
 }
 
