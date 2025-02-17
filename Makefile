@@ -152,3 +152,6 @@ format:
 
 clean:
 	rm -fr ${OBJ_DIR}
+
+print_user_target:
+	@echo $(USER_TARGET)

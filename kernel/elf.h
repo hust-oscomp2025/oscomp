@@ -116,7 +116,7 @@ typedef struct elf_section_header_t {
 #define ELF_SHF_ALLOC      0x2    // 分配内存
 #define ELF_SHF_EXECINSTR  0x4    // 可执行
 
-elf_status load_function_name(elf_ctx *ctx);
+elf_status load_debug_infomation(elf_ctx *ctx);
 void print_elf_symbol(const elf_symbol *symbol, int index);
 char* locate_function_name(uint64 epc);
 
@@ -125,6 +125,11 @@ char* locate_function_name(uint64 epc);
 extern elf_symbol funtion_symbols[SYMBOL_NUM];
 extern char function_names[SYMBOL_NUM][SYMBOL_LENGTH];
 extern int function_count;
+
+// lab1_challenge2
+void load_debugline(elf_ctx *ctx);
+void print_chars(const char* start, int n);
+void print_elf_section_header(elf_sect_header *section_header, char *shstr);
 
 
 

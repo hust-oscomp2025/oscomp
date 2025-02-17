@@ -4,7 +4,7 @@ ENTRY(main)
 
 SECTIONS
 {
-  . = 0x81000000;
+  . = 0x82000000;
   . = ALIGN(0x1000);
   .text : { *(.text) }
   . = ALIGN(16);
