@@ -37,17 +37,16 @@ void enable_paging() {
 //
 void load_user_program(process *proc) {
   sprint("User application is loading.\n");
-  // allocate a page to store the trapframe. alloc_page is defined in kernel/pmm.c. added @lab2_1
+
+  // 为进程控制块的各个成员指针分配物理内存
   proc->trapframe = (trapframe *)alloc_page();
   memset(proc->trapframe, 0, sizeof(trapframe));
-
-  // allocate a page to store page directory. added @lab2_1
   proc->pagetable = (pagetable_t)alloc_page();
   memset((void *)proc->pagetable, 0, PGSIZE);
 
-  // allocate pages to both user-kernel stack and user app itself. added @lab2_1
-  proc->kstack = (uint64)alloc_page() + PGSIZE;   //user kernel stack top
-  uint64 user_stack = (uint64)alloc_page();       //phisical address of user stack bottom
+  // 内核栈是自上而下增长的，所以说起始位置是页的高地址（左闭右开）
+  proc->kstack = (uint64)alloc_page() + PGSIZE;
+  uint64 user_stack_bottom = (uint64)alloc_page();
 
   // USER_STACK_TOP = 0x7ffff000, defined in kernel/memlayout.h
   proc->trapframe->regs.sp = USER_STACK_TOP;  //virtual address of user stack top
@@ -55,20 +54,19 @@ void load_user_program(process *proc) {
   sprint("user frame 0x%lx, user stack 0x%lx, user kstack 0x%lx \n", proc->trapframe,
          proc->trapframe->regs.sp, proc->kstack);
 
-  // load_bincode_from_host_elf() is defined in kernel/elf.c
   load_bincode_from_host_elf(proc);
 
-  // populate the page table of user application. added @lab2_1
-  // map user stack in userspace, user_vm_map is defined in kernel/vmm.c
-  user_vm_map((pagetable_t)proc->pagetable, USER_STACK_TOP - PGSIZE, PGSIZE, user_stack,
-         prot_to_type(PROT_WRITE | PROT_READ, 1));
+  // 为用户栈创建地址映射
+  user_vm_map((pagetable_t)proc->pagetable, USER_STACK_TOP - PGSIZE, PGSIZE, user_stack_bottom,
+              prot_to_type(PROT_WRITE | PROT_READ, 1));
 
-  // map trapframe in user space (direct mapping as in kernel space).
+  // 为中断上下文创建地址映射
   user_vm_map((pagetable_t)proc->pagetable, (uint64)proc->trapframe, PGSIZE, (uint64)proc->trapframe,
          prot_to_type(PROT_WRITE | PROT_READ, 0));
 
-  // map S-mode trap vector section in user space (direct mapping as in kernel space)
-  // here, we assume that the size of usertrap.S is smaller than a page.
+  // 因为用户模式触发中断时，使用的stvec=smode_trap_vector仍然是虚拟地址。
+  // 所以说要把虚拟中断入口地址-->物理中断入口地址的虚实映射关系，也加入到用户模式的页表当中.
+  // 这样才能让软中断成功跳转到正确的中断入口向量地址。
   user_vm_map((pagetable_t)proc->pagetable, (uint64)trap_sec_start, PGSIZE, (uint64)trap_sec_start,
          prot_to_type(PROT_READ | PROT_EXEC, 0));
 }
@@ -88,16 +86,13 @@ int s_start(void) {
   //    确定核心占用的内存区域首尾 g_kernel_start, g_kernel_end
   //    确定所有可用的物理页资源首尾 free_mem_start_addr, free_mem_end_addr
   //    以此创建空闲物理页表 create_freepage_list(free_mem_start_addr, free_mem_end_addr);
+  //
+  // 空闲物理页资源表的数据结构
+  //    通过全局变量 static list_node g_free_mem_list; 管理所有空闲的物理页
+  //    list_node->next 指向下一个空闲的物理页基址，最后一个节点指向空指针。
+  //    释放物理页：在物理页开头创建链表节点，并插入物理页链表头部。
+  //    分配物理页：分配链表中第一个节点，并更新物理页链表。
   pmm_init();
-  /*
-    空闲物理页资源表的数据结构
-    通过全局变量 static list_node g_free_mem_list; 管理所有空闲的物理页
-    list_node->next 指向下一个空闲的物理页基址，最后一个节点指向空指针。
-    释放物理页：在物理页开头创建链表节点，并插入物理页链表头部。
-    分配物理页：分配链表中第一个节点，并更新物理页链表。
-
-    注：页大小为4KB
-  */
 
   // 参见kernel.lds.
   // 初始化内核空间的内存地址映射
@@ -106,19 +101,13 @@ int s_start(void) {
   //    分配一个空闲页用作全局页目录 g_kernel_pagetable(指向对应的内存页地址)
   kern_vm_init();
 
-  //
-  //  从这里开始，所有内存访问都通过MMU进行虚实转换
+  //  写入satp寄存器并刷新tlb缓存
+  //    从这里开始，所有内存访问都通过MMU进行虚实转换
   enable_paging();
-  // the code now formally works in paging mode, meaning the page table is now in use.
+
   sprint("kernel page table is on \n");
-
-  // the application code (elf) is first loaded into memory, and then put into execution
   load_user_program(&user_app);
-
   sprint("Switch to user mode...\n");
-  // switch_to() is defined in kernel/process.c
   switch_to(&user_app);
-
-  // we should never reach here.
   return 0;
 }
