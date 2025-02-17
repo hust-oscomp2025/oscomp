@@ -104,9 +104,9 @@ $(KERNEL_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(SPIKE_INF_LIB) $(KERNEL_OBJS) $(KERNE
 	@$(COMPILE) $(KERNEL_OBJS) $(UTIL_LIB) $(SPIKE_INF_LIB) -o $@ -T $(KERNEL_LDS) >> ./logs/compiler.log 2>&1
 	@echo "PKE core has been built into" \"$@\" >> ./logs/makefile.log 2>&1
 
-$(USER_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_OBJS) $(USER_LDS)
+$(USER_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_OBJS)
 	@echo "linking" $@	...	>> ./logs/makefile.log 2>&1
-	@$(COMPILE) --entry=main $(USER_OBJS) $(UTIL_LIB) -o $@ -T $(USER_LDS)
+	@$(COMPILE) --entry=main $(USER_OBJS) $(UTIL_LIB) -o $@
 	@echo "User app has been built into" \"$@\" >> ./logs/makefile.log 2>&1
 
 -include $(wildcard $(OBJ_DIR)/*/*.d)

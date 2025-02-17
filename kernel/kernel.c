@@ -78,18 +78,36 @@ void load_user_program(process *proc) {
 //
 int s_start(void) {
   sprint("Enter supervisor mode...\n");
-  // in the beginning, we use Bare mode (direct) memory mapping as in lab1.
-  // but now, we are going to switch to the paging mode @lab2_1.
-  // note, the code still works in Bare mode when calling pmm_init() and kern_vm_init().
+  //  satp是(S-mode)下控制页表的核心寄存器，用于地址变换和权限控制
+  //    存储分页模式MODE(bare/sv39/sv48)
+  //    区分不同进程的地址空间ASID
+  //    存储页表基址PPN
   write_csr(satp, 0);
 
-  // init phisical memory manager
+  // 初始化物理页资源表
+  //    确定核心占用的内存区域首尾 g_kernel_start, g_kernel_end
+  //    确定所有可用的物理页资源首尾 free_mem_start_addr, free_mem_end_addr
+  //    以此创建空闲物理页表 create_freepage_list(free_mem_start_addr, free_mem_end_addr);
   pmm_init();
+  /*
+    空闲物理页资源表的数据结构
+    通过全局变量 static list_node g_free_mem_list; 管理所有空闲的物理页
+    list_node->next 指向下一个空闲的物理页基址，最后一个节点指向空指针。
+    释放物理页：在物理页开头创建链表节点，并插入物理页链表头部。
+    分配物理页：分配链表中第一个节点，并更新物理页链表。
 
-  // build the kernel page table
+    注：页大小为4KB
+  */
+
+  // 参见kernel.lds.
+  // 初始化内核空间的内存地址映射
+  //    将code and text segment映射为虚实地址相同的 读/执行权限页
+  //    将内核剩下的段映射为虚实地址相同 的读/写页
+  //    分配一个空闲页用作全局页目录 g_kernel_pagetable(指向对应的内存页地址)
   kern_vm_init();
 
-  // now, switch to paging mode by turning on paging (SV39)
+  //
+  //  从这里开始，所有内存访问都通过MMU进行虚实转换
   enable_paging();
   // the code now formally works in paging mode, meaning the page table is now in use.
   sprint("kernel page table is on \n");
