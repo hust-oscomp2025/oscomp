@@ -20,7 +20,7 @@ ifneq (,)
   mabi := -mabi=$(if $(is_32bit),ilp32,lp64)
 endif
 
-CFLAGS        := -Wall -Werror  -fno-builtin -nostdlib -D__NO_INLINE__ -mcmodel=medany -g -Og -std=gnu99 -Wno-unused -Wno-attributes -fno-delete-null-pointer-checks -fno-PIE $(march)
+CFLAGS        := -Wall -Werror -gdwarf-3 -fno-builtin -nostdlib -D__NO_INLINE__ -mcmodel=medany -g -Og -std=gnu99 -Wno-unused -Wno-attributes -fno-delete-null-pointer-checks -fno-PIE $(march) -fno-omit-frame-pointer
 COMPILE       	:= $(CC) -MMD -MP $(CFLAGS) $(SPROJS_INCLUDE)
 
 #---------------------	utils -----------------------
@@ -75,6 +75,7 @@ USER_OBJ1  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_CPP1)))
 USER_TARGET0 	:= $(OBJ_DIR)/app0
 USER_TARGET1 	:= $(OBJ_DIR)/app1
 #------------------------targets------------------------
+
 $(OBJ_DIR):
 	@-mkdir -p $(OBJ_DIR)	
 	@-mkdir -p $(dir $(UTIL_OBJS))
@@ -84,27 +85,28 @@ $(OBJ_DIR):
 	@-mkdir -p $(dir $(USER_OBJ1))
 
 $(OBJ_DIR)/%.o : %.c
-	@echo "compiling" $<
-	@$(COMPILE) -c $< -o $@
+	@echo "compiling" $< >> ./logs/makefile.log 2>&1
+	@> ./logs/compiler.log
+	@$(COMPILE) -c $< -o $@ >> ./logs/compiler.log 2>&1
 
 $(OBJ_DIR)/%.o : %.S
-	@echo "compiling" $<
-	@$(COMPILE) -c $< -o $@
+	@echo "compiling" $< >> ./logs/makefile.log 2>&1
+	@$(COMPILE) -c $< -o $@ >> ./logs/compiler.log 2>&1
 
 $(UTIL_LIB): $(OBJ_DIR) $(UTIL_OBJS)
-	@echo "linking " $@	...	
-	@$(AR) -rcs $@ $(UTIL_OBJS) 
-	@echo "Util lib has been build into" \"$@\"
+	@echo "linking " $@	...	 >> ./logs/makefile.log 2>&1
+	@$(AR) -rcs $@ $(UTIL_OBJS)  >> ./logs/compiler.log 2>&1
+	@echo "Util lib has been build into" \"$@\" >> ./logs/makefile.log 2>&1
 	
 $(SPIKE_INF_LIB): $(OBJ_DIR) $(UTIL_OBJS) $(SPIKE_INF_OBJS)
-	@echo "linking " $@	...	
-	@$(AR) -rcs $@ $(SPIKE_INF_OBJS) $(UTIL_OBJS)
-	@echo "Spike lib has been build into" \"$@\"
+	@echo "linking " $@	...	 >> ./logs/makefile.log 2>&1
+	@$(AR) -rcs $@ $(SPIKE_INF_OBJS) $(UTIL_OBJS) >> ./logs/compiler.log 2>&1
+	@echo "Spike lib has been build into" \"$@\" >> ./logs/makefile.log 2>&1
 
 $(KERNEL_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(SPIKE_INF_LIB) $(KERNEL_OBJS) $(KERNEL_LDS)
-	@echo "linking" $@ ...
-	@$(COMPILE) $(KERNEL_OBJS) $(UTIL_LIB) $(SPIKE_INF_LIB) -o $@ -T $(KERNEL_LDS)
-	@echo "PKE core has been built into" \"$@\"
+	@echo "linking" $@ ... >> ./logs/makefile.log 2>&1
+	@$(COMPILE) $(KERNEL_OBJS) $(UTIL_LIB) $(SPIKE_INF_LIB) -o $@ -T $(KERNEL_LDS) >> ./logs/compiler.log 2>&1
+	@echo "PKE core has been built into" \"$@\" >> ./logs/makefile.log 2>&1
 
 $(USER_TARGET0): $(OBJ_DIR) $(UTIL_LIB) $(USER_OBJ0) $(USER_LDS0)
 	@echo "linking" $@	...	
@@ -159,3 +161,6 @@ format:
 
 clean:
 	rm -fr ${OBJ_DIR}
+
+print_user_target:
+	@echo $(USER_TARGET)
