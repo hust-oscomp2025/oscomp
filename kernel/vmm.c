@@ -16,6 +16,7 @@
 // establish mapping of virtual address [va, va+size] to phyiscal address [pa, pa+size]
 // with the permission of "perm".
 //
+// 这个函数只在内核初始化的时候用，所以不用担心想要分配的物理内存，在构建多级页表的过程中被分配掉了。
 int map_pages(pagetable_t page_dir, uint64 va, uint64 size, uint64 pa, int perm) {
   uint64 first, last;
   pte_t *pte;
@@ -46,7 +47,7 @@ uint64 prot_to_type(int prot, int user) {
 //
 // traverse the page table (starting from page_dir) to find the corresponding pte of va.
 // returns: PTE (page table entry) pointing to va.
-//
+// 实际查询va对应的页表项的过程，可以选择是否在查询过程中为页中间目录和页表分配内存空间。
 pte_t *page_walk(pagetable_t page_dir, uint64 va, int alloc) {
   if (va >= MAXVA) panic("page_walk");
 
@@ -159,8 +160,12 @@ void *user_va_to_pa(pagetable_t page_dir, void *va) {
   // (va & (1<<PGSHIFT -1)) means computing the offset of "va" inside its page.
   // Also, it is possible that "va" is not mapped at all. in such case, we can find
   // invalid PTE, and should return NULL.
-  panic( "You have to implement user_va_to_pa (convert user va to pa) to print messages in lab2_1.\n" );
-
+  // panic( "You have to implement user_va_to_pa (convert user va to pa) to print messages in lab2_1.\n" );
+  pte_t *pte = page_walk(page_dir, (uint64)va, 0);
+  uint64 offset = (uint64)va & ((1UL << PGSHIFT) - 1);
+  if (pte == 0)
+    return NULL;
+  return (void *)(PTE2PA(*pte) + offset);
 }
 
 //
@@ -184,6 +189,21 @@ void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free) {
   // (use free_page() defined in pmm.c) the physical pages. lastly, invalidate the PTEs.
   // as naive_free reclaims only one page at a time, you only need to consider one page
   // to make user/app_naive_malloc to behave correctly.
-  panic( "You have to implement user_vm_unmap to free pages using naive_free in lab2_2.\n" );
-
+  // panic( "You have to implement user_vm_unmap to free pages using naive_free in lab2_2.\n" );
+  pte_t *pte;
+  uint64 firstPage = ROUNDDOWN(va, PGSIZE);
+  uint64 lastPage = ROUNDDOWN(va + size - 1, PGSIZE);
+  if (lastPage < va)
+    for (; firstPage <= lastPage; firstPage += PGSIZE)
+    {
+      if ((pte = page_walk(page_dir, firstPage, 1)) == 0)
+        panic("user_vm_unmap failed to walk page table for va (0x%lx)", firstPage);
+      if (!(*pte & PTE_V))
+        panic("user_vm_unmap fails on unmapping va (0x%lx)", firstPage);
+      if (free)
+      {
+        free_page((void *)PTE2PA(*pte));
+      }
+      *pte = 0;
+    }
 }

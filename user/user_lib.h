@@ -4,5 +4,8 @@
 
 int printu(const char *s, ...);
 int exit(int code);
-void* naive_malloc();
+void printRegs();
+int getRa(void);
+int print_backtrace(int depth);void* naive_malloc();
 void naive_free(void* va);
+void* naive_malloc();
