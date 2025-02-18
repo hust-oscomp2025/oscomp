@@ -41,6 +41,6 @@ else
     git pull
 fi
 
-echo "Successfully switched to branch '$TARGET_BRANCH'."
+echo "Successfully switched from $CURRENT_BRANCH to branch $TARGET_BRANCH."
 # git merge "$CURRENT_BRANCH"
 # echo "Successfully merged branch '$CURRENT_BRANCH'."
