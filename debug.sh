@@ -34,7 +34,7 @@ sleep 2
 # 3. 启动 GDB，连接到目标远程调试
 echo "Starting GDB and connecting to $TARGET_REMOTE..."
 riscv64-unknown-elf-gdb -ex "target extended-remote $TARGET_REMOTE" \
-                        -ex "b switch_to" \
+                        -ex "b sys_user_print_backtrace" \
                         -ex "c " \
                         $PROGRAM
                         
