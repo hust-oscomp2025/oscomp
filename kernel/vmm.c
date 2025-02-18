@@ -13,10 +13,10 @@
 
 /* --- utility functions for virtual address mapping --- */
 //
-// establish mapping of virtual address [va, va+size] to phyiscal address [pa, pa+size]
-// with the permission of "perm".
+// establish mapping of virtual address [va, va+size] to phyiscal address [pa,
+// pa+size] with the permission of "perm".
 //
-// 这个函数只在内核初始化的时候用，所以不用担心想要分配的物理内存，在构建多级页表的过程中被分配掉了。
+//
 int map_pages(pagetable_t page_dir, uint64 va, uint64 size, uint64 pa, int perm) {
   uint64 first, last;
   pte_t *pte;
