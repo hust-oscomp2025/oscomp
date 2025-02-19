@@ -48,6 +48,7 @@ uint64 prot_to_type(int prot, int user) {
 // traverse the page table (starting from page_dir) to find the corresponding pte of va.
 // returns: PTE (page table entry) pointing to va.
 // 实际查询va对应的页表项的过程，可以选择是否在查询过程中为页中间目录和页表分配内存空间。
+// 拿一个物理页当页表并不影响在页表中初始化这个物理页的映射关系。
 pte_t *page_walk(pagetable_t page_dir, uint64 va, int alloc) {
   if (va >= MAXVA) panic("page_walk");
 
