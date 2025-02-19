@@ -70,7 +70,7 @@ USER_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_CPPS)))
 
 
 
-USER_TARGET 	:= $(OBJ_DIR)/app_print_backtrace
+USER_TARGET 	:= $(OBJ_DIR)/app_errorline
 #------------------------targets------------------------
 
 $(OBJ_DIR):
