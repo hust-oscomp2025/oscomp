@@ -4,6 +4,7 @@
 
 #include "vmm.h"
 #include "riscv.h"
+#include "process.h"
 #include "pmm.h"
 #include "util/types.h"
 #include "memlayout.h"
@@ -13,8 +14,9 @@
 
 /* --- utility functions for virtual address mapping --- */
 //
-// establish mapping of virtual address [va, va+size] to phyiscal address [pa, pa+size]
-// with the permission of "perm".
+// establish mapping of virtual address [va, va+size] to phyiscal address [pa,
+// pa+size] with the permission of "perm".
+//
 //
 int map_pages(pagetable_t page_dir, uint64 va, uint64 size, uint64 pa, int perm) {
   uint64 first, last;
@@ -46,7 +48,8 @@ uint64 prot_to_type(int prot, int user) {
 //
 // traverse the page table (starting from page_dir) to find the corresponding pte of va.
 // returns: PTE (page table entry) pointing to va.
-//
+// 实际查询va对应的页表项的过程，可以选择是否在查询过程中为页中间目录和页表分配内存空间。
+// 拿一个物理页当页表并不影响在页表中初始化这个物理页的映射关系。
 pte_t *page_walk(pagetable_t page_dir, uint64 va, int alloc) {
   if (va >= MAXVA) panic("page_walk");
 
@@ -159,8 +162,12 @@ void *user_va_to_pa(pagetable_t page_dir, void *va) {
   // (va & (1<<PGSHIFT -1)) means computing the offset of "va" inside its page.
   // Also, it is possible that "va" is not mapped at all. in such case, we can find
   // invalid PTE, and should return NULL.
-  panic( "You have to implement user_va_to_pa (convert user va to pa) to print messages in lab2_1.\n" );
-
+  // panic( "You have to implement user_va_to_pa (convert user va to pa) to print messages in lab2_1.\n" );
+  pte_t *pte = page_walk(page_dir, (uint64)va, 0);
+  uint64 offset = (uint64)va & ((1UL << PGSHIFT) - 1);
+  if (pte == 0)
+    return NULL;
+  return (void *)(PTE2PA(*pte) + offset);
 }
 
 //
@@ -184,6 +191,126 @@ void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free) {
   // (use free_page() defined in pmm.c) the physical pages. lastly, invalidate the PTEs.
   // as naive_free reclaims only one page at a time, you only need to consider one page
   // to make user/app_naive_malloc to behave correctly.
-  panic( "You have to implement user_vm_unmap to free pages using naive_free in lab2_2.\n" );
+  // panic( "You have to implement user_vm_unmap to free pages using naive_free in lab2_2.\n" );
+  pte_t *pte;
+  uint64 firstPage = ROUNDDOWN(va, PGSIZE);
+  uint64 lastPage = ROUNDDOWN(va + size - 1, PGSIZE);
+  if (lastPage < va)
+    for (; firstPage <= lastPage; firstPage += PGSIZE)
+    {
+      if ((pte = page_walk(page_dir, firstPage, 1)) == 0)
+        panic("user_vm_unmap failed to walk page table for va (0x%lx)", firstPage);
+      if (!(*pte & PTE_V))
+        panic("user_vm_unmap fails on unmapping va (0x%lx)", firstPage);
+      if (free)
+      {
+        free_page((void *)PTE2PA(*pte));
+      }
+      *pte = 0;
+    }
+}
+// 计算用户请求的内存大小，跳过堆元数据部分
+#define USER_MEM_SIZE(size) ((size) + sizeof(heap_block))
 
+
+
+
+
+// 目前只服务大小小于一个页的内存请求
+void* malloc(size_t size) {
+  int hartid = read_tp();
+    // 如果请求的大小为 0，直接返回 NULL
+    if (size == 0) {
+        return NULL;
+    }
+
+    heap_block* iterator = (heap_block*)current[hartid]->heap;
+    // 遍历空闲链表，查找足够大的空闲块
+    while (iterator != NULL) {
+        // 如果当前块足够大
+        // 这里出了问题。
+        heap_block* pa_iterator =  user_va_to_pa(current[hartid]->pagetable,iterator);
+        if (pa_iterator->free && pa_iterator->size >= USER_MEM_SIZE(size)) {
+            // 如果当前块大于请求的大小，拆分
+            if (pa_iterator->size > USER_MEM_SIZE(size) + sizeof(heap_block)) {
+                // 创建一个新的空闲块，放在当前块的后面
+                heap_block* new_block = (heap_block*)ALIGN((uintptr_t)iterator + USER_MEM_SIZE(size), 8);
+                // 这里出了问题，我们在分配地址时，需要考虑到用户请求的地址大小是不对齐的，需要进行对齐的向上取整。
+                heap_block* pa_newblock =  user_va_to_pa(current[hartid]->pagetable,new_block);
+                pa_newblock->size = pa_iterator->size - USER_MEM_SIZE(size);
+                pa_newblock->free = 1;
+                pa_newblock->next = pa_iterator->next;
+                pa_newblock->prev = pa_iterator;
+
+                if (pa_iterator->next != NULL) {
+                  heap_block* iterator_next = (heap_block*)pa_iterator->next;
+                  heap_block* pa_iterator_next = user_va_to_pa(current[hartid]->pagetable,iterator_next);
+                    pa_iterator_next->prev = new_block;
+                }
+
+                pa_iterator->next = new_block;
+                pa_iterator->size = USER_MEM_SIZE(size);
+            }
+
+            // 标记当前块为已分配
+            pa_iterator->free = 0;
+
+            // 返回用户的内存地址（跳过 heap_block 部分）
+            return (void*)((uintptr_t)iterator + sizeof(heap_block));
+        }
+        iterator = pa_iterator->next;
+    }
+
+    // 如果没有找到合适的块，返回 NULL（表示堆内存不足）
+    return NULL;
+}
+
+void free(void* ptr) {
+  int hartid = read_tp();
+    // 如果指针为 NULL，直接返回
+    if (ptr == NULL) {
+        return;
+    }
+
+    // 获取指向 heap_block 的指针，跳过用户数据区域
+    heap_block* block = (heap_block*)((uintptr_t)ptr - sizeof(heap_block));
+    heap_block* pa_block = user_va_to_pa(current[hartid]->pagetable,block);
+    // 如果该块已经是空闲的，说明已经释放过了，直接返回
+    if (pa_block->free) {
+        return;
+    }
+
+    // 标记为已释放
+    pa_block->free = 1;
+
+    heap_block* block_prev = pa_block->prev;
+    heap_block* pa_block_prev = user_va_to_pa(current[hartid]->pagetable,block_prev);          
+    heap_block* block_next = pa_block->next;
+    heap_block* pa_block_next = user_va_to_pa(current[hartid]->pagetable,block_next);
+    // 合并前面的空闲块
+    if (block_prev != NULL && pa_block_prev->free) {
+        // 合并前一个空闲块
+        pa_block_prev->size += pa_block->size;
+        pa_block_prev->next = pa_block->next;
+        if (pa_block->next != NULL) {
+
+            pa_block_next->prev = pa_block->prev;
+        }
+        block = pa_block->prev;  // 更新块指针，合并后变成前一个块
+    }
+
+    // 合并后面的空闲块
+    if (block_next != NULL && pa_block_next->free) {
+        // 合并后一个空闲块
+        pa_block->size += pa_block_next->size;
+        pa_block->next = pa_block_next->next;
+        if (block_next != NULL) {
+            pa_block_next->prev = block;
+        }
+    }
+
+    // 如果合并后是链表的头部或尾部，我们可能需要重新设置堆的头指针
+    if (block_prev == NULL) {
+        current[hartid]->heap = block;  // 更新堆的头部
+    }
 }
