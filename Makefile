@@ -165,4 +165,4 @@ print_user_target:
 	@echo $(USER_TARGET)
 
 print_spike_command:
-	@echo "-p2 $(KERNEL_TARGET) $(USER_TARGET0) $(USER_TARGET1)"
+	@echo "-p2 ./$(KERNEL_TARGET) ./$(USER_TARGET0) ./$(USER_TARGET1)"

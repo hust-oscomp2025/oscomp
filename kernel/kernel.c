@@ -61,16 +61,16 @@ void load_user_program(process *proc) {
   // 内核栈是自上而下增长的，所以说起始位置是页的高地址（左闭右开）
   proc->kstack = (uint64)alloc_page() + PGSIZE;
   uint64 user_stack_bottom = (uint64)alloc_page();
-
+  user_heap_init(proc);
   // USER_STACK_TOP = 0x7ffff000, defined in kernel/memlayout.h
   proc->trapframe->regs.sp = USER_STACK_TOP;  //virtual address of user stack top
   proc->trapframe->regs.tp = hartid;
 
-
-  sprint("hartid = ?: user frame 0x%lx, user stack 0x%lx, user kstack 0x%lx \n", proc->trapframe,
-         proc->trapframe->regs.sp, proc->kstack);
+  if(NCPU > 1)sprint("hartid = %d: ",hartid);
+  sprint("user frame 0x%lx, user stack 0x%lx, user kstack 0x%lx \n", proc->trapframe,proc->trapframe->regs.sp, proc->kstack);
 
   load_bincode_from_host_elf(proc);
+
 
   // 为用户栈创建地址映射
   user_vm_map((pagetable_t)proc->pagetable, USER_STACK_TOP - PGSIZE, PGSIZE, user_stack_bottom,

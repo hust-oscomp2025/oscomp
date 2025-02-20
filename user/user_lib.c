@@ -111,23 +111,22 @@ int getRa(void) {
 
 
 
-//
-// applications need to call exit to quit execution.
-//
 int exit(int code) {
   return do_user_call(SYS_user_exit, code, 0, 0, 0, 0, 0, 0); 
 }
 
-//
-// lib call to better_malloc
-//
 void* better_malloc(int n) {
   return (void*)do_user_call(SYS_user_malloc, n, 0, 0, 0, 0, 0, 0);
 }
 
-//
-// lib call to better_free
-//
+void* naive_malloc(int n) {
+  return (void*)do_user_call(SYS_user_malloc, 4000, 0, 0, 0, 0, 0, 0);
+}
+
 void better_free(void* va) {
+  do_user_call(SYS_user_free, (uint64)va, 0, 0, 0, 0, 0, 0);
+}
+
+void naive_free(void* va) {
   do_user_call(SYS_user_free, (uint64)va, 0, 0, 0, 0, 0, 0);
 }

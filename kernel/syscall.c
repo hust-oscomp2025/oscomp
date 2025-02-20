@@ -76,10 +76,11 @@ uint64 sys_user_malloc(size_t size) {
 // maybe, the simplest implementation of malloc in the world ... added @lab2_2
 //
 uint64 sys_user_allocate_page() {
+  int hartid = read_tp();
   void* pa = alloc_page();
   uint64 va = g_ufree_page;
   g_ufree_page += PGSIZE;
-  user_vm_map((pagetable_t)current->pagetable, va, PGSIZE, (uint64)pa,
+  user_vm_map((pagetable_t)current[hartid]->pagetable, va, PGSIZE, (uint64)pa,
          prot_to_type(PROT_WRITE | PROT_READ, 1));
   sprint("hartid = ?: vaddr 0x%x is mapped to paddr 0x%x\n", va, pa);
   return va;

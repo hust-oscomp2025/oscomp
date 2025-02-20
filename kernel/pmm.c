@@ -5,6 +5,7 @@
 #include "util/string.h"
 #include "memlayout.h"
 #include "spike_interface/spike_utils.h"
+#include "sync_utils.h"
 
 // _end is defined in kernel/kernel.lds, it marks the ending (virtual) address of PKE kernel
 extern char _end[];
@@ -50,7 +51,9 @@ void free_page(void *pa) {
 // takes the first free page from g_free_mem_list, and returns (allocates) it.
 // Allocates only ONE page!
 //
+volatile static int counter = 1;
 void *alloc_page(void) {
+  sync_barrier(&counter,NCPU);
   list_node *n = g_free_mem_list.next;
   uint64 hartid = 0;
   if (vm_alloc_stage[hartid]) {

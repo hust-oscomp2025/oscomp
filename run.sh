@@ -11,6 +11,7 @@ fi
 
 # 清空日志文件
 > ./logs/run.log
+echo $SPIKE_COMMAND
 
 # 使用 spike 运行并替换目标文件
 spike "$SPIKE_COMMAND" >> ./logs/run.log
