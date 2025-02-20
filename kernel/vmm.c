@@ -4,6 +4,7 @@
 
 #include "vmm.h"
 #include "riscv.h"
+#include "process.h"
 #include "pmm.h"
 #include "util/types.h"
 #include "memlayout.h"
@@ -13,8 +14,9 @@
 
 /* --- utility functions for virtual address mapping --- */
 //
-// establish mapping of virtual address [va, va+size] to phyiscal address [pa, pa+size]
-// with the permission of "perm".
+// establish mapping of virtual address [va, va+size] to phyiscal address [pa,
+// pa+size] with the permission of "perm".
+//
 //
 int map_pages(pagetable_t page_dir, uint64 va, uint64 size, uint64 pa, int perm) {
   uint64 first, last;
@@ -46,7 +48,8 @@ uint64 prot_to_type(int prot, int user) {
 //
 // traverse the page table (starting from page_dir) to find the corresponding pte of va.
 // returns: PTE (page table entry) pointing to va.
-//
+// 实际查询va对应的页表项的过程，可以选择是否在查询过程中为页中间目录和页表分配内存空间。
+// 拿一个物理页当页表并不影响在页表中初始化这个物理页的映射关系。
 pte_t *page_walk(pagetable_t page_dir, uint64 va, int alloc) {
   if (va >= MAXVA) panic("page_walk");
 
@@ -159,8 +162,12 @@ void *user_va_to_pa(pagetable_t page_dir, void *va) {
   // (va & (1<<PGSHIFT -1)) means computing the offset of "va" inside its page.
   // Also, it is possible that "va" is not mapped at all. in such case, we can find
   // invalid PTE, and should return NULL.
-  panic( "You have to implement user_va_to_pa (convert user va to pa) to print messages in lab2_1.\n" );
-
+  // panic( "You have to implement user_va_to_pa (convert user va to pa) to print messages in lab2_1.\n" );
+  pte_t *pte = page_walk(page_dir, (uint64)va, 0);
+  uint64 offset = (uint64)va & ((1UL << PGSHIFT) - 1);
+  if (pte == 0)
+    return NULL;
+  return (void *)(PTE2PA(*pte) + offset);
 }
 
 //
@@ -184,6 +191,121 @@ void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free) {
   // (use free_page() defined in pmm.c) the physical pages. lastly, invalidate the PTEs.
   // as naive_free reclaims only one page at a time, you only need to consider one page
   // to make user/app_naive_malloc to behave correctly.
-  panic( "You have to implement user_vm_unmap to free pages using naive_free in lab2_2.\n" );
+  // panic( "You have to implement user_vm_unmap to free pages using naive_free in lab2_2.\n" );
+  pte_t *pte;
+  uint64 firstPage = ROUNDDOWN(va, PGSIZE);
+  uint64 lastPage = ROUNDDOWN(va + size - 1, PGSIZE);
+  if (lastPage < va)
+    for (; firstPage <= lastPage; firstPage += PGSIZE)
+    {
+      if ((pte = page_walk(page_dir, firstPage, 1)) == 0)
+        panic("user_vm_unmap failed to walk page table for va (0x%lx)", firstPage);
+      if (!(*pte & PTE_V))
+        panic("user_vm_unmap fails on unmapping va (0x%lx)", firstPage);
+      if (free)
+      {
+        free_page((void *)PTE2PA(*pte));
+      }
+      *pte = 0;
+    }
+}
+// 计算用户请求的内存大小，跳过堆元数据部分
+#define USER_MEM_SIZE(size) ((size) + sizeof(heap_block))
 
+void user_heap_init(process* proc){
+  proc->heap = (heap_block* )USER_FREE_ADDRESS_START;
+  user_vm_map(proc->pagetable, proc->heap, PGSIZE,alloc_page(),prot_to_type(PROT_WRITE | PROT_READ, 1));
+  proc->heap_size = PGSIZE;
+  // 初始化堆内存块
+  heap_block* initial_block = proc->heap;
+  initial_block->size = proc->heap_size - sizeof(heap_block);  // 第一个块的大小是堆总大小减去元数据
+  initial_block->prev = NULL;
+  initial_block->next = NULL;
+  initial_block->free = 1;  // 初始块是空闲的
+
+}
+// 目前只服务大小小于一个页的内存请求
+void* malloc(process* proc, size_t size) {
+    // 如果请求的大小为 0，直接返回 NULL
+    if (size == 0) {
+        return NULL;
+    }
+
+    heap_block* current = proc->heap;
+    // 遍历空闲链表，查找足够大的空闲块
+    while (current != NULL) {
+        // 如果当前块足够大
+        if (current->free && current->size >= USER_MEM_SIZE(size)) {
+            // 如果当前块大于请求的大小，拆分
+            if (current->size > USER_MEM_SIZE(size) + sizeof(heap_block)) {
+                // 创建一个新的空闲块，放在当前块的后面
+                heap_block* new_block = (heap_block*)((uintptr_t)current + USER_MEM_SIZE(size));
+                new_block->size = current->size - USER_MEM_SIZE(size);
+                new_block->free = 1;
+                new_block->next = current->next;
+                new_block->prev = current;
+
+                if (current->next != NULL) {
+                    current->next->prev = new_block;
+                }
+
+                current->next = new_block;
+                current->size = USER_MEM_SIZE(size);
+            }
+
+            // 标记当前块为已分配
+            current->free = 0;
+
+            // 返回用户的内存地址（跳过 heap_block 部分）
+            return (void*)((uintptr_t)current + sizeof(heap_block));
+        }
+        current = current->next;
+    }
+
+    // 如果没有找到合适的块，返回 NULL（表示堆内存不足）
+    return NULL;
+}
+
+void free(process* proc, void* ptr) {
+    // 如果指针为 NULL，直接返回
+    if (ptr == NULL) {
+        return;
+    }
+
+    // 获取指向 heap_block 的指针，跳过用户数据区域
+    heap_block* block = (heap_block*)((uintptr_t)ptr - sizeof(heap_block));
+
+    // 如果该块已经是空闲的，说明已经释放过了，直接返回
+    if (block->free) {
+        return;
+    }
+
+    // 标记为已释放
+    block->free = 1;
+
+    // 合并前面的空闲块
+    if (block->prev != NULL && block->prev->free) {
+        // 合并前一个空闲块
+        block->prev->size += block->size;
+        block->prev->next = block->next;
+        if (block->next != NULL) {
+            block->next->prev = block->prev;
+        }
+        block = block->prev;  // 更新块指针，合并后变成前一个块
+    }
+
+    // 合并后面的空闲块
+    if (block->next != NULL && block->next->free) {
+        // 合并后一个空闲块
+        block->size += block->next->size;
+        block->next = block->next->next;
+        if (block->next != NULL) {
+            block->next->prev = block;
+        }
+    }
+
+    // 如果合并后是链表的头部或尾部，我们可能需要重新设置堆的头指针
+    if (block->prev == NULL) {
+        proc->heap = block;  // 更新堆的头部
+    }
 }
