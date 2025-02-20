@@ -109,14 +109,14 @@ $(KERNEL_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(SPIKE_INF_LIB) $(KERNEL_OBJS) $(KERNE
 	@echo "PKE core has been built into" \"$@\" >> ./logs/makefile.log 2>&1
 
 $(USER_TARGET0): $(OBJ_DIR) $(UTIL_LIB) $(USER_OBJ0) $(USER_LDS0)
-	@echo "linking" $@	...	
-	@$(COMPILE) $(USER_OBJ0) $(UTIL_LIB) -o $@ -T $(USER_LDS0)
-	@echo "User app has been built into" \"$@\"
+	@echo "linking" $@	...	>> ./logs/makefile.log 2>&1
+	@$(COMPILE) $(USER_OBJ0) $(UTIL_LIB) -o $@ -T $(USER_LDS0)./logs/compiler.log 2>&1
+	@echo "User app has been built into" \"$@\">> ./logs/makefile.log 2>&1
 	
 $(USER_TARGET1): $(OBJ_DIR) $(UTIL_LIB) $(USER_OBJ1) $(USER_LDS1)
-	@echo "linking" $@	...	
-	@$(COMPILE) $(USER_OBJ1) $(UTIL_LIB) -o $@ -T $(USER_LDS1)
-	@echo "User app has been built into" \"$@\"
+	@echo "linking" $@	...	>> ./logs/makefile.log 2>&1
+	@$(COMPILE) $(USER_OBJ1) $(UTIL_LIB) -o $@ -T $(USER_LDS1)./logs/compiler.log 2>&1
+	@echo "User app has been built into" \"$@\">> ./logs/makefile.log 2>&1
 
 -include $(wildcard $(OBJ_DIR)/*/*.d)
 -include $(wildcard $(OBJ_DIR)/*/*/*.d)

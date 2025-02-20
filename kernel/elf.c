@@ -6,6 +6,8 @@
 #include "elf.h"
 #include "string.h"
 #include "riscv.h"
+#include "vmm.h"
+#include "pmm.h"
 #include "spike_interface/spike_utils.h"
 
 typedef struct elf_info_t
@@ -14,13 +16,31 @@ typedef struct elf_info_t
   process *p;
 } elf_info;
 
-//
-// the implementation of allocater. allocates memory space for later segment loading
-//
-static void *elf_alloc_mb(elf_ctx *ctx, uint64 elf_pa, uint64 elf_va, uint64 size)
-{
-  // directly returns the virtual address as we are in the Bare mode in lab1_x
-  return (void *)elf_va;
+static void *elf_alloc_mb(elf_ctx *ctx, uint64 elf_pa, uint64 elf_va, uint64 size) {
+  elf_info *msg = (elf_info *)ctx->info;
+
+  // 计算需要多少页
+  uint64 num_pages = (size + PGSIZE - 1) / PGSIZE; // 向上取整
+  void *first_pa = NULL;
+
+  for (uint64 i = 0; i < num_pages; i++)
+  {
+    void *pa = alloc_page();
+    if (pa == 0)
+      panic("uvmalloc mem alloc failed\n");
+
+    memset((void *)pa, 0, PGSIZE);
+
+    // 记录第一个分配的物理页
+    if (i == 0)
+      first_pa = pa;
+
+    // 映射虚拟地址到物理地址
+    user_vm_map((pagetable_t)msg->p->pagetable, elf_va + i * PGSIZE, PGSIZE, (uint64)pa,
+                prot_to_type(PROT_WRITE | PROT_READ | PROT_EXEC, 1));
+  }
+
+  return first_pa; // 返回第一个物理页的地址
 }
 
 //
@@ -297,7 +317,7 @@ void make_addr_line(elf_ctx *ctx, char *debug_line, uint64 length)
 }
 
 //
-// load the elf segments to memory regions as we are in Bare mode in lab1
+// load the elf segments to memory regions.
 //
 elf_status elf_load(elf_ctx *ctx)
 {
