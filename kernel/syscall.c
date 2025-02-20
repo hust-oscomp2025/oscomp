@@ -60,7 +60,7 @@ uint64 sys_user_malloc(size_t size) {
 //
 uint64 sys_user_free(uint64 va) {
   //user_vm_unmap((pagetable_t)current->pagetable, va, PGSIZE, 1);
-  free(va);
+  free((void*)va);
   return 0;
 }
 

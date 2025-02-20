@@ -31,6 +31,19 @@ void enable_paging() {
   flush_tlb();
 }
 
+void user_heap_init(process* proc){
+  heap_block* heap_pa = (void*)alloc_page();
+  //proc->heap = (void*)alloc_page();
+  user_vm_map(proc->pagetable,USER_FREE_ADDRESS_START, PGSIZE,(uint64)heap_pa,prot_to_type(PROT_WRITE | PROT_READ, 1));
+  proc->heap_size = PGSIZE;
+  // 初始化堆内存块
+  //heap_block* initial_block = proc->heap;
+  heap_pa->size = proc->heap_size - sizeof(heap_block);  // 第一个块的大小是堆总大小减去元数据
+  heap_pa->prev = NULL;
+  heap_pa->next = NULL;
+  heap_pa->free = 1;  // 初始块是空闲的
+  proc->heap = (void*)USER_FREE_ADDRESS_START;
+}
 //
 // load the elf, and construct a "process" (with only a trapframe).
 // load_bincode_from_host_elf is defined in elf.c
@@ -43,18 +56,13 @@ void load_user_program(process *proc) {
   memset(proc->trapframe, 0, sizeof(trapframe));
   proc->pagetable = (pagetable_t)alloc_page();
   memset((void *)proc->pagetable, 0, PGSIZE);
-
   // 内核栈是自上而下增长的，所以说起始位置是页的高地址（左闭右开）
   proc->kstack = (uint64)alloc_page() + PGSIZE;
   uint64 user_stack_bottom = (uint64)alloc_page();
 
-
-  user_heap_init(proc);
-
-
   // USER_STACK_TOP = 0x7ffff000, defined in kernel/memlayout.h
   proc->trapframe->regs.sp = USER_STACK_TOP;  //virtual address of user stack top
-
+  user_heap_init(proc);
   sprint("user frame 0x%lx, user stack 0x%lx, user kstack 0x%lx \n", proc->trapframe,
          proc->trapframe->regs.sp, proc->kstack);
 
@@ -74,6 +82,7 @@ void load_user_program(process *proc) {
   // 这样才能让软中断成功跳转到正确的中断入口向量地址。
   user_vm_map((pagetable_t)proc->pagetable, (uint64)trap_sec_start, PGSIZE, (uint64)trap_sec_start,
          prot_to_type(PROT_READ | PROT_EXEC, 0));
+  
 }
 
 //

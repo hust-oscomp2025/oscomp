@@ -2,6 +2,7 @@
 #define _PROC_H_
 
 #include "riscv.h"
+#include "vmm.h"
 
 typedef struct trapframe_t {
   // space to store context (all common registers)
@@ -48,7 +49,7 @@ typedef struct process_t {
   // user stack bottom. added @lab2_challenge1
   uint64 user_stack_bottom;
 
-  heap_block* heap;
+  void* heap;
   size_t heap_size;
 
 }process;

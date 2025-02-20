@@ -212,18 +212,7 @@ void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free) {
 // 计算用户请求的内存大小，跳过堆元数据部分
 #define USER_MEM_SIZE(size) ((size) + sizeof(heap_block))
 
-void user_heap_init(process* proc){
-  proc->heap = (heap_block* )USER_FREE_ADDRESS_START;
-  user_vm_map(proc->pagetable, proc->heap, PGSIZE,alloc_page(),prot_to_type(PROT_WRITE | PROT_READ, 1));
-  proc->heap_size = PGSIZE;
-  // 初始化堆内存块
-  heap_block* initial_block = proc->heap;
-  initial_block->size = proc->heap_size - sizeof(heap_block);  // 第一个块的大小是堆总大小减去元数据
-  initial_block->prev = NULL;
-  initial_block->next = NULL;
-  initial_block->free = 1;  // 初始块是空闲的
 
-}
 
 
 
@@ -234,35 +223,41 @@ void* malloc(size_t size) {
         return NULL;
     }
 
-    heap_block* current_heapblock = current->heap;
+    heap_block* iterator = (heap_block*)current->heap;
     // 遍历空闲链表，查找足够大的空闲块
-    while (current_heapblock != NULL) {
+    while (iterator != NULL) {
         // 如果当前块足够大
-        if (current_heapblock->free && current_heapblock->size >= USER_MEM_SIZE(size)) {
+        // 这里出了问题。
+        heap_block* pa_iterator =  user_va_to_pa(current->pagetable,iterator);
+        if (pa_iterator->free && pa_iterator->size >= USER_MEM_SIZE(size)) {
             // 如果当前块大于请求的大小，拆分
-            if (current_heapblock->size > USER_MEM_SIZE(size) + sizeof(heap_block)) {
+            if (pa_iterator->size > USER_MEM_SIZE(size) + sizeof(heap_block)) {
                 // 创建一个新的空闲块，放在当前块的后面
-                heap_block* new_block = (heap_block*)((uintptr_t)current_heapblock + USER_MEM_SIZE(size));
-                new_block->size = current_heapblock->size - USER_MEM_SIZE(size);
-                new_block->free = 1;
-                new_block->next = current_heapblock->next;
-                new_block->prev = current_heapblock;
+                heap_block* new_block = (heap_block*)ALIGN((uintptr_t)iterator + USER_MEM_SIZE(size), 8);
+                // 这里出了问题，我们在分配地址时，需要考虑到用户请求的地址大小是不对齐的，需要进行对齐的向上取整。
+                heap_block* pa_newblock =  user_va_to_pa(current->pagetable,new_block);
+                pa_newblock->size = pa_iterator->size - USER_MEM_SIZE(size);
+                pa_newblock->free = 1;
+                pa_newblock->next = pa_iterator->next;
+                pa_newblock->prev = pa_iterator;
 
-                if (current_heapblock->next != NULL) {
-                    current_heapblock->next->prev = new_block;
+                if (pa_iterator->next != NULL) {
+                  heap_block* iterator_next = (heap_block*)pa_iterator->next;
+                  heap_block* pa_iterator_next = user_va_to_pa(current->pagetable,iterator_next);
+                    pa_iterator_next->prev = new_block;
                 }
 
-                current_heapblock->next = new_block;
-                current_heapblock->size = USER_MEM_SIZE(size);
+                pa_iterator->next = new_block;
+                pa_iterator->size = USER_MEM_SIZE(size);
             }
 
             // 标记当前块为已分配
-            current_heapblock->free = 0;
+            pa_iterator->free = 0;
 
             // 返回用户的内存地址（跳过 heap_block 部分）
-            return (void*)((uintptr_t)current_heapblock + sizeof(heap_block));
+            return (void*)((uintptr_t)iterator + sizeof(heap_block));
         }
-        current_heapblock = current_heapblock->next;
+        iterator = pa_iterator->next;
     }
 
     // 如果没有找到合适的块，返回 NULL（表示堆内存不足）
@@ -277,38 +272,43 @@ void free(void* ptr) {
 
     // 获取指向 heap_block 的指针，跳过用户数据区域
     heap_block* block = (heap_block*)((uintptr_t)ptr - sizeof(heap_block));
-
+    heap_block* pa_block = user_va_to_pa(current->pagetable,block);
     // 如果该块已经是空闲的，说明已经释放过了，直接返回
-    if (block->free) {
+    if (pa_block->free) {
         return;
     }
 
     // 标记为已释放
-    block->free = 1;
+    pa_block->free = 1;
 
+    heap_block* block_prev = pa_block->prev;
+    heap_block* pa_block_prev = user_va_to_pa(current->pagetable,block_prev);          
+    heap_block* block_next = pa_block->next;
+    heap_block* pa_block_next = user_va_to_pa(current->pagetable,block_next);
     // 合并前面的空闲块
-    if (block->prev != NULL && block->prev->free) {
+    if (block_prev != NULL && pa_block_prev->free) {
         // 合并前一个空闲块
-        block->prev->size += block->size;
-        block->prev->next = block->next;
-        if (block->next != NULL) {
-            block->next->prev = block->prev;
+        pa_block_prev->size += pa_block->size;
+        pa_block_prev->next = pa_block->next;
+        if (pa_block->next != NULL) {
+
+            pa_block_next->prev = pa_block->prev;
         }
-        block = block->prev;  // 更新块指针，合并后变成前一个块
+        block = pa_block->prev;  // 更新块指针，合并后变成前一个块
     }
 
     // 合并后面的空闲块
-    if (block->next != NULL && block->next->free) {
+    if (block_next != NULL && pa_block_next->free) {
         // 合并后一个空闲块
-        block->size += block->next->size;
-        block->next = block->next->next;
-        if (block->next != NULL) {
-            block->next->prev = block;
+        pa_block->size += pa_block_next->size;
+        pa_block->next = pa_block_next->next;
+        if (block_next != NULL) {
+            pa_block_next->prev = block;
         }
     }
 
     // 如果合并后是链表的头部或尾部，我们可能需要重新设置堆的头指针
-    if (block->prev == NULL) {
+    if (block_prev == NULL) {
         current->heap = block;  // 更新堆的头部
     }
 }

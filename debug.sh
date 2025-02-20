@@ -10,8 +10,15 @@ pkill cpptools-srv -9
 source ./compile.sh
 # 设置变量
 PKE="./obj/riscv-pke"
-USER_PROGRAM="./obj/app_print_backtrace"
-PROGRAM="$PKE $USER_PROGRAM"
+# 读取 Makefile 中的 USER_TARGET 变量
+USER_TARGET=$(make -f Makefile -s -C . print_user_target)
+
+# 检查 USER_TARGET 是否为空
+if [ -z "$USER_TARGET" ]; then
+    echo "Error: USER_TARGET is not defined in Makefile"
+    exit 1
+fi
+PROGRAM="$PKE $USER_TARGET"
 SPIKE_PORT="9824"
 OPENOCD_CFG="spike.cfg"
 GDB_CMD="riscv64-unknown-elf-gdb"
@@ -34,7 +41,7 @@ sleep 2
 # 3. 启动 GDB，连接到目标远程调试
 echo "Starting GDB and connecting to $TARGET_REMOTE..."
 riscv64-unknown-elf-gdb -ex "target extended-remote $TARGET_REMOTE" \
-                        -ex "b sys_user_print_backtrace" \
+                        -ex "b malloc" \
                         -ex "c " \
                         $PROGRAM
                         

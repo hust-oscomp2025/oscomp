@@ -129,5 +129,5 @@ void* better_malloc(int n) {
 // lib call to better_free
 //
 void better_free(void* va) {
-  do_user_call(SYS_user_free_page, (uint64)va, 0, 0, 0, 0, 0, 0);
+  do_user_call(SYS_user_free, (uint64)va, 0, 0, 0, 0, 0, 0);
 }
