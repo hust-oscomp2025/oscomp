@@ -31,4 +31,14 @@ void *user_va_to_pa(pagetable_t page_dir, void *va);
 void user_vm_map(pagetable_t page_dir, uint64 va, uint64 size, uint64 pa, int perm);
 void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free);
 
+
+
+// 堆内存管理
+typedef struct heap_block_t {
+    size_t size;                  // 堆块大小（包含元数据）
+    heap_block* prev;      // 前一个空闲块指针
+    heap_block* next;      // 后一个空闲块指针
+    int free;                     // 标志位，表示是否为空闲块
+} heap_block;
+
 #endif

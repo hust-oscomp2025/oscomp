@@ -16,6 +16,7 @@ typedef struct trapframe_t {
 
   // kernel page table. added @lab2_1
   /* offset:272 */ uint64 kernel_satp;
+
 }trapframe;
 
 // code file struct, including directory index and file name char pointer
@@ -43,6 +44,13 @@ typedef struct process_t {
   code_file *file;
   addr_line *line;
   int line_count;
+
+  // user stack bottom. added @lab2_challenge1
+  uint64 user_stack_bottom;
+
+  heap_block* heap;
+  size_t heap_size;
+
 }process;
 
 // switch to run user app

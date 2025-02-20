@@ -58,7 +58,8 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
   sprint("handle_page_fault: %lx\n", stval);
   switch (mcause) {
   case CAUSE_STORE_PAGE_FAULT:
-    if (stval < USER_STACK_TOP) {
+    if (stval >= current->user_stack_bottom - PGSIZE) {
+      current->user_stack_bottom -= PGSIZE;
       // 有新增的栈请求
       // 同时需要大于用户栈的栈底（未实现）
       void *pa = alloc_page();
@@ -69,6 +70,8 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
       // 如果这里不做ROUNDDOWN，会导致对于一个非对齐的地址，最终map_pages分配两个页，在之后的分配中就会出现问题。
       user_vm_map((pagetable_t)current->pagetable, ROUNDDOWN(stval, PGSIZE),
                   PGSIZE, (uint64)pa, prot_to_type(PROT_WRITE | PROT_READ, 1));
+    }else{
+      panic("this address is not available!");
     }
 
     break;

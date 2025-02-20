@@ -48,6 +48,10 @@ void load_user_program(process *proc) {
   proc->kstack = (uint64)alloc_page() + PGSIZE;
   uint64 user_stack_bottom = (uint64)alloc_page();
 
+
+  user_heap_init(proc);
+
+
   // USER_STACK_TOP = 0x7ffff000, defined in kernel/memlayout.h
   proc->trapframe->regs.sp = USER_STACK_TOP;  //virtual address of user stack top
 
@@ -59,6 +63,7 @@ void load_user_program(process *proc) {
   // 为用户栈创建地址映射
   user_vm_map((pagetable_t)proc->pagetable, USER_STACK_TOP - PGSIZE, PGSIZE, user_stack_bottom,
               prot_to_type(PROT_WRITE | PROT_READ, 1));
+  proc->user_stack_bottom = USER_STACK_TOP - PGSIZE;
 
   // 为中断上下文创建地址映射
   user_vm_map((pagetable_t)proc->pagetable, (uint64)proc->trapframe, PGSIZE, (uint64)proc->trapframe,
