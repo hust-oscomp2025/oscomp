@@ -22,7 +22,7 @@ extern char smode_trap_vector[];
 extern void return_to_user(trapframe *, uint64 satp);
 
 // current points to the currently running user-mode application.
-process* current = NULL;
+process* current[2];
 
 // points to the first free page in our simple heap. added @lab2_2
 uint64 g_ufree_page = USER_FREE_ADDRESS_START;
@@ -31,8 +31,10 @@ uint64 g_ufree_page = USER_FREE_ADDRESS_START;
 // switch to a user-mode process
 //
 void switch_to(process* proc) {
+  int hartid = read_tp();
+  
   assert(proc);
-  current = proc;
+  current[hartid] = proc;
   write_csr(stvec, (uint64)smode_trap_vector);
 
   // set up trapframe values (in process structure) that smode_trap_vector will

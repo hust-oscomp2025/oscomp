@@ -218,24 +218,25 @@ void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free) {
 
 // 目前只服务大小小于一个页的内存请求
 void* malloc(size_t size) {
+  int hartid = read_tp();
     // 如果请求的大小为 0，直接返回 NULL
     if (size == 0) {
         return NULL;
     }
 
-    heap_block* iterator = (heap_block*)current->heap;
+    heap_block* iterator = (heap_block*)current[hartid]->heap;
     // 遍历空闲链表，查找足够大的空闲块
     while (iterator != NULL) {
         // 如果当前块足够大
         // 这里出了问题。
-        heap_block* pa_iterator =  user_va_to_pa(current->pagetable,iterator);
+        heap_block* pa_iterator =  user_va_to_pa(current[hartid]->pagetable,iterator);
         if (pa_iterator->free && pa_iterator->size >= USER_MEM_SIZE(size)) {
             // 如果当前块大于请求的大小，拆分
             if (pa_iterator->size > USER_MEM_SIZE(size) + sizeof(heap_block)) {
                 // 创建一个新的空闲块，放在当前块的后面
                 heap_block* new_block = (heap_block*)ALIGN((uintptr_t)iterator + USER_MEM_SIZE(size), 8);
                 // 这里出了问题，我们在分配地址时，需要考虑到用户请求的地址大小是不对齐的，需要进行对齐的向上取整。
-                heap_block* pa_newblock =  user_va_to_pa(current->pagetable,new_block);
+                heap_block* pa_newblock =  user_va_to_pa(current[hartid]->pagetable,new_block);
                 pa_newblock->size = pa_iterator->size - USER_MEM_SIZE(size);
                 pa_newblock->free = 1;
                 pa_newblock->next = pa_iterator->next;
@@ -243,7 +244,7 @@ void* malloc(size_t size) {
 
                 if (pa_iterator->next != NULL) {
                   heap_block* iterator_next = (heap_block*)pa_iterator->next;
-                  heap_block* pa_iterator_next = user_va_to_pa(current->pagetable,iterator_next);
+                  heap_block* pa_iterator_next = user_va_to_pa(current[hartid]->pagetable,iterator_next);
                     pa_iterator_next->prev = new_block;
                 }
 
@@ -265,6 +266,7 @@ void* malloc(size_t size) {
 }
 
 void free(void* ptr) {
+  int hartid = read_tp();
     // 如果指针为 NULL，直接返回
     if (ptr == NULL) {
         return;
@@ -272,7 +274,7 @@ void free(void* ptr) {
 
     // 获取指向 heap_block 的指针，跳过用户数据区域
     heap_block* block = (heap_block*)((uintptr_t)ptr - sizeof(heap_block));
-    heap_block* pa_block = user_va_to_pa(current->pagetable,block);
+    heap_block* pa_block = user_va_to_pa(current[hartid]->pagetable,block);
     // 如果该块已经是空闲的，说明已经释放过了，直接返回
     if (pa_block->free) {
         return;
@@ -282,9 +284,9 @@ void free(void* ptr) {
     pa_block->free = 1;
 
     heap_block* block_prev = pa_block->prev;
-    heap_block* pa_block_prev = user_va_to_pa(current->pagetable,block_prev);          
+    heap_block* pa_block_prev = user_va_to_pa(current[hartid]->pagetable,block_prev);          
     heap_block* block_next = pa_block->next;
-    heap_block* pa_block_next = user_va_to_pa(current->pagetable,block_next);
+    heap_block* pa_block_next = user_va_to_pa(current[hartid]->pagetable,block_next);
     // 合并前面的空闲块
     if (block_prev != NULL && pa_block_prev->free) {
         // 合并前一个空闲块
@@ -309,6 +311,6 @@ void free(void* ptr) {
 
     // 如果合并后是链表的头部或尾部，我们可能需要重新设置堆的头指针
     if (block_prev == NULL) {
-        current->heap = block;  // 更新堆的头部
+        current[hartid]->heap = block;  // 更新堆的头部
     }
 }

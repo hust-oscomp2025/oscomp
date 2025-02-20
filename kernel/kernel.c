@@ -12,7 +12,7 @@
 #include "spike_interface/spike_utils.h"
 
 // process is a structure defined in kernel/process.h
-process user_app;
+process user_app[2];
 
 //
 // trap_sec_start points to the beginning of S-mode trap segment (i.e., the entry point of
@@ -49,6 +49,8 @@ void user_heap_init(process* proc){
 // load_bincode_from_host_elf is defined in elf.c
 //
 void load_user_program(process *proc) {
+  int hartid = read_tp();
+  if(NCPU > 1)sprint("hartid = %d: ",hartid);
   sprint("User application is loading.\n");
 
   // 为进程控制块的各个成员指针分配物理内存
@@ -62,6 +64,9 @@ void load_user_program(process *proc) {
 
   // USER_STACK_TOP = 0x7ffff000, defined in kernel/memlayout.h
   proc->trapframe->regs.sp = USER_STACK_TOP;  //virtual address of user stack top
+  proc->trapframe->regs.tp = hartid;
+
+
   user_heap_init(proc);
   sprint("user frame 0x%lx, user stack 0x%lx, user kstack 0x%lx \n", proc->trapframe,
          proc->trapframe->regs.sp, proc->kstack);
@@ -88,8 +93,11 @@ void load_user_program(process *proc) {
 //
 // s_start: S-mode entry point of riscv-pke OS kernel.
 //
+volatile static int sig = 1;
 int s_start(void) {
-  sprint("hartid = ?: Enter supervisor mode...\n");
+  int hartid = read_tp();
+  if(NCPU > 1)sprint("hartid = %d: ",hartid);
+  sprint("Enter supervisor mode...\n");
   // Note: we use direct (i.e., Bare mode) for memory mapping in lab1.
   // which means: Virtual Address = Physical Address
   // therefore, we need to set satp to be 0 for now. we will enable paging in lab2_x.
@@ -97,34 +105,30 @@ int s_start(void) {
   // write_csr is a macro defined in kernel/riscv.h
   write_csr(satp, 0);
 
-  // 初始化物理页资源表
-  //    确定核心占用的内存区域首尾 g_kernel_start, g_kernel_end
-  //    确定所有可用的物理页资源首尾 free_mem_start_addr, free_mem_end_addr
-  //    以此创建空闲物理页表 create_freepage_list(free_mem_start_addr, free_mem_end_addr);
-  //
-  // 空闲物理页资源表的数据结构
-  //    通过全局变量 static list_node g_free_mem_list; 管理所有空闲的物理页
-  //    list_node->next 指向下一个空闲的物理页基址，最后一个节点指向空指针。
-  //    释放物理页：在物理页开头创建链表节点，并插入物理页链表头部。
-  //    分配物理页：分配链表中第一个节点，并更新物理页链表。
-  pmm_init();
-
-  // 参见kernel.lds.
-  // 初始化内核空间的内存地址映射
-  //    将code and text segment映射为虚实地址相同的 读/执行权限页
-  //    将内核剩下的段映射为虚实地址相同 的读/写页
-  //    分配一个空闲页用作全局页目录 g_kernel_pagetable(指向对应的内存页地址)
-  kern_vm_init();
+  if(hartid == 0){
+    pmm_init();
+    kern_vm_init();
+    sig = 0;
+  }
+  while(sig){
+    //sprint("hartid = %d: ",hartid);
+    continue;
+  }
+  
+  //sync_barrier(&sync_counter, NCPU);
 
   //  写入satp寄存器并刷新tlb缓存
   //    从这里开始，所有内存访问都通过MMU进行虚实转换
   enable_paging();
 
+  if(NCPU > 1)sprint("hartid = %d: ",hartid);
   sprint("kernel page table is on \n");
-  load_user_program(&user_app);
+  
+  load_user_program(&(user_app[hartid]));
 
-  sprint("hartid = ?: Switch to user mode...\n");
+  if(NCPU > 1)sprint("hartid = %d: ",hartid);
+  sprint("Switch to user mode...\n");
   // switch_to() is defined in kernel/process.c
-  switch_to(&user_app);
+  switch_to(&(user_app[hartid]));
   return 0;
 }

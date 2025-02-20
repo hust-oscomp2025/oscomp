@@ -2,6 +2,7 @@
 #include "util/types.h"
 
 int main(void) {
+  //printu("!!!");
   printu(">>> app1 is expected to be executed by hart1\n");
   exit(0);
 }
