@@ -224,49 +224,52 @@ void user_heap_init(process* proc){
   initial_block->free = 1;  // 初始块是空闲的
 
 }
+
+
+
 // 目前只服务大小小于一个页的内存请求
-void* malloc(process* proc, size_t size) {
+void* malloc(size_t size) {
     // 如果请求的大小为 0，直接返回 NULL
     if (size == 0) {
         return NULL;
     }
 
-    heap_block* current = proc->heap;
+    heap_block* current_heapblock = current->heap;
     // 遍历空闲链表，查找足够大的空闲块
-    while (current != NULL) {
+    while (current_heapblock != NULL) {
         // 如果当前块足够大
-        if (current->free && current->size >= USER_MEM_SIZE(size)) {
+        if (current_heapblock->free && current_heapblock->size >= USER_MEM_SIZE(size)) {
             // 如果当前块大于请求的大小，拆分
-            if (current->size > USER_MEM_SIZE(size) + sizeof(heap_block)) {
+            if (current_heapblock->size > USER_MEM_SIZE(size) + sizeof(heap_block)) {
                 // 创建一个新的空闲块，放在当前块的后面
-                heap_block* new_block = (heap_block*)((uintptr_t)current + USER_MEM_SIZE(size));
-                new_block->size = current->size - USER_MEM_SIZE(size);
+                heap_block* new_block = (heap_block*)((uintptr_t)current_heapblock + USER_MEM_SIZE(size));
+                new_block->size = current_heapblock->size - USER_MEM_SIZE(size);
                 new_block->free = 1;
-                new_block->next = current->next;
-                new_block->prev = current;
+                new_block->next = current_heapblock->next;
+                new_block->prev = current_heapblock;
 
-                if (current->next != NULL) {
-                    current->next->prev = new_block;
+                if (current_heapblock->next != NULL) {
+                    current_heapblock->next->prev = new_block;
                 }
 
-                current->next = new_block;
-                current->size = USER_MEM_SIZE(size);
+                current_heapblock->next = new_block;
+                current_heapblock->size = USER_MEM_SIZE(size);
             }
 
             // 标记当前块为已分配
-            current->free = 0;
+            current_heapblock->free = 0;
 
             // 返回用户的内存地址（跳过 heap_block 部分）
-            return (void*)((uintptr_t)current + sizeof(heap_block));
+            return (void*)((uintptr_t)current_heapblock + sizeof(heap_block));
         }
-        current = current->next;
+        current_heapblock = current_heapblock->next;
     }
 
     // 如果没有找到合适的块，返回 NULL（表示堆内存不足）
     return NULL;
 }
 
-void free(process* proc, void* ptr) {
+void free(void* ptr) {
     // 如果指针为 NULL，直接返回
     if (ptr == NULL) {
         return;
@@ -306,6 +309,6 @@ void free(process* proc, void* ptr) {
 
     // 如果合并后是链表的头部或尾部，我们可能需要重新设置堆的头指针
     if (block->prev == NULL) {
-        proc->heap = block;  // 更新堆的头部
+        current->heap = block;  // 更新堆的头部
     }
 }

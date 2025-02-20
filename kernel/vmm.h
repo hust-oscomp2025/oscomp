@@ -32,6 +32,9 @@ void user_vm_map(pagetable_t page_dir, uint64 va, uint64 size, uint64 pa, int pe
 void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free);
 
 
+void user_heap_init(process* proc);
+void* malloc(size_t size);
+void free( void* ptr);
 
 // 堆内存管理
 typedef struct heap_block_t {

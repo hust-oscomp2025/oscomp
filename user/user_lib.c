@@ -122,7 +122,7 @@ int exit(int code) {
 // lib call to better_malloc
 //
 void* better_malloc(int n) {
-  return (void*)do_user_call(SYS_user_allocate_page, n, 0, 0, 0, 0, 0, 0);
+  return (void*)do_user_call(SYS_user_malloc, n, 0, 0, 0, 0, 0, 0);
 }
 
 //

@@ -42,21 +42,25 @@ ssize_t sys_user_exit(uint64 code) {
 //
 // maybe, the simplest implementation of malloc in the world ... added @lab2_2
 //
-uint64 sys_user_allocate_page() {
-  void *pa = alloc_page();
+uint64 sys_user_malloc(size_t size) {
+  /*
+    void *pa = alloc_page();
   uint64 va = g_ufree_page;
   g_ufree_page += PGSIZE;
   user_vm_map((pagetable_t)current->pagetable, va, PGSIZE, (uint64)pa,
               prot_to_type(PROT_WRITE | PROT_READ, 1));
 
   return va;
+  */
+  return (uint64)malloc(size);
 }
 
 //
 // reclaim a page, indicated by "va". added @lab2_2
 //
-uint64 sys_user_free_page(uint64 va) {
-  user_vm_unmap((pagetable_t)current->pagetable, va, PGSIZE, 1);
+uint64 sys_user_free(uint64 va) {
+  //user_vm_unmap((pagetable_t)current->pagetable, va, PGSIZE, 1);
+  free(va);
   return 0;
 }
 
@@ -94,10 +98,10 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
   case SYS_user_exit:
     return sys_user_exit(a1);
   // added @lab2_2
-  case SYS_user_allocate_page:
-    return sys_user_allocate_page();
-  case SYS_user_free_page:
-    return sys_user_free_page(a1);
+  case SYS_user_malloc:
+    return sys_user_malloc(a1);
+  case SYS_user_free:
+    return sys_user_free(a1);
   case SYS_user_print_backtrace:
     return sys_user_print_backtrace(a1);
   default:
