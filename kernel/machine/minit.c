@@ -106,7 +106,8 @@ void m_start(uintptr_t hartid, uintptr_t dtb) {
     spike_file_init();
     init_dtb(dtb);
   }
-  //sync_barrier(&counter, NCPU);
+  if(NCPU > 1)
+   sync_barrier(&counter, NCPU);
   // 这一个函数是用来同步不同核心的任务的。
   sprint("In m_start, hartid:%d\n", hartid);
   write_tp(hartid);

@@ -53,7 +53,8 @@ void free_page(void *pa) {
 //
 volatile static int counter = 1;
 void *alloc_page(void) {
-  sync_barrier(&counter,NCPU);
+  if(NCPU > 1)
+    sync_barrier(&counter,NCPU);
   list_node *n = g_free_mem_list.next;
   uint64 hartid = 0;
   if (vm_alloc_stage[hartid]) {
