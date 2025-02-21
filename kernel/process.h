@@ -57,9 +57,9 @@ typedef struct process_heap_manager {
   uint64 heap_bottom;
 
   // the address of free pages in the heap
-  uint64 free_pages_address[MAX_HEAP_PAGES];
+  // uint64 free_pages_address[MAX_HEAP_PAGES];
   // the number of free pages in the heap
-  uint32 free_pages_count;
+  // uint32 free_pages_count;
 }process_heap_manager;
 
 // code file struct, including directory index and file name char pointer
