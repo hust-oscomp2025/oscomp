@@ -6,16 +6,16 @@
 #include <stdint.h>
 
 #include "elf.h"
+#include "global.h"
 #include "pmm.h"
 #include "process.h"
+#include "sched.h"
 #include "spike_interface/spike_utils.h"
 #include "string.h"
 #include "syscall.h"
 #include "util/functions.h"
 #include "util/types.h"
 #include "vmm.h"
-#include "sched.h"
-#include "global.h"
 
 #include "sync_utils.h"
 
@@ -48,7 +48,7 @@ ssize_t sys_user_exit(uint64 code) {
   sprint("User exit with code:%d.\n", code);
 
   // reclaim the current process, and reschedule. added @lab3_1
-  free_process( current[hartid] );
+  free_process(current[hartid]);
   schedule();
 
   return 0;
@@ -58,15 +58,17 @@ ssize_t sys_user_exit(uint64 code) {
 uint64 sys_user_allocate_page() {
   void* pa = alloc_page();
   uint64 va;
-  // if there are previously reclaimed pages, use them first (this does not change the
+  // if there are previously reclaimed pages, use them first (this does not
+change the
   // size of the heap)
   if (current->user_heap.free_pages_count > 0) {
-    va =  current->user_heap.free_pages_address[--current->user_heap.free_pages_count];
+    va =
+current->user_heap.free_pages_address[--current->user_heap.free_pages_count];
     assert(va < current->user_heap.heap_top);
   } else {
-    // otherwise, allocate a new page (this increases the size of the heap by one page)
-    va = current->user_heap.heap_top;
-    current->user_heap.heap_top += PGSIZE;
+    // otherwise, allocate a new page (this increases the size of the heap by
+one page) va = current->user_heap.heap_top; current->user_heap.heap_top +=
+PGSIZE;
 
     current->mapped_info[HEAP_SEGMENT].npages++;
   }
@@ -89,8 +91,6 @@ uint64 sys_user_malloc(size_t size) {
   return (uint64)malloc(size);
 }
 
-
-
 //
 // reclaim a page, indicated by "va". added @lab2_2
 //
@@ -103,12 +103,10 @@ uint64 sys_user_free(uint64 va) {
 uint64 sys_user_free_page(uint64 va) {
   user_vm_unmap((pagetable_t)current->pagetable, va, PGSIZE, 1);
   // add the reclaimed page to the free page list
-  current->user_heap.free_pages_address[current->user_heap.free_pages_count++] = va;
-  return 0;
+  current->user_heap.free_pages_address[current->user_heap.free_pages_count++] =
+va; return 0;
 }
 */
-
-
 
 ssize_t sys_user_print_backtrace(uint64 depth) {
 
@@ -139,7 +137,36 @@ ssize_t sys_user_print_backtrace(uint64 depth) {
 ssize_t sys_user_fork() {
   int hartid = read_tp();
   sprint("User call fork.\n");
-  return do_fork( current[hartid] );
+  return do_fork(current[hartid]);
+}
+
+int sys_user_wait(int pid) {
+  int hartid = read_tp();
+  int child_found_flag = 0;
+  if (pid == -1) {
+    while (1) {
+      for (int i = 0; i < NPROC; i++) {
+        process *p = &procs[i];
+        if (p->parent == current[hartid] && p->status == ZOMBIE) {
+          p->status = FREE;
+          return p->pid;
+        }
+      }
+    }
+  }
+  if(0 < pid && pid < NPROC){
+    process *p = &procs[pid];
+    if(p->parent != current[hartid]){
+      return -1;
+    }else{
+      while(p->status != ZOMBIE){
+        continue;
+      }
+      p->status = FREE;
+      return pid;
+    }
+  }
+  return -1;
 }
 
 //
@@ -148,9 +175,9 @@ ssize_t sys_user_fork() {
 ssize_t sys_user_yield() {
   // TODO (lab3_2): implment the syscall of yield.
   // hint: the functionality of yield is to give up the processor. therefore,
-  // we should set the status of currently running process to READY, insert it in
-  // the rear of ready queue, and finally, schedule a READY process to run.
-  //panic( "You need to implement the yield syscall in lab3_2.\n" );
+  // we should set the status of currently running process to READY, insert it
+  // in the rear of ready queue, and finally, schedule a READY process to run.
+  // panic( "You need to implement the yield syscall in lab3_2.\n" );
   int hartid = read_tp();
   current[hartid]->status = READY;
   insert_to_ready_queue(current[hartid]);
@@ -177,10 +204,12 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
   case SYS_user_print_backtrace:
     return sys_user_print_backtrace(a1);
   case SYS_user_fork:
-      return sys_user_fork();
-    case SYS_user_yield:
-      return sys_user_yield();
-    default:
-      panic("Unknown syscall %ld \n", a0);
+    return sys_user_fork();
+  case SYS_user_yield:
+    return sys_user_yield();
+  case SYS_user_wait:
+    return sys_user_wait(a1);
+  default:
+    panic("Unknown syscall %ld \n", a0);
   }
 }

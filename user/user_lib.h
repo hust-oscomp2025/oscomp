@@ -13,3 +13,4 @@ void naive_free(void* va);
 void* naive_malloc();
 int fork();
 void yield();
+void wait(int pid);
