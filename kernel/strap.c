@@ -48,6 +48,9 @@ void handle_mtimer_trap() {
   // bit in sip. panic( "lab1_3: increase g_ticks by one, and clear SIP field in
   // sip register.\n" );
   g_ticks++;
+  int hartid = read_tp();
+  current[hartid]->tick_count++;
+
   write_csr(sip, read_csr(sip) & ~SIP_SSIP);
 }
 
@@ -88,21 +91,14 @@ void rrsched() {
   // hint: increase the tick_count member of current process by one, if it is bigger than
   // TIME_SLICE_LEN (means it has consumed its time slice), change its status into READY,
   // place it in the rear of ready queue, and finally schedule next process to run.
-  panic( "You need to further implement the timer handling in lab3_3.\n" );
-
+  //panic( "You need to further implement the timer handling in lab3_3.\n" );
+  int hartid = read_tp();
+  if(current[hartid]->tick_count >= TIME_SLICE_LEN){
+    current[hartid]->tick_count = 0;
+    sys_user_yield();
+  }
 }
 
-//
-// implements round-robin scheduling. added @lab3_3
-//
-void rrsched() {
-  // TODO (lab3_3): implements round-robin scheduling.
-  // hint: increase the tick_count member of current process by one, if it is bigger than
-  // TIME_SLICE_LEN (means it has consumed its time slice), change its status into READY,
-  // place it in the rear of ready queue, and finally schedule next process to run.
-  panic( "You need to further implement the timer handling in lab3_3.\n" );
-
-}
 
 //
 // kernel/smode_trap.S will pass control to smode_trap_handler, when a trap happens in S-mode.
