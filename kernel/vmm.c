@@ -3,6 +3,7 @@
  */
 
 #include "vmm.h"
+#include "global.h"
 #include "memlayout.h"
 #include "pmm.h"
 #include "process.h"
@@ -25,10 +26,15 @@ int map_pages(pagetable_t page_dir, uint64 va, uint64 size, uint64 pa,
 
   for (first = ROUNDDOWN(va, PGSIZE), last = ROUNDDOWN(va + size - 1, PGSIZE);
        first <= last; first += PGSIZE, pa += PGSIZE) {
+    // sprint("first=0x%lx\n",first);
     if ((pte = page_walk(page_dir, first, 1)) == 0)
       return -1;
-    if (*pte & PTE_V)
+    // sprint("first=0x%lx\n",first);
+    if (*pte & PTE_V) {
+      // sprint("first=0x%lx\n",first);
       panic("map_pages fails on mapping va (0x%lx) to pa (0x%lx)", first, pa);
+    }
+
     *pte = PA2PTE(pa) | perm | PTE_V;
   }
   return 0;
@@ -138,11 +144,8 @@ void kern_vm_init(void) {
   // pagetable_t is defined in kernel/riscv.h. it's actually uint64*
   pagetable_t t_page_dir;
 
-  // allocate a page (t_page_dir) to be the page directory for kernel.
-  // alloc_page is defined in kernel/pmm.c
-  t_page_dir = (pagetable_t)alloc_page();
-  // memset is defined in util/string.c
-  memset(t_page_dir, 0, PGSIZE);
+
+  t_page_dir = (pagetable_t)Alloc_page();
 
   // map virtual address [KERN_BASE, _etext] to physical address [DRAM_BASE,
   // DRAM_BASE+(_etext - KERN_BASE)], to maintain (direct) text section kernel
@@ -231,78 +234,90 @@ void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free) {
 // 计算用户请求的内存大小，跳过堆元数据部分
 #define USER_MEM_SIZE(size) ((size) + sizeof(heap_block))
 
+void heap_init(process *ps) {
+  heap_block *first_block = (heap_block *)Alloc_page();
+  first_block->size = PGSIZE - sizeof(heap_block);
+  first_block->prev = NULL;
+  first_block->next = NULL;
+  first_block->free = 1; // 初始块是空闲的
+  user_vm_map(ps->pagetable, ps->user_heap.heap_bottom, PGSIZE,
+              (uint64)first_block, prot_to_type(PROT_WRITE | PROT_READ, 1));
+  ps->user_heap.heap_top += PGSIZE;
+  ps->mapped_info[HEAP_SEGMENT].npages++;
+}
+
 // 目前只服务大小小于一个页的内存请求
 void *malloc(size_t size) {
   if (size == 0)
     return NULL;
   int hartid = read_tp();
+  process *ps = current[hartid];
+  if (ps->user_heap.heap_top == ps->user_heap.heap_bottom) {
+    heap_init(ps);
+  }
 
   int required_size = ALIGN(size + sizeof(heap_block), 8);
-  heap_block *iterator = (heap_block *)current[hartid]->heap;
-  // 遍历空闲链表，查找足够大的空闲块
-  while (iterator != NULL) {
-    // 如果当前块足够大
-    heap_block *pa_iterator =
-        user_va_to_pa(current[hartid]->pagetable, iterator);
-    //sprint("pa_iterator->free=0x%x,pa_iterator->size=0x%x\n",pa_iterator->free,pa_iterator->size);
-    if (pa_iterator->free && pa_iterator->size >= required_size) {
-      // 如果当前块大于请求的大小，拆分
-      if (pa_iterator->size > USER_MEM_SIZE(size) + sizeof(heap_block)) {
-        // 创建一个新的空闲块，放在当前块的后面
-        heap_block *new_block =
-            (heap_block *)((uintptr_t)iterator + required_size);
-        // 这里出了问题，我们在分配地址时，需要考虑到用户请求的地址大小是不对齐的，需要进行对齐的向上取整。
-        heap_block *pa_newblock =
-            user_va_to_pa(current[hartid]->pagetable, new_block);
-        pa_newblock->size = pa_iterator->size - required_size;
-        pa_newblock->free = 1;
-        pa_newblock->next = pa_iterator->next;
-        pa_newblock->prev = pa_iterator;
-
-        if (pa_iterator->next != NULL) {
-          heap_block *iterator_next = (heap_block *)pa_iterator->next;
-          heap_block *pa_iterator_next =
-              user_va_to_pa(current[hartid]->pagetable, iterator_next);
-          pa_iterator_next->prev = new_block;
-        }
-
-        pa_iterator->next = new_block;
-        pa_iterator->size = required_size;
-      }
-
-      // 标记当前块为已分配
-      pa_iterator->free = 0;
-
-      // 返回用户的内存地址（跳过 heap_block 部分）
-      return (void *)((uintptr_t)iterator + sizeof(heap_block));
-    }
-    if(pa_iterator->next == NULL){
-      //遍历到了最后一个节点，仍然没有找到可用的块
-      //新分配一个够大的块
-      int n_pages = (required_size >> 12) + 1;
-      void* va = (void*)(((uint64)iterator >> 12) << 12) + PGSIZE;
-      //sprint("va=0x%x\n",va);
-      //sprint("malloc returning null\n");
-      for(uint64 i = 0;i < n_pages;i ++){
-        void* paa = alloc_page();
-        //sprint("paa=0x%x\n",paa);
-        user_vm_map(current[hartid]->pagetable,(uint64)va + i*PGSIZE,PGSIZE,(uint64)paa,prot_to_type(PROT_READ | PROT_WRITE, 1));
-      }
-      //sprint("BBBBB\n");
-      heap_block* pa = user_va_to_pa(current[hartid]->pagetable,va);
-      //sprint("pa=0x%x\n",pa);
-      pa->next = pa_iterator->next;
-      pa->size = PGSIZE * n_pages;
-      pa->prev = iterator;
-      pa->free = 1;
-      pa_iterator->next = va;
-      
-      continue;
-      
-    }
-    iterator = pa_iterator->next;
+  heap_block *current_block = (heap_block *)ps->user_heap.heap_bottom;
+  heap_block *pa_current_block = user_va_to_pa(ps->pagetable, current_block);
+  if(required_size >= PGSIZE){
+    goto heap_alloc;
   }
-  
+  // 遍历空闲链表，查找足够大的空闲块
+  while (current_block != NULL) {
+    
+    /*可以分配*/
+    if (pa_current_block->free && pa_current_block->size >= required_size) {
+      /*可以分割*/
+      if (pa_current_block->size > required_size + sizeof(heap_block)) {
+        pa_current_block->size = required_size;
+        heap_block *new_block =
+            (heap_block *)((uintptr_t)current_block + required_size);
+        heap_block *pa_newblock = user_va_to_pa(ps->pagetable, new_block);
+        pa_newblock->size =
+            pa_current_block->size - required_size - sizeof(heap_block);
+        pa_newblock->free = 1;
+
+        pa_current_block->next = new_block;
+        pa_newblock->prev = current_block;
+
+        pa_newblock->next = pa_current_block->next;
+        if (pa_current_block->next != NULL) {
+          heap_block *next_block = (heap_block *)pa_current_block->next;
+          heap_block *pa_next_block = user_va_to_pa(ps->pagetable, next_block);
+          pa_next_block->prev = new_block;
+        }
+      }
+      pa_current_block->free = 0;
+      return (void *)((uintptr_t)current_block + sizeof(heap_block));
+    }
+    if (pa_current_block->next == NULL) {
+heap_alloc:
+      // 遍历到了最后一个节点，仍然没有找到可用的块
+      // 新分配一个够大的块，然后再做切割
+      int n_pages = (required_size >> 12) + 1;
+      uint64 va = ps->user_heap.heap_top;
+      //void *va = (void *)(((uint64)current_block >> 12) << 12) + PGSIZE;
+      for (uint64 i = 0; i < n_pages; i++) {
+        user_vm_map(ps->pagetable, va + i * PGSIZE, PGSIZE, (uint64)Alloc_page(),
+                    prot_to_type(PROT_READ | PROT_WRITE, 1));
+      }
+      ps->user_heap.heap_top += n_pages * PGSIZE;
+      ps->mapped_info[HEAP_SEGMENT].npages += n_pages;
+
+      heap_block *pa = user_va_to_pa(ps->pagetable, (void*)va);
+      pa->next = NULL;
+      pa->size = PGSIZE * n_pages - sizeof(heap_block);
+      pa->prev = current_block;
+      pa->free = 1;
+      pa_current_block->next = (heap_block*)va;
+
+      current_block = (heap_block*)va;
+      continue;
+    }
+    current_block = pa_current_block->next;
+    pa_current_block = user_va_to_pa(ps->pagetable, current_block);
+  }
+
   // 如果没有找到合适的块，返回 NULL（表示堆内存不足）
   return NULL;
 }
@@ -353,26 +368,38 @@ void free(void *ptr) {
     }
   }
 
-  // 如果合并后是链表的头部或尾部，我们可能需要重新设置堆的头指针
-  if (block_prev == NULL) {
-    current[hartid]->heap = block; // 更新堆的头部
-  }
+  // 合并会自动设置好堆的头指针，所以不需要做更多工作。
+  // if (block_prev == NULL) {
+  //  current[hartid]->heap = block; // 更新堆的头部
+  //}
 }
 
 //
 // debug function, print the vm space of a process. added @lab3_1
 //
-void print_proc_vmspace(process* proc) {
-  sprint( "======\tbelow is the vm space of process%d\t========\n", proc->pid );
-  for( int i=0; i<proc->total_mapped_region; i++ ){
-    sprint( "-va:%lx, npage:%d, ", proc->mapped_info[i].va, proc->mapped_info[i].npages);
-    switch(proc->mapped_info[i].seg_type){
-      case CODE_SEGMENT: sprint( "type: CODE SEGMENT" ); break;
-      case DATA_SEGMENT: sprint( "type: DATA SEGMENT" ); break;
-      case STACK_SEGMENT: sprint( "type: STACK SEGMENT" ); break;
-      case CONTEXT_SEGMENT: sprint( "type: TRAPFRAME SEGMENT" ); break;
-      case SYSTEM_SEGMENT: sprint( "type: USER KERNEL STACK SEGMENT" ); break;
+void print_proc_vmspace(process *proc) {
+  sprint("======\tbelow is the vm space of process%d\t========\n", proc->pid);
+  for (int i = 0; i < proc->total_mapped_region; i++) {
+    sprint("-va:%lx, npage:%d, ", proc->mapped_info[i].va,
+           proc->mapped_info[i].npages);
+    switch (proc->mapped_info[i].seg_type) {
+    case CODE_SEGMENT:
+      sprint("type: CODE SEGMENT");
+      break;
+    case DATA_SEGMENT:
+      sprint("type: DATA SEGMENT");
+      break;
+    case STACK_SEGMENT:
+      sprint("type: STACK SEGMENT");
+      break;
+    case CONTEXT_SEGMENT:
+      sprint("type: TRAPFRAME SEGMENT");
+      break;
+    case SYSTEM_SEGMENT:
+      sprint("type: USER KERNEL STACK SEGMENT");
+      break;
     }
-    sprint( ", mapped to pa:%lx\n", lookup_pa(proc->pagetable, proc->mapped_info[i].va) );
+    sprint(", mapped to pa:%lx\n",
+           lookup_pa(proc->pagetable, proc->mapped_info[i].va));
   }
 }

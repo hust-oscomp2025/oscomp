@@ -15,6 +15,7 @@
 #include "util/types.h"
 #include "vmm.h"
 #include "sched.h"
+#include "global.h"
 
 #include "sync_utils.h"
 
@@ -47,19 +48,8 @@ ssize_t sys_user_exit(uint64 code) {
   sprint("User exit with code:%d.\n", code);
 
   // reclaim the current process, and reschedule. added @lab3_1
-  free_process( current );
+  free_process( current[hartid] );
   schedule();
-  /*
-  if(NCPU > 1)
-    sync_barrier(&counter,NCPU);
-  
-  if (hartid == 0) {
-    if (NCPU > 1)
-      sprint("hartid = %d: ", hartid);
-    sprint("shutdown with code:%d.\n", code);
-    shutdown(code);
-  }
-  */
 
   return 0;
 }
@@ -116,8 +106,44 @@ uint64 sys_user_free_page(uint64 va) {
   current->user_heap.free_pages_address[current->user_heap.free_pages_count++] = va;
   return 0;
 }
-
 */
+
+
+
+ssize_t sys_user_print_backtrace(uint64 depth) {
+
+  if (depth <= 0)
+    return 0;
+  int hartid = read_tp();
+  trapframe *tf = current[hartid]->trapframe;
+  uint64 temp_fp = tf->regs.s0;
+  uint64 temp_pc = tf->epc;
+
+  temp_fp = *(uint64 *)user_va_to_pa((pagetable_t)(current[hartid]->pagetable),
+                                     (void *)temp_fp - 16);
+  for (int i = 1; i <= depth; i++) {
+    temp_pc = *(uint64 *)user_va_to_pa(
+        (pagetable_t)(current[hartid]->pagetable), (void *)temp_fp - 8);
+    char *function_name = locate_function_name(temp_pc);
+    sprint("%s\n", function_name);
+    if (strcmp(function_name, "main") == 0) {
+      return i;
+    } else {
+      temp_fp = *(uint64 *)user_va_to_pa(
+          (pagetable_t)(current[hartid]->pagetable), (void *)temp_fp - 16);
+    }
+  }
+  return depth;
+}
+
+ssize_t sys_user_fork() {
+  int hartid = read_tp();
+  sprint("User call fork.\n");
+  return do_fork( current[hartid] );
+}
+
+
+
 //
 // [a0]: the syscall number; [a1] ... [a7]: arguments to the syscalls.
 // returns the code of success, (e.g., 0 means success, fail for otherwise)

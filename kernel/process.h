@@ -2,7 +2,6 @@
 #define _PROC_H_
 
 #include "riscv.h"
-#include "vmm.h"
 
 typedef struct trapframe_t {
   // space to store context (all common registers)
@@ -92,17 +91,17 @@ typedef struct process_t {
   // user stack bottom. added @lab2_challenge1
   uint64 user_stack_bottom;
 
-  void* heap;
+  //heap_block* heap;
   // size_t heap_size;
 
 
   // points to a page that contains mapped_regions. below are added @lab3_1
-  // mapped_region *mapped_info;
+  mapped_region *mapped_info;
   // next free mapped region in mapped_info
-  // int total_mapped_region;
+  int total_mapped_region;
 
   // heap management
- // process_heap_manager user_heap;
+  process_heap_manager user_heap;
 
   // process id
   uint64 pid;
@@ -127,6 +126,6 @@ int free_process( process* proc );
 int do_fork(process* parent);
 
 // current running process
-extern process* current[NCPU];
+// extern process* current[NCPU];
 
 #endif

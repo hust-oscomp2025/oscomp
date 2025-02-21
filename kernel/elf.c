@@ -1,65 +1,88 @@
 /*
- * routines that scan and load a (host) Executable and Linkable Format (ELF) file
- * into the (emulated) memory.
+ * routines that scan and load a (host) Executable and Linkable Format (ELF)
+ * file into the (emulated) memory.
  */
 
 #include "elf.h"
-#include "string.h"
-#include "riscv.h"
-#include "vmm.h"
 #include "pmm.h"
+#include "riscv.h"
 #include "spike_interface/spike_utils.h"
+#include "string.h"
+#include "vmm.h"
 
-typedef struct elf_info_t
-{
+typedef struct elf_info_t {
   spike_file_t *f;
   process *p;
 } elf_info;
 
-static void *elf_alloc_mb(elf_ctx *ctx, uint64 elf_pa, uint64 elf_va, uint64 size) {
-  elf_info *msg = (elf_info *)ctx->info;
-
-  // 计算需要多少页
-  uint64 num_pages = (size + PGSIZE - 1) / PGSIZE; // 向上取整
-  void *first_pa = NULL;
-
-  for (uint64 i = 0; i < num_pages; i++)
-  {
-    void *pa = alloc_page();
-    if (pa == 0)
-      panic("uvmalloc mem alloc failed\n");
-
-    memset((void *)pa, 0, PGSIZE);
-
-    // 记录第一个分配的物理页
-    if (i == 0)
-      first_pa = pa;
-
-    // 映射虚拟地址到物理地址
-    user_vm_map((pagetable_t)msg->p->pagetable, elf_va + i * PGSIZE, PGSIZE, (uint64)pa,
-                prot_to_type(PROT_WRITE | PROT_READ | PROT_EXEC, 1));
-  }
-
-  return first_pa; // 返回第一个物理页的地址
-}
-
 //
 // actual file reading, using the spike file interface.
 //
-static uint64 elf_fpread(elf_ctx *ctx, void *dest, uint64 nb, uint64 offset)
-{
+static uint64 elf_fpread(elf_ctx *ctx, void *dest, uint64 nb, uint64 offset) {
   elf_info *msg = (elf_info *)ctx->info;
   // call spike file utility to load the content of elf file into memory.
-  // spike_file_pread will read the elf file (msg->f) from offset to memory (indicated by
-  // *dest) for nb bytes.
+  // spike_file_pread will read the elf file (msg->f) from offset to memory
+  // (indicated by *dest) for nb bytes.
   return spike_file_pread(msg->f, dest, nb, offset);
 }
+
+static void *elf_alloc_page(elf_ctx *ctx, uint64 elf_va) {
+  elf_info *msg = (elf_info *)ctx->info;
+  void *pa = Alloc_page();
+  user_vm_map((pagetable_t)msg->p->pagetable, elf_va, PGSIZE, (uint64)pa,
+              prot_to_type(PROT_WRITE | PROT_READ | PROT_EXEC, 1));
+  return pa;
+}
+
+elf_status elf_load_segment(elf_ctx *ctx, elf_prog_header *ph_addr) {
+  process *target_ps = ((elf_info *)ctx->info)->p;
+  size_t num_bytes = ph_addr->memsz;
+  uint64 num_pages = (ph_addr->memsz + PGSIZE - 1) / PGSIZE; // 向上取整
+  void *first_pa = NULL;
+  for (uint64 i = 0; i < num_pages; i++) {
+    void *pa = elf_alloc_page(ctx, ph_addr->vaddr + i * PGSIZE);
+    if (i == 0)
+      first_pa = pa;
+    // actual loading
+    size_t load_bytes;
+    if(i == num_pages - 1){
+      load_bytes = num_bytes % PGSIZE;
+    }else{
+      load_bytes = PGSIZE;
+    }
+    if (elf_fpread(ctx, pa, load_bytes, ph_addr->off + i * PGSIZE) != load_bytes)
+      return EL_EIO;
+  }
+  mapped_region* mapped_info_write = NULL;
+  for(int j = 0;j < PGSIZE/sizeof(mapped_region);j++){
+    if(target_ps->mapped_info[j].va == 0x0){
+      mapped_info_write = &(target_ps->mapped_info[j]);
+      mapped_info_write->va = ph_addr->vaddr;
+      mapped_info_write->npages = num_pages;
+      if(ph_addr->flags == (SEGMENT_READABLE | SEGMENT_EXECUTABLE)){
+        mapped_info_write->seg_type = CODE_SEGMENT;
+        sprint("CODE_SEGMENT added at mapped info offset:%d\n", j);
+      }else if(ph_addr->flags == (SEGMENT_READABLE | SEGMENT_WRITABLE)){
+        mapped_info_write->seg_type = DATA_SEGMENT;
+        sprint("DATA_SEGMENT added at mapped info offset:%d\n", j);
+      }else{
+        panic("unknown program segment encountered, segment flag:%d.\n",
+            ph_addr->flags);
+      }
+      target_ps->total_mapped_region++;
+      break;
+    }
+  }
+  return EL_OK;
+}
+
+
+
 
 //
 // init elf_ctx, a data structure that loads the elf.
 //
-elf_status elf_init(elf_ctx *ctx, void *info)
-{
+elf_status elf_init(elf_ctx *ctx, void *info) {
   ctx->info = info;
 
   // load the elf header
@@ -75,13 +98,11 @@ elf_status elf_init(elf_ctx *ctx, void *info)
 
 // leb128 (little-endian base 128) is a variable-length
 // compression algoritm in DWARF
-void read_uleb128(uint64 *out, char **off)
-{
+void read_uleb128(uint64 *out, char **off) {
   uint64 value = 0;
   int shift = 0;
   uint8 b;
-  for (;;)
-  {
+  for (;;) {
     b = *(uint8 *)(*off);
     (*off)++;
     value |= ((uint64)b & 0x7F) << shift;
@@ -92,13 +113,11 @@ void read_uleb128(uint64 *out, char **off)
   if (out)
     *out = value;
 }
-void read_sleb128(int64 *out, char **off)
-{
+void read_sleb128(int64 *out, char **off) {
   int64 value = 0;
   int shift = 0;
   uint8 b;
-  for (;;)
-  {
+  for (;;) {
     b = *(uint8 *)(*off);
     (*off)++;
     value |= ((uint64_t)b & 0x7F) << shift;
@@ -113,29 +132,23 @@ void read_sleb128(int64 *out, char **off)
 }
 // Since reading below types through pointer cast requires aligned address,
 // so we can only read them byte by byte
-void read_uint64(uint64 *out, char **off)
-{
+void read_uint64(uint64 *out, char **off) {
   *out = 0;
-  for (int i = 0; i < 8; i++)
-  {
+  for (int i = 0; i < 8; i++) {
     *out |= (uint64)(**off) << (i << 3);
     (*off)++;
   }
 }
-void read_uint32(uint32 *out, char **off)
-{
+void read_uint32(uint32 *out, char **off) {
   *out = 0;
-  for (int i = 0; i < 4; i++)
-  {
+  for (int i = 0; i < 4; i++) {
     *out |= (uint32)(**off) << (i << 3);
     (*off)++;
   }
 }
-void read_uint16(uint16 *out, char **off)
-{
+void read_uint16(uint16 *out, char **off) {
   *out = 0;
-  for (int i = 0; i < 2; i++)
-  {
+  for (int i = 0; i < 2; i++) {
     *out |= (uint16)(**off) << (i << 3);
     (*off)++;
   }
@@ -149,12 +162,12 @@ void read_uint16(uint16 *out, char **off)
  *
  * make 3 arrays:
  * "process->dir" stores all directory paths of code files
- * "process->file" stores all code file names of code files and their directory path index of array "dir"
- * "process->line" stores all relationships map instruction addresses to code line numbers
- * and their code file name index of array "file"
+ * "process->file" stores all code file names of code files and their directory
+ * path index of array "dir" "process->line" stores all relationships map
+ * instruction addresses to code line numbers and their code file name index of
+ * array "file"
  */
-void make_addr_line(elf_ctx *ctx, char *debug_line, uint64 length)
-{
+void make_addr_line(elf_ctx *ctx, char *debug_line, uint64 length) {
   // 在debug_line之后为pDir,、pFile、和pLine分配空间。
   // 当然这些空间也可以作为独立的结构，预先在内存中分配好
   // 这么写可读性比较差，篇幅关系懒得改了
@@ -166,8 +179,7 @@ void make_addr_line(elf_ctx *ctx, char *debug_line, uint64 length)
   int file_count = 0;
   int line_count = 0;
   char *debugline_offset = debug_line;
-  while (debugline_offset < debug_line + length)
-  {
+  while (debugline_offset < debug_line + length) {
     // 在编译的过程中，每一个编译单元，都会在debugline中形成它自身的文件名-目录表。
     // 所以说，在我们保存的文件名总表和目录总表中，会有重复的文件名或目录。
     // 这里的dir_base就记录了当前编译单元的目录，在目录总表pDir下的开始位置。
@@ -180,8 +192,7 @@ void make_addr_line(elf_ctx *ctx, char *debug_line, uint64 length)
     debugline_offset += sizeof(debug_header);
 
     // 从debugline中解析所有directory_name， 直到出现两个'\0'作为终止记号
-    while (*debugline_offset != 0)
-    {
+    while (*debugline_offset != 0) {
       pDir[directory_count++] = debugline_offset;
       while (*debugline_offset != 0)
         debugline_offset++;
@@ -189,8 +200,7 @@ void make_addr_line(elf_ctx *ctx, char *debug_line, uint64 length)
     }
     debugline_offset++;
 
-    while (*debugline_offset != 0)
-    {
+    while (*debugline_offset != 0) {
       // 为每个文件确认与文件名的对应关系
       pFile[file_count].file = debugline_offset;
       while (*debugline_offset != 0)
@@ -201,7 +211,8 @@ void make_addr_line(elf_ctx *ctx, char *debug_line, uint64 length)
       uint64 dir;
       read_uleb128(&dir, &debugline_offset);
       // sprint("%s.dirvalue = %d;\n", pFile[file_count].file, dir);
-      // sprint("%s.recdir = %d;\n", pFile[file_count].file, dir - 1 + dir_base);
+      // sprint("%s.recdir = %d;\n", pFile[file_count].file, dir - 1 +
+      // dir_base);
       pFile[file_count++].dir = dir - 1 + dir_base;
       read_uleb128(NULL, &debugline_offset);
       read_uleb128(NULL, &debugline_offset);
@@ -215,16 +226,13 @@ void make_addr_line(elf_ctx *ctx, char *debug_line, uint64 length)
     regs.file = 1;
     regs.line = 1;
     // simulate the state machine op code
-    for (;;)
-    {
+    for (;;) {
       uint8 op = *(debugline_offset++);
-      switch (op)
-      {
+      switch (op) {
       case 0: // Extended Opcodes
         read_uleb128(NULL, &debugline_offset);
         op = *(debugline_offset++);
-        switch (op)
-        {
+        switch (op) {
         case 1: // DW_LNE_end_sequence
           if (line_count > 0 && pLine[line_count - 1].addr == regs.addr)
             line_count--;
@@ -248,15 +256,13 @@ void make_addr_line(elf_ctx *ctx, char *debug_line, uint64 length)
         pLine[line_count].file += file_base - 1;
         line_count++;
         break;
-      case 2:
-      { // DW_LNS_advance_pc
+      case 2: { // DW_LNS_advance_pc
         uint64 delta;
         read_uleb128(&delta, &debugline_offset);
         regs.addr += delta * dh->min_instruction_length;
         break;
       }
-      case 3:
-      { // DW_LNS_advance_line
+      case 3: { // DW_LNS_advance_line
         int64 delta;
         read_sleb128(&delta, &debugline_offset);
         regs.line += delta;
@@ -271,23 +277,20 @@ void make_addr_line(elf_ctx *ctx, char *debug_line, uint64 length)
       case 6: // DW_LNS_negate_stmt
       case 7: // DW_LNS_set_basic_block
         break;
-      case 8:
-      { // DW_LNS_const_add_pc
+      case 8: { // DW_LNS_const_add_pc
         int adjust = 255 - dh->opcode_base;
         int delta = (adjust / dh->line_range) * dh->min_instruction_length;
         regs.addr += delta;
         break;
       }
-      case 9:
-      { // DW_LNS_fixed_advanced_pc
+      case 9: { // DW_LNS_fixed_advanced_pc
         uint16 delta;
         read_uint16(&delta, &debugline_offset);
         regs.addr += delta;
         break;
       }
         // ignore 10, 11 and 12
-      default:
-      { // Special Opcodes
+      default: { // Special Opcodes
         int adjust = op - dh->opcode_base;
         int addr_delta = (adjust / dh->line_range) * dh->min_instruction_length;
         int line_delta = dh->line_base + (adjust % dh->line_range);
@@ -319,19 +322,17 @@ void make_addr_line(elf_ctx *ctx, char *debug_line, uint64 length)
 //
 // load the elf segments to memory regions.
 //
-elf_status elf_load(elf_ctx *ctx)
-{
-  // elf_prog_header structure is defined in kernel/elf.h
-  elf_prog_header ph_addr;
-
-  int i, off;
-
+elf_status elf_load(elf_ctx *ctx) {
   // traverse the elf program segment headers
   // sprint("%x\n", ctx->ehdr.phoff);
-  for (i = 0, off = ctx->ehdr.phoff; i < ctx->ehdr.phnum; i++, off += sizeof(ph_addr))
-  {
+  for (int i = 0, offset = ctx->ehdr.phoff; i < ctx->ehdr.phnum;
+       i++, offset += sizeof(elf_prog_header)) {
+    // elf_prog_header structure is defined in kernel/elf.h
+    elf_prog_header ph_addr;
+
     // read segment headers
-    if (elf_fpread(ctx, (void *)&ph_addr, sizeof(ph_addr), off) != sizeof(ph_addr))
+    if (elf_fpread(ctx, (void *)&ph_addr, sizeof(ph_addr), offset) !=
+        sizeof(ph_addr))
       return EL_EIO;
 
     if (ph_addr.type != ELF_PROG_LOAD)
@@ -341,55 +342,31 @@ elf_status elf_load(elf_ctx *ctx)
     if (ph_addr.vaddr + ph_addr.memsz < ph_addr.vaddr)
       return EL_ERR;
 
-    // allocate memory block before elf loading
-    // sprint("%x\n", ph_addr.vaddr);
-    void *dest = elf_alloc_mb(ctx, ph_addr.vaddr, ph_addr.vaddr, ph_addr.memsz);
-
-    // actual loading
-    if (elf_fpread(ctx, dest, ph_addr.memsz, ph_addr.off) != ph_addr.memsz)
-      return EL_EIO;
-
-    // record the vm region in proc->mapped_info. added @lab3_1
-    int j;
-    for( j=0; j<PGSIZE/sizeof(mapped_region); j++ ) //seek the last mapped region
-      if( (process*)(((elf_info*)(ctx->info))->p)->mapped_info[j].va == 0x0 ) break;
-
-    ((process*)(((elf_info*)(ctx->info))->p))->mapped_info[j].va = ph_addr.vaddr;
-    ((process*)(((elf_info*)(ctx->info))->p))->mapped_info[j].npages = 1;
-
-    // SEGMENT_READABLE, SEGMENT_EXECUTABLE, SEGMENT_WRITABLE are defined in kernel/elf.h
-    if( ph_addr.flags == (SEGMENT_READABLE|SEGMENT_EXECUTABLE) ){
-      ((process*)(((elf_info*)(ctx->info))->p))->mapped_info[j].seg_type = CODE_SEGMENT;
-      sprint( "CODE_SEGMENT added at mapped info offset:%d\n", j );
-    }else if ( ph_addr.flags == (SEGMENT_READABLE|SEGMENT_WRITABLE) ){
-      ((process*)(((elf_info*)(ctx->info))->p))->mapped_info[j].seg_type = DATA_SEGMENT;
-      sprint( "DATA_SEGMENT added at mapped info offset:%d\n", j );
-    }else
-      panic( "unknown program segment encountered, segment flag:%d.\n", ph_addr.flags );
-
-    ((process*)(((elf_info*)(ctx->info))->p))->total_mapped_region ++;
+    elf_status ret;
+    if((ret = elf_load_segment(ctx,&ph_addr)) != EL_OK){
+      return ret;
+    }
   }
   /* lab1_challenge1 & lab1_challenge2 */
-  //int ret;
-  //if ((ret = load_debug_infomation(ctx)) != EL_OK)
-    //return ret;
+  // int ret;
+  // if ((ret = load_debug_infomation(ctx)) != EL_OK)
+  // return ret;
 
   return EL_OK;
 }
 
-typedef union
-{
+typedef union {
   uint64 buf[MAX_CMDLINE_ARGS];
   char *argv[MAX_CMDLINE_ARGS];
 } arg_buf;
 
 //
-// returns the number (should be 1) of string(s) after PKE kernel in command line.
-// and store the string(s) in arg_bug_msg.
+// returns the number (should be 1) of string(s) after PKE kernel in command
+// line. and store the string(s) in arg_bug_msg.
 //
-static size_t parse_args(arg_buf *arg_bug_msg)
-{
-  // HTIFSYS_getmainvars frontend call reads command arguments to (input) *arg_bug_msg
+static size_t parse_args(arg_buf *arg_bug_msg) {
+  // HTIFSYS_getmainvars frontend call reads command arguments to (input)
+  // *arg_bug_msg
   long r = frontend_syscall(HTIFSYS_getmainvars, (uint64)arg_bug_msg,
                             sizeof(*arg_bug_msg), 0, 0, 0, 0, 0);
   kassert(r == 0);
@@ -397,7 +374,8 @@ static size_t parse_args(arg_buf *arg_bug_msg)
   size_t pk_argc = arg_bug_msg->buf[0];
   uint64 *pk_argv = &arg_bug_msg->buf[1];
 
-  int arg = 1; // skip the PKE OS kernel string, leave behind only the application name
+  int arg = 1; // skip the PKE OS kernel string, leave behind only the
+               // application name
   for (size_t i = 0; arg + i < pk_argc; i++)
     arg_bug_msg->argv[i] = (char *)(uintptr_t)pk_argv[arg + i];
 
@@ -408,8 +386,7 @@ static size_t parse_args(arg_buf *arg_bug_msg)
 //
 // load the elf of user application, by using the spike file interface.
 //
-void load_bincode_from_host_elf(process *p)
-{
+void load_bincode_from_host_elf(process *p) {
   int hartid = read_tp();
   arg_buf arg_bug_msg;
 
@@ -418,41 +395,31 @@ void load_bincode_from_host_elf(process *p)
   if (!argc)
     panic("You need to specify the application program!\n");
 
-
-  if(NCPU > 1)sprint("hartid = %d: ",hartid);
+  if (NCPU > 1)
+    sprint("hartid = %d: ", hartid);
   sprint("Application: %s\n", arg_bug_msg.argv[hartid]);
 
-  // elf loading. elf_ctx is defined in kernel/elf.h, used to track the loading process.
+  // elf loading. elf_ctx is defined in kernel/elf.h, used to track the loading
+  // process.
   elf_ctx elfloader;
-  // elf_info is defined above, used to tie the elf file and its corresponding process.
+  // elf_info is defined above, used to tie the elf file and its corresponding
+  // process.
   elf_info info;
 
   info.f = spike_file_open(arg_bug_msg.argv[hartid], O_RDONLY, 0);
   info.p = p;
 
-
-
-
   // IS_ERR_VALUE is a macro defined in spike_interface/spike_htif.h
   if (IS_ERR_VALUE(info.f))
     panic("Fail on openning the input application program.\n");
-
-
-
 
   // init elfloader context. elf_init() is defined above.
   if (elf_init(&elfloader, &info) != EL_OK)
     panic("fail to init elfloader.\n");
 
-
-
-
-
   // load elf. elf_load() is defined above.
   if (elf_load(&elfloader) != EL_OK)
     panic("Fail on loading elf.\n");
-
-
 
   // entry (virtual, also physical in lab1_x) address
   p->trapframe->epc = elfloader.ehdr.entry;
@@ -460,11 +427,10 @@ void load_bincode_from_host_elf(process *p)
   // close the host spike file
   spike_file_close(info.f);
 
-
-
-  if(NCPU > 1)sprint("hartid = %d: ",hartid);
-  sprint("Application program entry point (virtual address): 0x%lx\n", p->trapframe->epc);
-
+  if (NCPU > 1)
+    sprint("hartid = %d: ", hartid);
+  sprint("Application program entry point (virtual address): 0x%lx\n",
+         p->trapframe->epc);
 }
 
 // lab1_challenge1
@@ -476,37 +442,35 @@ int function_count;
 elf_sect_header debugline_section_header;
 char dbline_buf[8000];
 
-elf_status load_debug_infomation(elf_ctx *ctx)
-{
+elf_status load_debug_infomation(elf_ctx *ctx) {
   elf_sect_header symbol_section_header;
   elf_sect_header string_section_header;
   elf_sect_header shstr_section_header;
   uint64 shstr_offset;
 
   shstr_offset = ctx->ehdr.shoff + ctx->ehdr.shstrndx * sizeof(elf_sect_header);
-  elf_fpread(ctx, (void *)&shstr_section_header, sizeof(shstr_section_header), shstr_offset);
+  elf_fpread(ctx, (void *)&shstr_section_header, sizeof(shstr_section_header),
+             shstr_offset);
 
   char shstr_buffer[256 * 100];
-  elf_fpread(ctx, &shstr_buffer, shstr_section_header.size, shstr_section_header.offset);
+  elf_fpread(ctx, &shstr_buffer, shstr_section_header.size,
+             shstr_section_header.offset);
 
   elf_sect_header temp_sh;
-  for (int i = 0; i < ctx->ehdr.shnum; i++)
-  {
-    elf_fpread(ctx, (void *)&temp_sh, sizeof(temp_sh), ctx->ehdr.shoff + i * ctx->ehdr.shentsize);
+  for (int i = 0; i < ctx->ehdr.shnum; i++) {
+    elf_fpread(ctx, (void *)&temp_sh, sizeof(temp_sh),
+               ctx->ehdr.shoff + i * ctx->ehdr.shentsize);
     uint32 type = temp_sh.type;
-    if (type == ELF_SHT_SYMTAB)
-    {
+    if (type == ELF_SHT_SYMTAB) {
       symbol_section_header = temp_sh;
-    }
-    else if (type == ELF_SHT_STRTAB && strcmp(shstr_buffer + temp_sh.name, ".strtab") == 0)
-    {
+    } else if (type == ELF_SHT_STRTAB &&
+               strcmp(shstr_buffer + temp_sh.name, ".strtab") == 0) {
       string_section_header = temp_sh;
       // lab1_challenge2新增
-    }
-    else if (strcmp(shstr_buffer + temp_sh.name, ".debug_line") == 0)
-    {
+    } else if (strcmp(shstr_buffer + temp_sh.name, ".debug_line") == 0) {
       debugline_section_header = temp_sh;
-      elf_fpread(ctx, (void *)&dbline_buf, debugline_section_header.size, debugline_section_header.offset);
+      elf_fpread(ctx, (void *)&dbline_buf, debugline_section_header.size,
+                 debugline_section_header.offset);
       make_addr_line(ctx, dbline_buf, debugline_section_header.size);
     }
   }
@@ -515,18 +479,15 @@ elf_status load_debug_infomation(elf_ctx *ctx)
 
   int count = 0;
   int symbol_num = symbol_section_header.size / sizeof(elf_symbol);
-  for (int i = 0; i < symbol_num; i++)
-  {
+  for (int i = 0; i < symbol_num; i++) {
     elf_symbol symbol;
-    elf_fpread(ctx, (void *)&symbol, sizeof(symbol), symbol_section_header.offset + i * sizeof(elf_symbol));
+    elf_fpread(ctx, (void *)&symbol, sizeof(symbol),
+               symbol_section_header.offset + i * sizeof(elf_symbol));
     if (symbol.name == 0)
       continue;
-    if (symbol.info == 18)
-    {
+    if (symbol.info == 18) {
       char symbol_name[256];
-      elf_fpread(ctx,
-                 (void *)symbol_name,
-                 sizeof(symbol_name),
+      elf_fpread(ctx, (void *)symbol_name, sizeof(symbol_name),
                  string_section_header.offset + symbol.name);
       function_symbols[count] = symbol;
       strcpy(function_names[count++], symbol_name);
@@ -538,15 +499,12 @@ elf_status load_debug_infomation(elf_ctx *ctx)
   return EL_OK;
 }
 
-char *locate_function_name(uint64 epc)
-{
+char *locate_function_name(uint64 epc) {
   int find_index = 0;
   uint64 closest_entry = 0x0;
-  for (int i = 0; i < function_count; i++)
-  {
+  for (int i = 0; i < function_count; i++) {
     uint64 function_entry = function_symbols[i].value;
-    if (function_entry < epc && function_entry > closest_entry)
-    {
+    if (function_entry < epc && function_entry > closest_entry) {
       closest_entry = function_entry;
       find_index = i;
     }
@@ -555,10 +513,8 @@ char *locate_function_name(uint64 epc)
 }
 
 // debug函数，查看elf符号信息
-void print_elf_symbol(const elf_symbol *symbol, int index)
-{
-  if (symbol == NULL)
-  {
+void print_elf_symbol(const elf_symbol *symbol, int index) {
+  if (symbol == NULL) {
     sprint("Invalid symbol\n");
     return;
   }
@@ -579,10 +535,8 @@ void print_elf_symbol(const elf_symbol *symbol, int index)
 
 // debug函数，查看elf节头信息
 //  打印节类型字符串
-const char *get_section_type_string(uint32 type)
-{
-  switch (type)
-  {
+const char *get_section_type_string(uint32 type) {
+  switch (type) {
   case ELF_SHT_NULL:
     return "NULL";
   case ELF_SHT_PROGBITS:
@@ -613,8 +567,7 @@ const char *get_section_type_string(uint32 type)
 }
 
 // 打印节标志位
-const char *get_section_flags_string(uint64 flags)
-{
+const char *get_section_flags_string(uint64 flags) {
 
   if (flags & ELF_SHF_WRITE)
     return "WRITE ";
@@ -627,38 +580,29 @@ const char *get_section_flags_string(uint64 flags)
 }
 
 // 打印 ELF 节头信息
-void print_elf_section_header(elf_sect_header *section_header, char *shstr)
-{
+void print_elf_section_header(elf_sect_header *section_header, char *shstr) {
   sprint("%-20s %-10s %-10s %-10s %-10s %-10s %-10s %-10s %-10s\n",
-         "Section Name", "Type", "Flags", "Addr", "Offset", "Size", "Link", "Info", "Align");
+         "Section Name", "Type", "Flags", "Addr", "Offset", "Size", "Link",
+         "Info", "Align");
 
   // 获取节名称，假设节名称表在字符串表中
-  const char *section_name = (section_header->name != 0) ? (shstr + section_header->name) : "None";
+  const char *section_name =
+      (section_header->name != 0) ? (shstr + section_header->name) : "None";
 
   // 打印节头信息
   sprint("%-20s %-10s %-10s 0x%lx 0x%lx 0x%lx %-10u %-10u %-10lu\n",
-         section_name,
-         get_section_type_string(section_header->type),
-         get_section_flags_string(section_header->flags),
-         section_header->addr,
-         section_header->offset,
-         section_header->size,
-         section_header->link,
-         section_header->info,
-         section_header->addralign);
+         section_name, get_section_type_string(section_header->type),
+         get_section_flags_string(section_header->flags), section_header->addr,
+         section_header->offset, section_header->size, section_header->link,
+         section_header->info, section_header->addralign);
 }
 
-void print_chars(const char *start, int n)
-{
-  for (int i = 0; i < n; i++)
-  {
+void print_chars(const char *start, int n) {
+  for (int i = 0; i < n; i++) {
     char tmp = *(start + i);
-    if (tmp)
-    {
+    if (tmp) {
       sprint("%c", tmp);
-    }
-    else
-    {
+    } else {
       sprint("\0");
     }
   }

@@ -64,6 +64,14 @@ void *alloc_page(void) {
   return (void *)n;
 }
 
+void* Alloc_page(void){
+  void *pa = alloc_page();
+  if (pa == 0)
+    panic("uvmalloc mem alloc failed\n");
+  memset((void *)pa, 0, PGSIZE);
+  return pa;
+}
+
 //
 // pmm_init() establishes the list of free physical pages according to available
 // physical memory space.

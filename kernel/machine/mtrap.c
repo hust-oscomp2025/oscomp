@@ -2,6 +2,7 @@
 #include "kernel/process.h"
 #include "spike_interface/spike_utils.h"
 #include "spike_interface/spike_file.h"
+#include "kernel/global.h"
 // #include "util/string.h"
 #include <string.h>
 
