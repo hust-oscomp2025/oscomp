@@ -14,6 +14,15 @@ enum VMPermision {
   PROT_EXEC = 4,
 };
 
+
+// 堆内存管理
+typedef struct heap_block_t {
+    size_t size;                  // 堆块大小（包含元数据）
+    struct heap_block_t * prev;      // 前一个空闲块指针
+    struct heap_block_t * next;      // 后一个空闲块指针
+    int free;                     // 标志位，表示是否为空闲块
+} heap_block;
+
 uint64 prot_to_type(int prot, int user);
 pte_t *page_walk(pagetable_t pagetable, uint64 va, int alloc);
 uint64 lookup_pa(pagetable_t pagetable, uint64 va);
@@ -32,5 +41,11 @@ void *user_va_to_pa(pagetable_t page_dir, void *va);
 void user_vm_map(pagetable_t page_dir, uint64 va, uint64 size, uint64 pa, int perm);
 void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free);
 void print_proc_vmspace(process* proc);
+
+void* malloc(size_t size);
+void free( void* ptr);
+
+// 定义一个对齐宏，确保按 8 字节对齐
+#define ALIGN(addr, alignment) (((uintptr_t)(addr) + (alignment) - 1) & ~((alignment) - 1))
 
 #endif

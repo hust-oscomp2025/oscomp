@@ -3,6 +3,7 @@
  */
 
 #include "sched.h"
+#include "global.h"
 #include "spike_interface/spike_utils.h"
 
 process* ready_queue_head = NULL;
@@ -41,8 +42,10 @@ void insert_to_ready_queue( process* proc ) {
 // process is still runnable, you should place it into the ready queue (by calling
 // ready_queue_insert), and then call schedule().
 //
-extern process procs[NPROC];
+//extern process procs[NPROC];
 void schedule() {
+  int hartid = read_tp();
+
   if ( !ready_queue_head ){
     // by default, if there are no ready process, and all processes are in the status of
     // FREE and ZOMBIE, we should shutdown the emulated RISC-V machine.
@@ -55,19 +58,29 @@ void schedule() {
           i, procs[i].status );
       }
 
-    if( should_shutdown ){
-      sprint( "no more ready processes, system shutdown now.\n" );
-      shutdown( 0 );
-    }else{
+    // 如果所有进程都在 FREE 或 ZOMBIE 状态，允许关机
+    if( should_shutdown ) {
+      // 确保只有 hartid == 0 的核心执行 shutdown
+      if (hartid == 0) {
+        sprint( "no more ready processes, system shutdown now.\n" );
+        shutdown( 0 );  // 只有核心 0 执行关机
+      }
+      // 否则，其他核心等待关机标志
+      else {
+        while (1) {
+          // 自旋等待，直到 hartid == 0 核心完成 shutdown
+        }
+      }
+    } else {
       panic( "Not handled: we should let system wait for unfinished processes.\n" );
     }
   }
 
-  current = ready_queue_head;
-  assert( current->status == READY );
+  current[hartid] = ready_queue_head;
+  assert( current[hartid]->status == READY );
   ready_queue_head = ready_queue_head->queue_next;
 
-  current->status = RUNNING;
-  sprint( "going to schedule process %d to run.\n", current->pid );
-  switch_to( current );
+  current[hartid]->status = RUNNING;
+  sprint( "going to schedule process %d to run.\n", current[hartid]->pid );
+  switch_to( current[hartid] );
 }
