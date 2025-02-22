@@ -76,17 +76,24 @@ void* kmalloc(size_t size){
   heap_block* iterator = &kernel_heap_head;
   // 遍历内核堆表，找一个大小符合要求的块，进行分割
   while(iterator->next){
+      sprint("iterator->next=%x\n",iterator->next);
+      sprint("iterator->next->size=%x\n",iterator->next->size);
     if(iterator->next->free && iterator->next->size >= required_size){
       iterator->next->free = 0;
       // 可以分割
       if(iterator->next->size > required_size + sizeof(heap_block)){
-        iterator->next->size = required_size;
+        
         heap_block* new_block = (heap_block *)((uintptr_t)iterator->next + required_size);
         new_block->size = iterator->next->size - required_size - sizeof(heap_block);
         new_block->free = 1;
+        iterator->next->size = required_size;
         kheap_insert(iterator->next,new_block); 
+        
       }
-      return (void*)((uintptr_t)iterator->next + sizeof(heap_block));
+      //sprint("sizeof(heap_block)=%x\n",sizeof(heap_block));
+      sprint("iterator->next=%x\n",iterator->next);
+      sprint("iterator->next->size=%x\n",iterator->next->size);
+      return (void*)((uint64)iterator->next + sizeof(heap_block));
     }
     iterator = iterator->next;
   }

@@ -11,7 +11,7 @@
 int flag;
 int main(void) {
     test_kernel();
-    /*
+    
         flag = 0;
     int pid = fork();
     if (pid == 0) {
@@ -29,7 +29,7 @@ int main(void) {
         printu("Parent process end, flag = %d.\n", flag);
     }
     
-    */
+    
 
     exit(0);
     return 0;
