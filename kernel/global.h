@@ -3,6 +3,7 @@
 
 #include "config.h"
 #include "process.h"
+#include "vmm.h"
 
 //Two functions defined in kernel/usertrap.S
 extern char smode_trap_vector[];
@@ -18,5 +19,8 @@ extern process procs[NPROC];
 
 // current points to the currently running user-mode application.
 extern process* current[NCPU];
+
+extern heap_block kernel_heap_head;
+
 
 #endif

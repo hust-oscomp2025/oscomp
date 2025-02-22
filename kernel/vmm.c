@@ -141,14 +141,12 @@ void kern_vm_map(pagetable_t page_dir, uint64 va, uint64 pa, uint64 sz,
 // kern_vm_init() constructs the kernel page table.
 //
 void kern_vm_init(void) {
-  // pagetable_t is defined in kernel/riscv.h. it's actually uint64*
   pagetable_t t_page_dir;
-
-
   t_page_dir = (pagetable_t)Alloc_page();
+  // 首先分配一个页当内核的页表
 
   // map virtual address [KERN_BASE, _etext] to physical address [DRAM_BASE,
-  // DRAM_BASE+(_etext - KERN_BASE)], to maintain (direct) text section kernel
+  // DRAM_BASE+(_etext - KERN_BASE)], to maintin (direct) text section kernel
   // address mapping.
   kern_vm_map(t_page_dir, KERN_BASE, DRAM_BASE, (uint64)_etext - KERN_BASE,
               prot_to_type(PROT_READ | PROT_EXEC, 0));
@@ -164,6 +162,11 @@ void kern_vm_init(void) {
 
   sprint("physical address of _etext is: 0x%lx\n",
          lookup_pa(t_page_dir, (uint64)_etext));
+
+  kernel_heap_head.next = NULL;
+  kernel_heap_head.prev = NULL;
+  kernel_heap_head.free = 0;
+  kernel_heap_head.size = 0;
 
   g_kernel_pagetable = t_page_dir;
 }
@@ -247,7 +250,7 @@ void heap_init(process *ps) {
 }
 
 // 目前只服务大小小于一个页的内存请求
-void *malloc(size_t size) {
+void *vmalloc(size_t size) {
   if (size == 0)
     return NULL;
   int hartid = read_tp();
@@ -259,12 +262,12 @@ void *malloc(size_t size) {
   int required_size = ALIGN(size + sizeof(heap_block), 8);
   heap_block *current_block = (heap_block *)ps->user_heap.heap_bottom;
   heap_block *pa_current_block = user_va_to_pa(ps->pagetable, current_block);
-  if(required_size >= PGSIZE){
+  if (required_size >= PGSIZE) {
     goto heap_alloc;
   }
   // 遍历空闲链表，查找足够大的空闲块
   while (current_block != NULL) {
-    
+
     /*可以分配*/
     if (pa_current_block->free && pa_current_block->size >= required_size) {
       /*可以分割*/
@@ -276,42 +279,43 @@ void *malloc(size_t size) {
         pa_newblock->size =
             pa_current_block->size - required_size - sizeof(heap_block);
         pa_newblock->free = 1;
-
-        pa_current_block->next = new_block;
+        pa_newblock->next = pa_current_block->next;
         pa_newblock->prev = current_block;
 
-        pa_newblock->next = pa_current_block->next;
+        
         if (pa_current_block->next != NULL) {
           heap_block *next_block = (heap_block *)pa_current_block->next;
-          heap_block *pa_next_block = user_va_to_pa(ps->pagetable, next_block);
+          heap_block *pa_next_block = user_va_to_pa(ps->pagetable, (void*)next_block);
           pa_next_block->prev = new_block;
         }
+        pa_current_block->next = new_block;
       }
       pa_current_block->free = 0;
       return (void *)((uintptr_t)current_block + sizeof(heap_block));
     }
     if (pa_current_block->next == NULL) {
-heap_alloc:
+    heap_alloc:
       // 遍历到了最后一个节点，仍然没有找到可用的块
       // 新分配一个够大的块，然后再做切割
       int n_pages = (required_size >> 12) + 1;
       uint64 va = ps->user_heap.heap_top;
-      //void *va = (void *)(((uint64)current_block >> 12) << 12) + PGSIZE;
+      // void *va = (void *)(((uint64)current_block >> 12) << 12) + PGSIZE;
       for (uint64 i = 0; i < n_pages; i++) {
-        user_vm_map(ps->pagetable, va + i * PGSIZE, PGSIZE, (uint64)Alloc_page(),
+        user_vm_map(ps->pagetable, va + i * PGSIZE, PGSIZE,
+                    (uint64)Alloc_page(),
                     prot_to_type(PROT_READ | PROT_WRITE, 1));
       }
       ps->user_heap.heap_top += n_pages * PGSIZE;
       ps->mapped_info[HEAP_SEGMENT].npages += n_pages;
 
-      heap_block *pa = user_va_to_pa(ps->pagetable, (void*)va);
+      heap_block *pa = user_va_to_pa(ps->pagetable, (void *)va);
       pa->next = NULL;
       pa->size = PGSIZE * n_pages - sizeof(heap_block);
       pa->prev = current_block;
       pa->free = 1;
-      pa_current_block->next = (heap_block*)va;
+      pa_current_block->next = (heap_block *)va;
 
-      current_block = (heap_block*)va;
+      current_block = (heap_block *)va;
       continue;
     }
     current_block = pa_current_block->next;

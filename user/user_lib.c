@@ -147,3 +147,8 @@ void yield() {
 void wait(int pid){
   do_user_call(SYS_user_wait,(uint64)pid,0,0,0,0,0,0);
 }
+
+void test_kernel(void){
+  do_user_call(SYS_user_test,0,0,0,0,0,0,0);
+}
+

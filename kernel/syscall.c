@@ -88,7 +88,7 @@ uint64 sys_user_malloc(size_t size) {
 
   return va;
   */
-  return (uint64)malloc(size);
+  return (uint64)vmalloc(size);
 }
 
 //
@@ -154,12 +154,12 @@ int sys_user_wait(int pid) {
       }
     }
   }
-  if(0 < pid && pid < NPROC){
+  if (0 < pid && pid < NPROC) {
     process *p = &procs[pid];
-    if(p->parent != current[hartid]){
+    if (p->parent != current[hartid]) {
       return -1;
-    }else{
-      while(p->status != ZOMBIE){
+    } else {
+      while (p->status != ZOMBIE) {
         continue;
       }
       p->status = FREE;
@@ -182,6 +182,71 @@ ssize_t sys_user_yield() {
   current[hartid]->status = READY;
   insert_to_ready_queue(current[hartid]);
   schedule();
+  return 0;
+}
+
+int sys_user_test() {
+  // 第1步：通过 kmalloc 分配 100 字节的内存
+  char *test_mem = (char *)kmalloc(100); // 假设每次分配 100 字节
+  sprint("test_mem=0x%x\n",test_mem);
+
+  // 检查分配是否成功
+  if (test_mem == NULL) {
+    sprint("kmalloc failed to allocate memory\n");
+    return -1;
+  }
+
+  // 第2步：进行简单的写入操作（使用 kmalloc 分配的内存）
+  for (int i = 0; i < 100; i++) {
+    test_mem[i] = 'A' + (i % 26); // 填充字符 'A' 到 'Z'，然后循环
+  }
+
+  // 第3步：进行读取操作，验证写入是否正确
+  for (int i = 0; i < 100; i++) {
+    if (test_mem[i] != 'A' + (i % 26)) {
+      sprint("Test failed at index %d. Expected '%c' but got '%c'.\n", i,
+             'A' + (i % 26), test_mem[i]);
+      kfree(test_mem); // 释放内存
+      return -1;
+    }
+  }
+
+  sprint("kmalloc and memory write test passed!\n");
+
+  // 第4步：通过 kfree 释放内存
+  kfree(test_mem);
+
+  // 第5步：再次分配新的内存块，验证内存释放后能否正确使用
+  test_mem = (char *)kmalloc(50); // 试着分配 50 字节
+  sprint("test_mem=0x%x\n",test_mem);
+  test_mem = (char *)kmalloc(3950); // 试着分配 50 字节
+  sprint("test_mem=0x%x\n",test_mem);
+  test_mem = (char *)kmalloc(4000); // 试着分配 50 字节
+  sprint("test_mem=0x%x\n",test_mem);
+  if (test_mem == NULL) {
+    sprint("kmalloc failed to allocate new memory after kfree\n");
+    return -1;
+  }
+
+  // 填充新分配的内存并验证
+  for (int i = 0; i < 50; i++) {
+    test_mem[i] = 'a' + (i % 26); // 填充字符 'a' 到 'z'，然后循环
+  }
+
+  // 验证是否写入正确
+  for (int i = 0; i < 50; i++) {
+    if (test_mem[i] != 'a' + (i % 26)) {
+      sprint("Test failed at index %d. Expected '%c' but got '%c'.\n", i,
+             'a' + (i % 26), test_mem[i]);
+      kfree(test_mem);
+      return -1;
+    }
+  }
+
+  sprint("kmalloc and kfree memory test passed again!\n");
+
+  // 释放新分配的内存
+  kfree(test_mem);
   return 0;
 }
 
@@ -209,6 +274,8 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
     return sys_user_yield();
   case SYS_user_wait:
     return sys_user_wait(a1);
+  case SYS_user_test:
+    return sys_user_test();
   default:
     panic("Unknown syscall %ld \n", a0);
   }

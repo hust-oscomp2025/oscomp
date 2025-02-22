@@ -42,7 +42,7 @@ void user_vm_map(pagetable_t page_dir, uint64 va, uint64 size, uint64 pa, int pe
 void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free);
 void print_proc_vmspace(process* proc);
 
-void* malloc(size_t size);
+void* vmalloc(size_t size);
 void free( void* ptr);
 
 // 定义一个对齐宏，确保按 8 字节对齐

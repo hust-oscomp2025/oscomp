@@ -19,6 +19,7 @@
 #define SYS_user_wait (SYS_user_base + 6)
 //lab1_challenge1
 #define SYS_user_print_backtrace (SYS_user_base + 20)
+#define SYS_user_test (SYS_user_base + 21)
 
 long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, long a7);
 ssize_t sys_user_yield();

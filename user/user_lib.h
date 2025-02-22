@@ -14,3 +14,4 @@ void* naive_malloc();
 int fork();
 void yield();
 void wait(int pid);
+void test_kernel(void);
