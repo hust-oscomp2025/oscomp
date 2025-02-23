@@ -16,10 +16,12 @@ trap_sec_start:
 .globl smode_trap_vector
 .align 4
 smode_trap_vector:
+		# sscratch临时保存了用户中断上下文在内核中的位置。
     # swap a0 and sscratch, so that points a0 to the trapframe of current process
     csrrw a0, sscratch, a0
 
-    # save the context (user registers) of current process in its trapframe.
+		# t0-t6都是临时寄存器，操作系统或应用程序都不需要保护其中的内容。
+    # 这个t6寄存器在用户程序中用不上，所以可以用来做汇编的临时变量，作为保存所有寄存器的内存地址。
     addi t6, a0 , 0
 
     # store_all_registers is a macro defined in util/load_store.S, it stores contents
@@ -73,3 +75,20 @@ return_to_user:
 
     # return to user mode and user pc.
     sret
+
+# 用来服务信号量的内核阻塞和保存上下文。
+# block_kernel() takes two parameter, sem_P() return value and, the pointer (a0 register) pointing to 
+# ktrapframe (defined in kernel/process.h) of the process.
+#
+.globl block_kernel
+block_kernel:
+	addi t6, a0, 0
+	store_all_registers
+	ld t0, 280(a0)
+	jr t0
+
+.globl return_to_kernel
+return_to_kernel:
+	addi t6, a0, 0
+	restore_all_registers
+	sret

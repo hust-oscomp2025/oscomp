@@ -1,7 +1,7 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 
-// we use only one HART (cpu) in fundamental experiments
+// we use two HART (cpu) in challenge3
 #define NCPU 1
 
 //interval of timer interrupt. added @lab1_3
