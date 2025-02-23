@@ -145,7 +145,7 @@ process *alloc_process() {
   ps->total_mapped_region++;
 
   // 创建进程信号量，在wait(pid)系统调用中使用。
-  ps->sem_index = sem_new(0, ps->pid);
+  ps->sem_index = sem_new(0);
 	ps->ktrapframe = NULL;
 
   return ps;
@@ -210,7 +210,7 @@ int do_fork(process *parent) {
     }
   }
 
-  child->status = READY;
+  //child->status = READY;
   child->trapframe->regs.a0 = 0;
   child->parent = parent;
   insert_to_ready_queue(child);

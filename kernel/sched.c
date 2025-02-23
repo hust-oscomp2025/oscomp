@@ -120,7 +120,8 @@ void insert_to_ready_queue( process* proc ) {
 void schedule() {
 	int hartid = read_tp();
 	process* cur = current[hartid];
-	if(cur && cur->status == BLOCKED){
+			//sprint("debug\n");
+	if(cur && cur->status == BLOCKED && cur->ktrapframe == NULL){
 		cur->ktrapframe = Alloc_page();
 		store_all_registers(cur->ktrapframe);
 		//sprint("cur->ktrapframe->regs.ra=0x%x\n",cur->ktrapframe->regs.ra);
@@ -156,15 +157,20 @@ void schedule() {
       panic( "Not handled: we should let system wait for unfinished processes.\n" );
     }
   }
+	
+
 
   cur = ready_queue;
+	assert( cur->status == READY );
+	ready_queue = ready_queue->queue_next;
+	current[hartid] = cur;
+	cur->status = RUNNING;
 	if(cur->ktrapframe != NULL){
-		current[hartid] = cur;
-		cur->status = RUNNING;
+
+		//cur->status = RUNNING;
 		//sprint("ready_queue=0x%x\n",ready_queue);
 		//sprint("ready_queue->queue_next=0x%x\n",ready_queue->queue_next);
 
-		ready_queue = ready_queue->queue_next;
 		
 		restore_all_registers(cur->ktrapframe);
 
@@ -174,10 +180,8 @@ void schedule() {
 		
 		return;
 	}
-  assert( cur->status == READY );
-  ready_queue = ready_queue->queue_next;
+  
 
-  cur->status = RUNNING;
   sprint( "going to schedule process %d to run.\n", cur->pid );
   switch_to( cur );
 }

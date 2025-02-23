@@ -12,7 +12,7 @@ typedef struct semaphore_t {
   int pid; // 系统信号量为-1
 } semaphore;
 
-int sem_new(int initial_value, int pid);
+int sem_new(int initial_value);
 void sem_free(int sem_index);
 int sem_P(int sem_index);
 int sem_V(int sem_index);

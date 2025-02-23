@@ -147,23 +147,17 @@ volatile int sys_user_wait(int pid) {
 }
 
 int sys_user_sem_new(int initial_value) {
-  int pid = current[read_tp()]->pid;
-  return sem_new(initial_value, pid);
+  //int pid = current[read_tp()]->pid;
+  return sem_new(initial_value);
 }
 
 int sys_user_sem_P(int sem_index) {
   int hartid = read_tp();
-  if (current[hartid]->pid != sem_pool[sem_index].pid) {
-    return -1;
-  }
   return sem_P(sem_index);
 }
 
 int sys_user_sem_V(int sem_index) {
   int hartid = read_tp();
-  if (current[hartid]->pid != sem_pool[sem_index].pid) {
-    return -1;
-  }
   return sem_V(sem_index);
 }
 
@@ -174,7 +168,7 @@ ssize_t sys_user_yield() {
   // in the rear of ready queue, and finally, schedule a READY process to run.
   // panic( "You need to implement the yield syscall in lab3_2.\n" );
   int hartid = read_tp();
-  current[hartid]->status = READY;
+  //current[hartid]->status = READY;
   insert_to_ready_queue(current[hartid]);
   schedule();
   return 0;
