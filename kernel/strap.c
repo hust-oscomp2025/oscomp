@@ -60,18 +60,20 @@ void handle_mtimer_trap() {
 // stval: the virtual address that causes pagefault when being accessed.
 //
 void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
-  int hartid = read_tp();
+	process* ps = current[read_tp()];
+  // int hartid = read_tp();
   sprint("handle_page_fault: %lx\n", stval);
   switch (mcause) {
   case CAUSE_STORE_PAGE_FAULT:
-    if (stval >= current[hartid]->user_stack_bottom - PGSIZE) {
-      current[hartid]->user_stack_bottom -= PGSIZE;
-      // 有新增的栈请求
-      // 同时需要大于用户栈的栈底（未实现）
+    if (stval >= ps->user_stack_bottom - PGSIZE) {
+      ps->user_stack_bottom -= PGSIZE;
       void *pa = Alloc_page();
-      // 如果这里不做ROUNDDOWN，会导致对于一个非对齐的地址，最终map_pages分配两个页，在之后的分配中就会出现问题。
-      user_vm_map((pagetable_t)current[hartid]->pagetable, ROUNDDOWN(stval, PGSIZE),
+      user_vm_map((pagetable_t)ps->pagetable, ps->user_stack_bottom,
                   PGSIZE, (uint64)pa, prot_to_type(PROT_WRITE | PROT_READ, 1));
+			ps->mapped_info[STACK_SEGMENT].va = ps->user_stack_bottom;
+			ps->mapped_info[STACK_SEGMENT].npages++;
+
+
     }else{
       panic("this address is not available!");
     }

@@ -43,6 +43,12 @@ enum segment_type {
   DATA_SEGMENT,    // ELF segment
 };
 
+// types of a segment
+enum fork_choice {
+  FORK_MAP = 0,   // runtime stack segment
+  FORK_COPY, // trapframe segment
+};
+
 // the VM regions mapped to a user process
 typedef struct mapped_region {
   uint64 va;       // mapped virtual address
@@ -127,6 +133,11 @@ void switch_to(process*);
 void init_proc_pool();
 // allocate an empty process, init its vm space. returns its pid
 process* alloc_process();
+void init_user_stack(process* ps);
+void init_user_heap(process* ps);
+
+
+
 // reclaim a process, destruct its vm space and free physical pages.
 int free_process( process* proc );
 // fork a child from parent

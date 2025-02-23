@@ -39,8 +39,11 @@ process* load_user_program() {
   int hartid = read_tp();
   process* proc;
   proc = alloc_process();
-  if(NCPU > 1)sprint("hartid = %d: ",hartid);
-  sprint("User application is loading.\n");
+	init_user_stack(proc);
+	init_user_heap(proc);
+
+	
+  Sprint("User application is loading.\n");
   load_bincode_from_host_elf(proc);
   return proc;
 }

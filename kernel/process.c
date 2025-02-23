@@ -80,74 +80,20 @@ void init_proc_pool() {
   }
 }
 
-//
-// allocate an empty process, init its vm space. returns the pointer to
-// process strcuture. added @lab3_1
-//
-process *alloc_process() {
-  // locate the first usable process structure
-  process *ps = NULL;
-  for (int i = 0; i < NPROC; i++) {
-    if (procs[i].status == FREE) {
-      ps = &(procs[i]);
-      break;
-    }
-  }
-  if (ps == NULL) {
-    panic("cannot find any free process structure.\n");
-    return 0;
-  }
-
-  // init proc[i]'s vm space
-  ps->trapframe = (trapframe *)Alloc_page(); // trapframe, used to save context
-  //memset(ps->trapframe, 0, sizeof(trapframe));
-
-  // page directory
-  ps->pagetable = (pagetable_t)Alloc_page();
-  //memset((void *)ps->pagetable, 0, PGSIZE);
-
-  ps->kstack = (uint64)Alloc_page() + PGSIZE; // user kernel stack top
+void init_user_stack(process *ps) {
+  ps->trapframe->regs.sp = USER_STACK_TOP; // virtual address of user stack top
   uint64 user_stack =
       (uint64)Alloc_page(); // phisical address of user stack bottom
-  ps->trapframe->regs.sp = USER_STACK_TOP; // virtual address of user stack top
-
-  // allocates a page to record memory regions (segments)
-  ps->mapped_info = (mapped_region *)Alloc_page();
-  //memset(ps->mapped_info, 0, PGSIZE);
-
-	ps->sem_index = sem_new(0,ps->pid);
-
-
-
-
   // map user stack in userspace
   user_vm_map((pagetable_t)ps->pagetable, USER_STACK_TOP - PGSIZE, PGSIZE,
               user_stack, prot_to_type(PROT_WRITE | PROT_READ, 1));
   ps->mapped_info[STACK_SEGMENT].va = USER_STACK_TOP - PGSIZE;
   ps->mapped_info[STACK_SEGMENT].npages = 1;
   ps->mapped_info[STACK_SEGMENT].seg_type = STACK_SEGMENT;
+  ps->total_mapped_region++;
+}
 
-  // map trapframe in user space (direct mapping as in kernel space).
-  user_vm_map((pagetable_t)ps->pagetable, (uint64)ps->trapframe, PGSIZE,
-              (uint64)ps->trapframe, prot_to_type(PROT_WRITE | PROT_READ, 0));
-  ps->mapped_info[CONTEXT_SEGMENT].va = (uint64)ps->trapframe;
-  ps->mapped_info[CONTEXT_SEGMENT].npages = 1;
-  ps->mapped_info[CONTEXT_SEGMENT].seg_type = CONTEXT_SEGMENT;
-
-  // map S-mode trap vector section in user space (direct mapping as in kernel
-  // space) we assume that the size of usertrap.S is smaller than a page.
-  user_vm_map((pagetable_t)ps->pagetable, (uint64)trap_sec_start, PGSIZE,
-              (uint64)trap_sec_start, prot_to_type(PROT_READ | PROT_EXEC, 0));
-  ps->mapped_info[SYSTEM_SEGMENT].va = (uint64)trap_sec_start;
-  ps->mapped_info[SYSTEM_SEGMENT].npages = 1;
-  ps->mapped_info[SYSTEM_SEGMENT].seg_type = SYSTEM_SEGMENT;
-
-  sprint(
-      "in alloc_proc. user frame 0x%lx, user stack 0x%lx, user kstack 0x%lx \n",
-      ps->trapframe, ps->trapframe->regs.sp, ps->kstack);
-
-
-
+void init_user_heap(process *ps) {
   // initialize the process's heap manager
   ps->user_heap.heap_top = USER_FREE_ADDRESS_START;
   ps->user_heap.heap_bottom = USER_FREE_ADDRESS_START;
@@ -158,42 +104,93 @@ process *alloc_process() {
   ps->mapped_info[HEAP_SEGMENT].va = USER_FREE_ADDRESS_START;
   ps->mapped_info[HEAP_SEGMENT].npages = 0;
   ps->mapped_info[HEAP_SEGMENT].seg_type = HEAP_SEGMENT;
-  //sprint("ps->user_heap.heap_bottom=%lx\n",ps->user_heap.heap_bottom);
-
-
-  ps->total_mapped_region = 4;
-
-  // return after initialization.
-  return ps;
+  // sprint("ps->user_heap.heap_bottom=%lx\n",ps->user_heap.heap_bottom);
+  ps->total_mapped_region++;
 }
 
 //
-// reclaim a process. added @lab3_1
+// allocate an empty process, init its vm space. returns the pointer to
+// process strcuture. added @lab3_1
 //
+
+process *find_empty_process() {
+  for (int i = 0; i < NPROC; i++) {
+    if (procs[i].status == FREE) {
+      return &(procs[i]);
+    }
+  }
+  panic("cannot find any free process structure.\n");
+}
+
+process *alloc_process() {
+  // locate the first usable process structure
+  process *ps = find_empty_process();
+
+  // 首先为进程页表，和映射表分配空间
+  ps->pagetable = (pagetable_t)Alloc_page();
+  ps->mapped_info = (mapped_region *)Alloc_page();
+
+  // 分配内核栈
+  ps->kstack = (uint64)Alloc_page() + PGSIZE;
+
+  // 为进程中断上下文分配空间并记录
+  ps->trapframe = (trapframe *)Alloc_page();
+  user_vm_map((pagetable_t)ps->pagetable, (uint64)ps->trapframe, PGSIZE,
+              (uint64)ps->trapframe, prot_to_type(PROT_WRITE | PROT_READ, 0));
+  ps->mapped_info[CONTEXT_SEGMENT].va = (uint64)ps->trapframe;
+  ps->mapped_info[CONTEXT_SEGMENT].npages = 1;
+  ps->mapped_info[CONTEXT_SEGMENT].seg_type = CONTEXT_SEGMENT;
+  ps->total_mapped_region++;
+
+  // 为进程中断入口程序映射空间并记录
+  user_vm_map((pagetable_t)ps->pagetable, (uint64)trap_sec_start, PGSIZE,
+              (uint64)trap_sec_start, prot_to_type(PROT_READ | PROT_EXEC, 0));
+  ps->mapped_info[SYSTEM_SEGMENT].va = (uint64)trap_sec_start;
+  ps->mapped_info[SYSTEM_SEGMENT].npages = 1;
+  ps->mapped_info[SYSTEM_SEGMENT].seg_type = SYSTEM_SEGMENT;
+  ps->total_mapped_region++;
+
+  // 创建进程信号量，在wait(pid)系统调用中使用。
+  ps->sem_index = sem_new(0, ps->pid);
+
+  return ps;
+}
+
 int free_process(process *proc) {
-  // we set the status to ZOMBIE, but cannot destruct its vm space immediately.
-  // since proc can be current process, and its user kernel stack is currently
-  // in use! but for proxy kernel, it (memory leaking) may NOT be a really
-  // serious issue, as it is different from regular OS, which needs to run 7x24.
-  // proc->status = ZOMBIE;
+  // 在exit中把进程的状态设成ZOMBIE，然后在父进程wait中调用这个函数，用于释放子进程的资源（待实现）
+  // 由于代理内核的特殊机制，不做也不会造成内存泄漏（代填）
 
   return 0;
 }
 
-//
-// implements fork syscal in kernel. added @lab3_1
-// basic idea here is to first allocate an empty process (child), then duplicate
-// the context and data segments of parent process to the child, and lastly, map
-// other segments (code, system) of the parent to child. the stack segment
-// remains unchanged for the child.
-//
+void fork_segment(process *parent, process *child, int segnum, int copy,
+                  uint64 perm) {
+  mapped_region *mapped_info = &parent->mapped_info[segnum];
+  uint64 va = mapped_info->va;
+  for (int i = 0; i < mapped_info->npages; i++) {
+    uint64 pa;
+    if (copy) {
+      pa = (uint64)Alloc_page();
+      memcpy((void*)pa,
+             (void *)lookup_pa(parent->pagetable, mapped_info->va + i * PGSIZE),
+             PGSIZE);
+    } else {
+      pa = lookup_pa(parent->pagetable, mapped_info->va + i * PGSIZE);
+    }
+    user_vm_map((pagetable_t)child->pagetable, mapped_info->va + i * PGSIZE,
+                PGSIZE, pa, perm);
+  }
+  memcpy(&(child->mapped_info[segnum]), mapped_info, sizeof(mapped_region));
+  child->total_mapped_region++;
+}
+
 int do_fork(process *parent) {
   int hartid = read_tp();
   sprint("will fork a child from parent %d.\n", parent->pid);
   process *child = alloc_process();
-	if(parent->pid == 1){
-		sprint("child pid 1 fork debug\n");
-	}
+  if (parent->pid == 1) {
+    sprint("child pid 1 fork debug\n");
+  }
   for (int i = 0; i < parent->total_mapped_region; i++) {
     // browse parent's vm space, and copy its trapframe and data segments,
     // map its code segment.
@@ -202,47 +199,16 @@ int do_fork(process *parent) {
       *child->trapframe = *parent->trapframe;
       break;
     case STACK_SEGMENT:
-      memcpy((void *)lookup_pa(child->pagetable,
-                               child->mapped_info[STACK_SEGMENT].va),
-             (void *)lookup_pa(parent->pagetable, parent->mapped_info[i].va),
-             PGSIZE);
+      fork_segment(parent, child, i, FORK_COPY,
+                   prot_to_type(PROT_WRITE | PROT_READ, 1));
       break;
     case HEAP_SEGMENT:
-      for (uint64 heap_block = current[hartid]->user_heap.heap_bottom;
-           heap_block < current[hartid]->user_heap.heap_top;
-           heap_block += PGSIZE) {
-
-        void *child_pa = Alloc_page();
-        memcpy(child_pa, (void *)lookup_pa(parent->pagetable, heap_block),
-               PGSIZE);
-        user_vm_map((pagetable_t)child->pagetable, heap_block, PGSIZE,
-                    (uint64)child_pa, prot_to_type(PROT_WRITE | PROT_READ, 1));
-      }
-
-      child->mapped_info[HEAP_SEGMENT].npages =
-          parent->mapped_info[HEAP_SEGMENT].npages;
-
-      memcpy((void *)&child->user_heap, (void *)&parent->user_heap,
-             sizeof(parent->user_heap));
+      fork_segment(parent, child, i, FORK_COPY,
+                   prot_to_type(PROT_WRITE | PROT_READ, 1));
       break;
     case CODE_SEGMENT:
-      // 在不考虑动态链接的情况下，ELF文件中只有一个代码段。
-      uint64 num_pages = parent->mapped_info[i].npages;
-      uint64 va_start = parent->mapped_info[i].va;
-
-      for (uint64 i = 0; i < num_pages; i++) {
-        map_pages(child->pagetable, va_start, PGSIZE,
-                  lookup_pa(parent->pagetable, va_start + i * PGSIZE),
-                  prot_to_type(PROT_EXEC | PROT_READ, 1));
-      }
-
-      // after mapping, register the vm region (do not delete codes below!)
-      child->mapped_info[child->total_mapped_region].va =
-          parent->mapped_info[i].va;
-      child->mapped_info[child->total_mapped_region].npages =
-          parent->mapped_info[i].npages;
-      child->mapped_info[child->total_mapped_region].seg_type = CODE_SEGMENT;
-      child->total_mapped_region++;
+      // 代码段不需要复制
+      fork_segment(parent, child, i, FORK_MAP, prot_to_type(PROT_EXEC | PROT_READ, 1));
       break;
     }
   }
@@ -252,6 +218,6 @@ int do_fork(process *parent) {
   child->parent = parent;
   insert_to_ready_queue(child);
 
-  //sprint("do_fork ends\n");
+  // sprint("do_fork ends\n");
   return child->pid;
 }
