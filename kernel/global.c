@@ -10,6 +10,7 @@ process procs[NPROC];
 process* current[NCPU];
 // 进程就绪队列和阻塞队列
 process* ready_queue = NULL;
+
 //process* blocked_queue = NULL;
 // 阻塞队列都在信号量里边。
 

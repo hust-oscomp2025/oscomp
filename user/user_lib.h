@@ -13,7 +13,7 @@ void naive_free(void* va);
 void* naive_malloc();
 int fork();
 void yield();
-void wait(int pid);
+int wait(int pid);
 void test_kernel(void);
 
 int sem_new(int initial_value);

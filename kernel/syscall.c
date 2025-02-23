@@ -49,7 +49,7 @@ ssize_t sys_user_exit(uint64 code) {
 	current[hartid]->status = ZOMBIE;
 	sem_V(current[hartid]->sem_index);
 	if(current[hartid]->parent != NULL)
-		sem_P(current[hartid]->parent->sem_index);
+		sem_V(current[hartid]->parent->sem_index);
 	
   // reclaim the current process, and reschedule. added @lab3_1
 	// 这个过程只在父进程显式调用wait时执行。如果说父进程提前退出，那么子进程应该被init进程收养。
@@ -104,11 +104,11 @@ ssize_t sys_user_fork() {
   return do_fork(current[hartid]);
 }
 
-int sys_user_wait(int pid) {
+volatile int sys_user_wait(int pid) {
 	//sprint("DEBUG LINE, pid = %d\n",pid);
 
   int hartid = read_tp();
-  int child_found_flag = 0;
+  //int child_found_flag = 0;
   if (pid == -1) {
 		while(1){
 			for(int i = 0;i < NPROC;i++){
@@ -123,12 +123,15 @@ int sys_user_wait(int pid) {
 					return i;
 				}
 			}
-			sprint("current[hartid]->sem_index = %d\n",current[hartid]->sem_index);
+			//sprint("current[hartid]->sem_index = %d\n",current[hartid]->sem_index);
 			sem_P(current[hartid]->sem_index);
+			sprint("pid = %d\n",pid);
+
+
 		}
   }
   if (0 < pid && pid < NPROC) {
-	sprint("DEBUG LINE\n");
+	//sprint("DEBUG LINE\n");
 
     process *p = &procs[pid];
     if (p->parent != current[hartid]) {
@@ -138,6 +141,7 @@ int sys_user_wait(int pid) {
 			return pid;
 		}else {
 			sem_P(p->sem_index);
+
       return pid;
     }
   }

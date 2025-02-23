@@ -171,7 +171,7 @@ void fork_segment(process *parent, process *child, int segnum, int copy,
     uint64 pa;
     if (copy) {
       pa = (uint64)Alloc_page();
-      memcpy((void*)pa,
+      memcpy((void *)pa,
              (void *)lookup_pa(parent->pagetable, mapped_info->va + i * PGSIZE),
              PGSIZE);
     } else {
@@ -188,9 +188,6 @@ int do_fork(process *parent) {
   int hartid = read_tp();
   sprint("will fork a child from parent %d.\n", parent->pid);
   process *child = alloc_process();
-  if (parent->pid == 1) {
-    sprint("child pid 1 fork debug\n");
-  }
   for (int i = 0; i < parent->total_mapped_region; i++) {
     // browse parent's vm space, and copy its trapframe and data segments,
     // map its code segment.
@@ -208,7 +205,12 @@ int do_fork(process *parent) {
       break;
     case CODE_SEGMENT:
       // 代码段不需要复制
-      fork_segment(parent, child, i, FORK_MAP, prot_to_type(PROT_EXEC | PROT_READ, 1));
+      fork_segment(parent, child, i, FORK_MAP,
+                   prot_to_type(PROT_EXEC | PROT_READ, 1));
+      break;
+    case DATA_SEGMENT:
+      fork_segment(parent, child, i, FORK_COPY,
+                   prot_to_type(PROT_WRITE | PROT_READ, 1));
       break;
     }
   }

@@ -49,12 +49,16 @@ int sem_P(int sem_index) {
 // 我们这里为了实现简单，直接把信号队列当成信号栈使了。
 // 如果说有进程等待信号量，返回0，不然返回增加后的信号资源量sem->value
 int sem_V(int sem_index) {
+	//sprint("received sem_V signal, sem_index=%d\n",sem_index);
   if (sem_index < 0 || sem_index >= NSEM || !sem_pool[sem_index].isActive) {
+		panic("invalid sem_index!");
+		
     return -1;
   }
   semaphore *sem = &sem_pool[sem_index];
   if (sem->wait_queue != NULL) {
     process *wakeup_process = sem->wait_queue;
+		//sprint("wakeup_process=0x%x\n",wakeup_process);
     sem->wait_queue = wakeup_process->queue_next;
 
     wakeup_process->status = READY;

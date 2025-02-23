@@ -6,7 +6,7 @@
 #include "global.h"
 #include "spike_interface/spike_utils.h"
 
-process* ready_queue_head = NULL;
+
 
 //
 // insert a process, proc, into the END of ready queue.
@@ -14,16 +14,16 @@ process* ready_queue_head = NULL;
 void insert_to_ready_queue( process* proc ) {
   sprint( "going to insert process %d to ready queue.\n", proc->pid );
   // if the queue is empty in the beginning
-  if( ready_queue_head == NULL ){
+  if( ready_queue == NULL ){
     proc->status = READY;
     proc->queue_next = NULL;
-    ready_queue_head = proc;
+    ready_queue = proc;
     return;
   }
   // ready queue is not empty
   process *p;
   // browse the ready queue to see if proc is already in-queue
-  for( p=ready_queue_head; p->queue_next!=NULL; p=p->queue_next )
+  for( p=ready_queue; p->queue_next!=NULL; p=p->queue_next )
     if( p == proc ) return;  //already in queue
   // p points to the last element of the ready queue
   if( p==proc ) return;
@@ -43,7 +43,7 @@ void insert_to_ready_queue( process* proc ) {
 void schedule() {
   int hartid = read_tp();
 
-  if ( !ready_queue_head ){
+  if ( !ready_queue ){
     // by default, if there are no ready process, and all processes are in the status of
     // FREE and ZOMBIE, we should shutdown the emulated RISC-V machine.
     int should_shutdown = 1;
@@ -73,9 +73,9 @@ void schedule() {
     }
   }
 
-  current[hartid] = ready_queue_head;
+  current[hartid] = ready_queue;
   assert( current[hartid]->status == READY );
-  ready_queue_head = ready_queue_head->queue_next;
+  ready_queue = ready_queue->queue_next;
 
   current[hartid]->status = RUNNING;
   sprint( "going to schedule process %d to run.\n", current[hartid]->pid );
