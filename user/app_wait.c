@@ -10,13 +10,21 @@
 
 int flag;
 int main(void) {
-    test_kernel();
+    //test_kernel();
     
         flag = 0;
     int pid = fork();
+		printu("forked pid=%d\n",pid);
     if (pid == 0) {
+				printu("Child process continue\n");
         flag = 1;
+				printu("Child process continue\n");
+
         pid = fork();
+				printu("Child process continue\n");
+
+				printu("forked pid=%d\n",pid);
+
         if (pid == 0) {
             flag = 2;
             printu("Grandchild process end, flag = %d.\n", flag);
@@ -25,6 +33,7 @@ int main(void) {
             printu("Child process end, flag = %d.\n", flag);
         }
     } else {
+			printu("pid=%d\n",pid);
         wait(-1);
         printu("Parent process end, flag = %d.\n", flag);
     }

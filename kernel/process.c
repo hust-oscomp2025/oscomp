@@ -115,6 +115,11 @@ process *alloc_process() {
   ps->mapped_info = (mapped_region *)Alloc_page();
   //memset(ps->mapped_info, 0, PGSIZE);
 
+	ps->sem_index = sem_new(0,ps->pid);
+
+
+
+
   // map user stack in userspace
   user_vm_map((pagetable_t)ps->pagetable, USER_STACK_TOP - PGSIZE, PGSIZE,
               user_stack, prot_to_type(PROT_WRITE | PROT_READ, 1));
@@ -170,7 +175,7 @@ int free_process(process *proc) {
   // since proc can be current process, and its user kernel stack is currently
   // in use! but for proxy kernel, it (memory leaking) may NOT be a really
   // serious issue, as it is different from regular OS, which needs to run 7x24.
-  proc->status = ZOMBIE;
+  // proc->status = ZOMBIE;
 
   return 0;
 }
@@ -186,7 +191,9 @@ int do_fork(process *parent) {
   int hartid = read_tp();
   sprint("will fork a child from parent %d.\n", parent->pid);
   process *child = alloc_process();
-
+	if(parent->pid == 1){
+		sprint("child pid 1 fork debug\n");
+	}
   for (int i = 0; i < parent->total_mapped_region; i++) {
     // browse parent's vm space, and copy its trapframe and data segments,
     // map its code segment.
@@ -201,60 +208,25 @@ int do_fork(process *parent) {
              PGSIZE);
       break;
     case HEAP_SEGMENT:
-      // build a same heap for child process.
-
-      // convert free_pages_address into a filter to skip reclaimed blocks in
-      // the heap when mapping the heap blocks
-      /*
-      int free_block_filter[MAX_HEAP_PAGES];
-      memset(free_block_filter, 0, MAX_HEAP_PAGES);
-      uint64 heap_bottom = parent->user_heap.heap_bottom;
-      for (int i = 0; i < parent->user_heap.free_pages_count; i++) {
-        int index = (parent->user_heap.free_pages_address[i] - heap_bottom) /
-      PGSIZE; free_block_filter[index] = 1;
-      }
-      */
-
-      // copy and map the heap blocks
       for (uint64 heap_block = current[hartid]->user_heap.heap_bottom;
            heap_block < current[hartid]->user_heap.heap_top;
            heap_block += PGSIZE) {
-        //sprint("heap_block=0x%lx\n", heap_block);
-
-        // if (free_block_filter[(heap_block - heap_bottom) / PGSIZE])  // skip
-        // free blocks
-        //   continue;
 
         void *child_pa = Alloc_page();
-        //sprint("child_pa=0x%lx\n", child_pa);
-        //sprint("lookup_pa=0x%lx\n",(void *)lookup_pa(parent->pagetable, heap_block));
         memcpy(child_pa, (void *)lookup_pa(parent->pagetable, heap_block),
                PGSIZE);
-        //sprint("heap_block=0x%lx,heap_block_address=0x%lx\n", heap_block,&heap_block);
         user_vm_map((pagetable_t)child->pagetable, heap_block, PGSIZE,
                     (uint64)child_pa, prot_to_type(PROT_WRITE | PROT_READ, 1));
-        //sprint("heap_block=0x%lx,heap_block_address=0x%lx\n", heap_block,&heap_block);
       }
 
       child->mapped_info[HEAP_SEGMENT].npages =
           parent->mapped_info[HEAP_SEGMENT].npages;
 
-      // copy the heap manager from parent to child
       memcpy((void *)&child->user_heap, (void *)&parent->user_heap,
              sizeof(parent->user_heap));
       break;
     case CODE_SEGMENT:
       // 在不考虑动态链接的情况下，ELF文件中只有一个代码段。
-      // TODO (lab3_1): implment the mapping of child code segment to parent's
-      // code segment.
-      // hint: the virtual address mapping of code segment is tracked in
-      // mapped_info page of parent's process structure. use the information in
-      // mapped_info to retrieve the virtual to physical mapping of code
-      // segment. after having the mapping information, just map the
-      // corresponding virtual address region of child to the physical pages
-      // that actually store the code segment of parent process. DO NOT COPY THE
-      // PHYSICAL PAGES, JUST MAP THEM. panic( "You need to implement the code
-      // segment mapping of child in lab3_1.\n" );
       uint64 num_pages = parent->mapped_info[i].npages;
       uint64 va_start = parent->mapped_info[i].va;
 
@@ -279,6 +251,7 @@ int do_fork(process *parent) {
   child->trapframe->regs.a0 = 0;
   child->parent = parent;
   insert_to_ready_queue(child);
+
   //sprint("do_fork ends\n");
   return child->pid;
 }

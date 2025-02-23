@@ -20,19 +20,16 @@ void insert_to_ready_queue( process* proc ) {
     ready_queue_head = proc;
     return;
   }
-
   // ready queue is not empty
   process *p;
   // browse the ready queue to see if proc is already in-queue
   for( p=ready_queue_head; p->queue_next!=NULL; p=p->queue_next )
     if( p == proc ) return;  //already in queue
-
   // p points to the last element of the ready queue
   if( p==proc ) return;
   p->queue_next = proc;
   proc->status = READY;
   proc->queue_next = NULL;
-
   return;
 }
 

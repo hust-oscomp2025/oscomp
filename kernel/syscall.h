@@ -17,6 +17,13 @@
 #define SYS_user_fork (SYS_user_base + 4)
 #define SYS_user_yield (SYS_user_base + 5)
 #define SYS_user_wait (SYS_user_base + 6)
+
+#define SYS_user_sem_new (SYS_user_base + 7)
+#define SYS_user_sem_P (SYS_user_base + 8)
+#define SYS_user_sem_V (SYS_user_base + 9)
+
+
+
 //lab1_challenge1
 #define SYS_user_print_backtrace (SYS_user_base + 20)
 #define SYS_user_test (SYS_user_base + 21)

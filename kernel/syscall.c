@@ -46,48 +46,20 @@ ssize_t sys_user_exit(uint64 code) {
   if (NCPU > 1)
     sprint("hartid = %d: ", hartid);
   sprint("User exit with code:%d.\n", code);
-
+	current[hartid]->status = ZOMBIE;
+	sem_V(current[hartid]->sem_index);
+	if(current[hartid]->parent != NULL)
+		sem_P(current[hartid]->parent->sem_index);
+	
   // reclaim the current process, and reschedule. added @lab3_1
-  free_process(current[hartid]);
+	// 这个过程只在父进程显式调用wait时执行。如果说父进程提前退出，那么子进程应该被init进程收养。
+  // free_process(current[hartid]);
   schedule();
 
   return 0;
 }
 
-/*
-uint64 sys_user_allocate_page() {
-  void* pa = alloc_page();
-  uint64 va;
-  // if there are previously reclaimed pages, use them first (this does not
-change the
-  // size of the heap)
-  if (current->user_heap.free_pages_count > 0) {
-    va =
-current->user_heap.free_pages_address[--current->user_heap.free_pages_count];
-    assert(va < current->user_heap.heap_top);
-  } else {
-    // otherwise, allocate a new page (this increases the size of the heap by
-one page) va = current->user_heap.heap_top; current->user_heap.heap_top +=
-PGSIZE;
-
-    current->mapped_info[HEAP_SEGMENT].npages++;
-  }
-  user_vm_map((pagetable_t)current->pagetable, va, PGSIZE, (uint64)pa,
-         prot_to_type(PROT_WRITE | PROT_READ, 1));
-
-  return va;
-}
-*/
 uint64 sys_user_malloc(size_t size) {
-  /*
-    void *pa = alloc_page();
-  uint64 va = g_ufree_page;
-  g_ufree_page += PGSIZE;
-  user_vm_map((pagetable_t)current->pagetable, va, PGSIZE, (uint64)pa,
-         prot_to_type(PROT_WRITE | PROT_READ, 1));
-
-  return va;
-  */
   return (uint64)vmalloc(size);
 }
 
@@ -99,14 +71,6 @@ uint64 sys_user_free(uint64 va) {
   free((void *)va);
   return 0;
 }
-/*
-uint64 sys_user_free_page(uint64 va) {
-  user_vm_unmap((pagetable_t)current->pagetable, va, PGSIZE, 1);
-  // add the reclaimed page to the free page list
-  current->user_heap.free_pages_address[current->user_heap.free_pages_count++] =
-va; return 0;
-}
-*/
 
 ssize_t sys_user_print_backtrace(uint64 depth) {
 
@@ -141,37 +105,69 @@ ssize_t sys_user_fork() {
 }
 
 int sys_user_wait(int pid) {
+	//sprint("DEBUG LINE, pid = %d\n",pid);
+
   int hartid = read_tp();
   int child_found_flag = 0;
   if (pid == -1) {
-    while (1) {
-      for (int i = 0; i < NPROC; i++) {
-        process *p = &procs[i];
-        if (p->parent == current[hartid] && p->status == ZOMBIE) {
-          p->status = FREE;
-          return p->pid;
-        }
-      }
-    }
+		while(1){
+			for(int i = 0;i < NPROC;i++){
+			//sprint("DEBUG LINE\n");
+
+				process* p = &(procs[i]);
+				//sprint("p = 0x%lx,\n",p);
+				if(p->status != FREE &&p->parent != NULL &&  p->parent->pid == pid && p->status == ZOMBIE){
+					//sprint("DEBUG LINE\n");
+
+					free_process(p);
+					return i;
+				}
+			}
+			sprint("current[hartid]->sem_index = %d\n",current[hartid]->sem_index);
+			sem_P(current[hartid]->sem_index);
+		}
   }
   if (0 < pid && pid < NPROC) {
+	sprint("DEBUG LINE\n");
+
     process *p = &procs[pid];
     if (p->parent != current[hartid]) {
       return -1;
-    } else {
-      while (p->status != ZOMBIE) {
-        continue;
-      }
-      p->status = FREE;
+    }else if(p->status == ZOMBIE){
+			free_process(p);
+			return pid;
+		}else {
+			sem_P(p->sem_index);
       return pid;
     }
   }
   return -1;
 }
 
-//
-// kerenl entry point of yield. added @lab3_2
-//
+
+
+int sys_user_sem_new(int initial_value) {
+	int pid = current[read_tp()]->pid;
+	return sem_new(initial_value,pid);
+
+}
+
+int sys_user_sem_P(int sem_index) {
+  int hartid = read_tp();
+	if(current[hartid]->pid != sem_pool[sem_index].pid){
+		return -1;
+	}
+	return sem_P(sem_index);
+}
+
+int sys_user_sem_V(int sem_index) {
+  int hartid = read_tp();
+	if(current[hartid]->pid != sem_pool[sem_index].pid){
+		return -1;
+	}
+	return sem_V(sem_index);
+}
+
 ssize_t sys_user_yield() {
   // TODO (lab3_2): implment the syscall of yield.
   // hint: the functionality of yield is to give up the processor. therefore,
@@ -221,6 +217,8 @@ int sys_user_test() {
   sprint("test_mem=0x%x\n",test_mem);
   test_mem = (char *)kmalloc(3950); // 试着分配 50 字节
   sprint("test_mem=0x%x\n",test_mem);
+    test_mem = (char *)kmalloc(50); // 试着分配 50 字节
+  sprint("test_mem=0x%x\n",test_mem);
   test_mem = (char *)kmalloc(4000); // 试着分配 50 字节
   sprint("test_mem=0x%x\n",test_mem);
   if (test_mem == NULL) {
@@ -269,6 +267,8 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
   case SYS_user_print_backtrace:
     return sys_user_print_backtrace(a1);
   case SYS_user_fork:
+		//int ret = sys_user_fork();
+		//sprint("DEBUG LINE\n");
     return sys_user_fork();
   case SYS_user_yield:
     return sys_user_yield();
@@ -276,6 +276,12 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
     return sys_user_wait(a1);
   case SYS_user_test:
     return sys_user_test();
+  case SYS_user_sem_new:
+    return sys_user_sem_new(a1);
+  case SYS_user_sem_P:
+    return sys_user_sem_P(a1);
+  case SYS_user_sem_V:
+    return sys_user_sem_V(a1);
   default:
     panic("Unknown syscall %ld \n", a0);
   }
