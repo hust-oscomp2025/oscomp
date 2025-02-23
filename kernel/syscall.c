@@ -46,22 +46,20 @@ ssize_t sys_user_exit(uint64 code) {
   if (NCPU > 1)
     sprint("hartid = %d: ", hartid);
   sprint("User exit with code:%d.\n", code);
-	current[hartid]->status = ZOMBIE;
-	sem_V(current[hartid]->sem_index);
-	if(current[hartid]->parent != NULL)
-		sem_V(current[hartid]->parent->sem_index);
-	
+  current[hartid]->status = ZOMBIE;
+  sem_V(current[hartid]->sem_index);
+  if (current[hartid]->parent != NULL)
+    sem_V(current[hartid]->parent->sem_index);
+
   // reclaim the current process, and reschedule. added @lab3_1
-	// 这个过程只在父进程显式调用wait时执行。如果说父进程提前退出，那么子进程应该被init进程收养。
+  // 这个过程只在父进程显式调用wait时执行。如果说父进程提前退出，那么子进程应该被init进程收养。
   // free_process(current[hartid]);
   schedule();
 
   return 0;
 }
 
-uint64 sys_user_malloc(size_t size) {
-  return (uint64)vmalloc(size);
-}
+uint64 sys_user_malloc(size_t size) { return (uint64)vmalloc(size); }
 
 //
 // reclaim a page, indicated by "va". added @lab2_2
@@ -105,42 +103,42 @@ ssize_t sys_user_fork() {
 }
 
 volatile int sys_user_wait(int pid) {
-	//sprint("DEBUG LINE, pid = %d\n",pid);
+  // sprint("DEBUG LINE, pid = %d\n",pid);
 
   int hartid = read_tp();
-  //int child_found_flag = 0;
+  // int child_found_flag = 0;
   if (pid == -1) {
-		while(1){
-			for(int i = 0;i < NPROC;i++){
-			//sprint("DEBUG LINE\n");
+    while (1) {
+      for (int i = 0; i < NPROC; i++) {
+        // sprint("DEBUG LINE\n");
 
-				process* p = &(procs[i]);
-				//sprint("p = 0x%lx,\n",p);
-				if(p->status != FREE &&p->parent != NULL &&  p->parent->pid == pid && p->status == ZOMBIE){
-					//sprint("DEBUG LINE\n");
+        process *p = &(procs[i]);
+        // sprint("p = 0x%lx,\n",p);
+        if (p->parent != NULL && p->parent->pid == current[hartid]->pid &&
+            p->status == ZOMBIE) {
+          // sprint("DEBUG LINE\n");
 
-					free_process(p);
-					return i;
-				}
-			}
-			//sprint("current[hartid]->sem_index = %d\n",current[hartid]->sem_index);
-			sem_P(current[hartid]->sem_index);
-			sprint("pid = %d\n",pid);
-
-
-		}
+          free_process(p);
+          return i;
+        }
+      }
+      // sprint("current[hartid]->sem_index = %d\n",current[hartid]->sem_index);
+      sem_P(current[hartid]->sem_index);
+      //sprint("wait:return from blocking!\n");
+    }
   }
   if (0 < pid && pid < NPROC) {
-	//sprint("DEBUG LINE\n");
+    // sprint("DEBUG LINE\n");
 
     process *p = &procs[pid];
     if (p->parent != current[hartid]) {
       return -1;
-    }else if(p->status == ZOMBIE){
-			free_process(p);
-			return pid;
-		}else {
-			sem_P(p->sem_index);
+    } else if (p->status == ZOMBIE) {
+      free_process(p);
+      return pid;
+    } else {
+      sem_P(p->sem_index);
+      sprint("return from blocking!\n");
 
       return pid;
     }
@@ -148,28 +146,25 @@ volatile int sys_user_wait(int pid) {
   return -1;
 }
 
-
-
 int sys_user_sem_new(int initial_value) {
-	int pid = current[read_tp()]->pid;
-	return sem_new(initial_value,pid);
-
+  int pid = current[read_tp()]->pid;
+  return sem_new(initial_value, pid);
 }
 
 int sys_user_sem_P(int sem_index) {
   int hartid = read_tp();
-	if(current[hartid]->pid != sem_pool[sem_index].pid){
-		return -1;
-	}
-	return sem_P(sem_index);
+  if (current[hartid]->pid != sem_pool[sem_index].pid) {
+    return -1;
+  }
+  return sem_P(sem_index);
 }
 
 int sys_user_sem_V(int sem_index) {
   int hartid = read_tp();
-	if(current[hartid]->pid != sem_pool[sem_index].pid){
-		return -1;
-	}
-	return sem_V(sem_index);
+  if (current[hartid]->pid != sem_pool[sem_index].pid) {
+    return -1;
+  }
+  return sem_V(sem_index);
 }
 
 ssize_t sys_user_yield() {
@@ -188,7 +183,7 @@ ssize_t sys_user_yield() {
 int sys_user_test() {
   // 第1步：通过 kmalloc 分配 100 字节的内存
   char *test_mem = (char *)kmalloc(100); // 假设每次分配 100 字节
-  sprint("test_mem=0x%x\n",test_mem);
+  sprint("test_mem=0x%x\n", test_mem);
 
   // 检查分配是否成功
   if (test_mem == NULL) {
@@ -218,13 +213,13 @@ int sys_user_test() {
 
   // 第5步：再次分配新的内存块，验证内存释放后能否正确使用
   test_mem = (char *)kmalloc(50); // 试着分配 50 字节
-  sprint("test_mem=0x%x\n",test_mem);
+  sprint("test_mem=0x%x\n", test_mem);
   test_mem = (char *)kmalloc(3950); // 试着分配 50 字节
-  sprint("test_mem=0x%x\n",test_mem);
-    test_mem = (char *)kmalloc(50); // 试着分配 50 字节
-  sprint("test_mem=0x%x\n",test_mem);
+  sprint("test_mem=0x%x\n", test_mem);
+  test_mem = (char *)kmalloc(50); // 试着分配 50 字节
+  sprint("test_mem=0x%x\n", test_mem);
   test_mem = (char *)kmalloc(4000); // 试着分配 50 字节
-  sprint("test_mem=0x%x\n",test_mem);
+  sprint("test_mem=0x%x\n", test_mem);
   if (test_mem == NULL) {
     sprint("kmalloc failed to allocate new memory after kfree\n");
     return -1;
@@ -271,12 +266,15 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
   case SYS_user_print_backtrace:
     return sys_user_print_backtrace(a1);
   case SYS_user_fork:
-		//int ret = sys_user_fork();
-		//sprint("DEBUG LINE\n");
+    // int ret = sys_user_fork();
+    // sprint("DEBUG LINE\n");
     return sys_user_fork();
   case SYS_user_yield:
     return sys_user_yield();
   case SYS_user_wait:
+    //int ret = sys_user_wait(a1);
+    //sprint("do_syscall:return from blocking!\n");
+
     return sys_user_wait(a1);
   case SYS_user_test:
     return sys_user_test();

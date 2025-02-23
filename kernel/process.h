@@ -86,6 +86,8 @@ typedef struct process_t {
   pagetable_t pagetable;
   // trapframe storing the context of a (User mode) process.
   trapframe* trapframe;
+	
+	trapframe* ktrapframe;
 
   // added @lab1_challenge2
   char *debugline;

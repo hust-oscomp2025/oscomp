@@ -65,6 +65,7 @@ void switch_to(process *proc) {
   uint64 user_satp = MAKE_SATP(proc->pagetable);
   // return_to_user() is defined in kernel/strap_vector.S. switch to user mode
   // with sret. note, return_to_user takes two parameters @ and after lab2_1.
+	//sprint("calling return to user\n");
   return_to_user(proc->trapframe, user_satp);
 }
 
@@ -152,6 +153,7 @@ process *alloc_process() {
 
   // 创建进程信号量，在wait(pid)系统调用中使用。
   ps->sem_index = sem_new(0, ps->pid);
+	ps->ktrapframe = NULL;
 
   return ps;
 }
