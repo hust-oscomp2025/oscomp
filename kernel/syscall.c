@@ -125,9 +125,8 @@ volatile int sys_user_wait(int pid) {
 			}
 			//sprint("current[hartid]->sem_index = %d\n",current[hartid]->sem_index);
 			sem_P(current[hartid]->sem_index);
-			sprint("pid = %d\n",pid);
-
-
+			
+			sprint("successfully returned from kernel, pid = %d\n",pid);
 		}
   }
   if (0 < pid && pid < NPROC) {

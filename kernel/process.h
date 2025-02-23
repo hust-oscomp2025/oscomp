@@ -16,7 +16,8 @@ typedef struct trapframe_t {
 
   // kernel page table. added @lab2_1
   /* offset:272 */ uint64 kernel_satp;
-
+	// kernel scheduler, added @lab3_challenge2
+	/* offset:280 */ uint64 kernel_schedule;
 }trapframe;
 
 // riscv-pke kernel supports at most 32 processes
@@ -86,6 +87,9 @@ typedef struct process_t {
   pagetable_t pagetable;
   // trapframe storing the context of a (User mode) process.
   trapframe* trapframe;
+
+	// lab3_challenge2新增：内核上下文。用来从内核阻塞中恢复。
+	trapframe* ktrapframe;
 
   // added @lab1_challenge2
   char *debugline;

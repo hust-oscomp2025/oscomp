@@ -41,6 +41,7 @@ void insert_to_ready_queue( process* proc ) {
 //
 //extern process procs[NPROC];
 void schedule() {
+	sprint("calling schedule\n");
   int hartid = read_tp();
 
   if ( !ready_queue ){

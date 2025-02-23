@@ -3,6 +3,7 @@
 #include "global.h"
 #include "sched.h"
 #include "spike_interface/spike_utils.h"
+#include "pmm.h"
 
 // 获取一个新的信号灯编号，成功返回0-64，失败返回-1
 int sem_new(int initial_value, int pid) {
@@ -35,14 +36,18 @@ int sem_P(int sem_index) {
   if (sem->value > 0) {
     return sem->value--;
   } else {
-		//sprint("BLOCK!\n");
+		sprint("BLOCK!\n");
     int hartid = read_tp();
     process *cur = current[hartid];
     cur->status = BLOCKED;
     cur->queue_next = sem->wait_queue;
     sem->wait_queue = cur;
-    schedule();
+		cur->ktrapframe = Alloc_page();
+		
+		block_kernel(cur->ktrapframe);
+		// we shall never reach here
 		return 0;
+		// 直接嵌入保存内核上下文到process->ktrapframe的汇编代码
   }
 }
 
