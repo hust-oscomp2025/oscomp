@@ -243,7 +243,7 @@ int sys_user_test() {
 
 ssize_t sys_user_printpa(uint64 va)
 {
-  uint64 pa = (uint64)user_va_to_pa((pagetable_t)(current->pagetable), (void*)va);
+  uint64 pa = (uint64)user_va_to_pa((pagetable_t)(current[read_tp()]->pagetable), (void*)va);
   sprint("%lx\n", pa);
   return 0;
 }
