@@ -8,5 +8,5 @@ void Sprint(const char* s, ...) {
     int hartid = read_tp();
     if (NCPU > 1)
         sprint("hartid = %d: ", hartid);
-    sprint("%s\n", s);
+    sprint(s);
 }

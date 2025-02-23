@@ -87,6 +87,8 @@ typedef struct process_t {
   pagetable_t pagetable;
   // trapframe storing the context of a (User mode) process.
   trapframe* trapframe;
+	
+	trapframe* ktrapframe;
 
 	// lab3_challenge2新增：内核上下文。用来从内核阻塞中恢复。
 	trapframe* ktrapframe;

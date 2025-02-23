@@ -124,6 +124,7 @@ void smode_trap_handler(void) {
   switch (cause) {
   case CAUSE_USER_ECALL:
     handle_syscall(current[hartid]->trapframe);
+		//sprint("coming back from syscall\n");
     break;
   case CAUSE_MTIMER_S_TRAP:
     handle_mtimer_trap();
@@ -142,7 +143,7 @@ void smode_trap_handler(void) {
     panic("unexpected exception happened.\n");
     break;
   }
-
+	//sprint("calling switch_to, current[hartid] = 0x%x\n", current[hartid]);
   // continue (come back to) the execution of current process.
   switch_to(current[hartid]);
 }

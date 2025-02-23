@@ -31,9 +31,9 @@ int main(void) {
     }
   } else {
     //printu("pid=%d\n", pid);
-		printu("waiting for pid=%d\n",-1);
+		//printu("waiting for pid=%d\n",-1);
     int waitpid = wait(-1);
-		printu("waitpid=%d\n",waitpid);
+		//printu("waitpid=%d\n",waitpid);
     printu("Parent process end, flag = %d.\n", flag);
   }
 

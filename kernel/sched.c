@@ -5,6 +5,82 @@
 #include "sched.h"
 #include "global.h"
 #include "spike_interface/spike_utils.h"
+#include "pmm.h"
+
+#define store_all_registers(t6) \
+    asm volatile(                \
+        "sd ra, 0(%0)\n"          \
+        "sd sp, 8(%0)\n"          \
+        "sd gp, 16(%0)\n"         \
+        "sd tp, 24(%0)\n"         \
+        "sd t0, 32(%0)\n"         \
+        "sd t1, 40(%0)\n"         \
+        "sd t2, 48(%0)\n"         \
+        "sd s0, 56(%0)\n"         \
+        "sd s1, 64(%0)\n"         \
+        "sd a0, 72(%0)\n"         \
+        "sd a1, 80(%0)\n"         \
+        "sd a2, 88(%0)\n"         \
+        "sd a3, 96(%0)\n"         \
+        "sd a4, 104(%0)\n"        \
+        "sd a5, 112(%0)\n"        \
+        "sd a6, 120(%0)\n"        \
+        "sd a7, 128(%0)\n"        \
+        "sd s2, 136(%0)\n"        \
+        "sd s3, 144(%0)\n"        \
+        "sd s4, 152(%0)\n"        \
+        "sd s5, 160(%0)\n"        \
+        "sd s6, 168(%0)\n"        \
+        "sd s7, 176(%0)\n"        \
+        "sd s8, 184(%0)\n"        \
+        "sd s9, 192(%0)\n"        \
+        "sd s10, 200(%0)\n"       \
+        "sd s11, 208(%0)\n"       \
+        "sd t3, 216(%0)\n"        \
+        "sd t4, 224(%0)\n"        \
+        "sd t5, 232(%0)\n"        \
+        "sd t6, 240(%0)\n"        \
+        :                         \
+        : "r"(t6)                 \
+        : "memory"                \
+    )
+#define restore_all_registers(t6) \
+    asm volatile(                \
+        "ld ra, 0(%0)\n"          \
+        "ld sp, 8(%0)\n"          \
+        "ld gp, 16(%0)\n"         \
+        "ld tp, 24(%0)\n"         \
+        "ld t0, 32(%0)\n"         \
+        "ld t1, 40(%0)\n"         \
+        "ld t2, 48(%0)\n"         \
+        "ld s0, 56(%0)\n"         \
+        "ld s1, 64(%0)\n"         \
+        "ld a0, 72(%0)\n"         \
+        "ld a1, 80(%0)\n"         \
+        "ld a2, 88(%0)\n"         \
+        "ld a3, 96(%0)\n"         \
+        "ld a4, 104(%0)\n"        \
+        "ld a5, 112(%0)\n"        \
+        "ld a6, 120(%0)\n"        \
+        "ld a7, 128(%0)\n"        \
+        "ld s2, 136(%0)\n"        \
+        "ld s3, 144(%0)\n"        \
+        "ld s4, 152(%0)\n"        \
+        "ld s5, 160(%0)\n"        \
+        "ld s6, 168(%0)\n"        \
+        "ld s7, 176(%0)\n"        \
+        "ld s8, 184(%0)\n"        \
+        "ld s9, 192(%0)\n"        \
+        "ld s10, 200(%0)\n"       \
+        "ld s11, 208(%0)\n"       \
+        "ld t3, 216(%0)\n"        \
+        "ld t4, 224(%0)\n"        \
+        "ld t5, 232(%0)\n"        \
+        "ld t6, 240(%0)\n"        \
+        :                         \
+        : "r"(t6)                 \
+        : "memory"                \
+    )
 
 
 
@@ -15,6 +91,7 @@ void insert_to_ready_queue( process* proc ) {
   sprint( "going to insert process %d to ready queue.\n", proc->pid );
   // if the queue is empty in the beginning
   if( ready_queue == NULL ){
+		//sprint("ready_queue is empty\n");
     proc->status = READY;
     proc->queue_next = NULL;
     ready_queue = proc;
@@ -41,8 +118,13 @@ void insert_to_ready_queue( process* proc ) {
 //
 //extern process procs[NPROC];
 void schedule() {
-	sprint("calling schedule\n");
-  int hartid = read_tp();
+	int hartid = read_tp();
+	process* cur = current[hartid];
+	if(cur && cur->status == BLOCKED){
+		cur->ktrapframe = Alloc_page();
+		store_all_registers(cur->ktrapframe);
+		//sprint("cur->ktrapframe->regs.ra=0x%x\n",cur->ktrapframe->regs.ra);
+	}
 
   if ( !ready_queue ){
     // by default, if there are no ready process, and all processes are in the status of
@@ -54,6 +136,7 @@ void schedule() {
         should_shutdown = 0;
         sprint( "ready queue empty, but process %d is not in free/zombie state:%d\n", 
           i, procs[i].status );
+				
       }
 
     // 如果所有进程都在 FREE 或 ZOMBIE 状态，允许关机
@@ -74,11 +157,27 @@ void schedule() {
     }
   }
 
-  current[hartid] = ready_queue;
-  assert( current[hartid]->status == READY );
+  cur = ready_queue;
+	if(cur->ktrapframe != NULL){
+		current[hartid] = cur;
+		cur->status = RUNNING;
+		//sprint("ready_queue=0x%x\n",ready_queue);
+		//sprint("ready_queue->queue_next=0x%x\n",ready_queue->queue_next);
+
+		ready_queue = ready_queue->queue_next;
+		
+		restore_all_registers(cur->ktrapframe);
+
+		free_page(cur->ktrapframe);
+		cur->ktrapframe = NULL;
+		//sprint("debug!\n");
+		
+		return;
+	}
+  assert( cur->status == READY );
   ready_queue = ready_queue->queue_next;
 
-  current[hartid]->status = RUNNING;
-  sprint( "going to schedule process %d to run.\n", current[hartid]->pid );
-  switch_to( current[hartid] );
+  cur->status = RUNNING;
+  sprint( "going to schedule process %d to run.\n", cur->pid );
+  switch_to( cur );
 }

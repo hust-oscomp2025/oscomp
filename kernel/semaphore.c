@@ -12,6 +12,7 @@ int sem_new(int initial_value, int pid) {
 			sem_pool[i].isActive = 1;
       sem_pool[i].value = initial_value;
       sem_pool[i].pid = pid;
+			sem_pool[i].wait_queue = NULL;
       return i;
     }
   }
@@ -42,10 +43,9 @@ int sem_P(int sem_index) {
     cur->status = BLOCKED;
     cur->queue_next = sem->wait_queue;
     sem->wait_queue = cur;
-		cur->ktrapframe = Alloc_page();
+    schedule();
 		
-		block_kernel(cur->ktrapframe);
-		// we shall never reach here
+		//sprint("return from blocking!\n");
 		return 0;
 		// 直接嵌入保存内核上下文到process->ktrapframe的汇编代码
   }
@@ -62,13 +62,8 @@ int sem_V(int sem_index) {
   }
   semaphore *sem = &sem_pool[sem_index];
   if (sem->wait_queue != NULL) {
-    process *wakeup_process = sem->wait_queue;
-		//sprint("wakeup_process=0x%x\n",wakeup_process);
-    sem->wait_queue = wakeup_process->queue_next;
-
-    wakeup_process->status = READY;
-    wakeup_process->queue_next = ready_queue;
-    ready_queue = wakeup_process;
+		insert_to_ready_queue(sem->wait_queue);
+		sem->wait_queue = sem->wait_queue->queue_next;
     schedule();
     return 0;
   } else {
