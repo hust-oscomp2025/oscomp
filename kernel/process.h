@@ -128,7 +128,8 @@ typedef struct process_t {
   int tick_count;
 
 	int sem_index;
-
+  // file system. added @lab4_1
+  proc_file_management *pfiles;
 
 }process;
 

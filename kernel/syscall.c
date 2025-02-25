@@ -20,6 +20,7 @@
 #include "vmm.h"
 
 #include "sync_utils.h"
+#include "utils.h"
 
 //
 // implement the SYS_user_print syscall
@@ -32,9 +33,7 @@ ssize_t sys_user_print(const char *buf, size_t n) {
   assert(current[hartid]);
   char *pa = (char *)user_va_to_pa((pagetable_t)(current[hartid]->pagetable),
                                    (void *)buf);
-  if (NCPU > 1)
-    sprint("hartid = %d: ", hartid);
-  sprint("%s\n", pa);
+  Sprint("%s\n", pa);
   return 0;
 }
 
@@ -45,9 +44,7 @@ ssize_t sys_user_print(const char *buf, size_t n) {
 volatile static int counter = 0;
 ssize_t sys_user_exit(uint64 code) {
   int hartid = read_tp();
-  if (NCPU > 1)
-    sprint("hartid = %d: ", hartid);
-  sprint("User exit with code:%d.\n", code);
+  Sprint("User exit with code:%d.\n", code);
   current[hartid]->status = ZOMBIE;
   sem_V(current[hartid]->sem_index);
   if (current[hartid]->parent != NULL)
@@ -100,7 +97,7 @@ ssize_t sys_user_print_backtrace(uint64 depth) {
 
 ssize_t sys_user_fork() {
   int hartid = read_tp();
-  sprint("User call fork.\n");
+  Sprint("User call fork.\n");
   return do_fork(current[hartid]);
 }
 
@@ -140,7 +137,7 @@ volatile int sys_user_wait(int pid) {
       return pid;
     } else {
       sem_P(p->sem_index);
-      sprint("return from blocking!\n");
+      //sprint("return from blocking!\n");
 
       return pid;
     }
@@ -254,7 +251,7 @@ ssize_t sys_user_printpa(uint64 va)
 // open file
 //
 ssize_t sys_user_open(char *pathva, int flags) {
-  char* pathpa = (char*)user_va_to_pa((pagetable_t)(current->pagetable), pathva);
+  char* pathpa = (char*)user_va_to_pa((pagetable_t)(current[read_tp()]->pagetable), pathva);
   return do_open(pathpa, flags);
 }
 
@@ -265,7 +262,7 @@ ssize_t sys_user_read(int fd, char *bufva, uint64 count) {
   int i = 0;
   while (i < count) { // count can be greater than page size
     uint64 addr = (uint64)bufva + i;
-    uint64 pa = lookup_pa((pagetable_t)current->pagetable, addr);
+    uint64 pa = lookup_pa((pagetable_t)current[read_tp()]->pagetable, addr);
     uint64 off = addr - ROUNDDOWN(addr, PGSIZE);
     uint64 len = count - i < PGSIZE - off ? count - i : PGSIZE - off;
     uint64 r = do_read(fd, (char *)pa + off, len);
@@ -281,7 +278,7 @@ ssize_t sys_user_write(int fd, char *bufva, uint64 count) {
   int i = 0;
   while (i < count) { // count can be greater than page size
     uint64 addr = (uint64)bufva + i;
-    uint64 pa = lookup_pa((pagetable_t)current->pagetable, addr);
+    uint64 pa = lookup_pa((pagetable_t)current[read_tp()]->pagetable, addr);
     uint64 off = addr - ROUNDDOWN(addr, PGSIZE);
     uint64 len = count - i < PGSIZE - off ? count - i : PGSIZE - off;
     uint64 r = do_write(fd, (char *)pa + off, len);
@@ -301,7 +298,7 @@ ssize_t sys_user_lseek(int fd, int offset, int whence) {
 // read vinode
 //
 ssize_t sys_user_stat(int fd, struct istat *istat) {
-  struct istat * pistat = (struct istat *)user_va_to_pa((pagetable_t)(current->pagetable), istat);
+  struct istat * pistat = (struct istat *)user_va_to_pa((pagetable_t)(current[read_tp()]->pagetable), istat);
   return do_stat(fd, pistat);
 }
 
@@ -309,7 +306,7 @@ ssize_t sys_user_stat(int fd, struct istat *istat) {
 // read disk inode
 //
 ssize_t sys_user_disk_stat(int fd, struct istat *istat) {
-  struct istat * pistat = (struct istat *)user_va_to_pa((pagetable_t)(current->pagetable), istat);
+  struct istat * pistat = (struct istat *)user_va_to_pa((pagetable_t)(current[read_tp()]->pagetable), istat);
   return do_disk_stat(fd, pistat);
 }
 
