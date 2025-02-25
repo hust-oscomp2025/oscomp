@@ -38,20 +38,19 @@ void switch_to(process *proc) {
   assert(proc);
   current[read_tp()] = proc;
 
-
   write_csr(stvec, (uint64)smode_trap_vector);
   // set up trapframe values (in process structure) that smode_trap_vector will
   // need when the process next re-enters the kernel.
   proc->trapframe->kernel_sp = proc->kstack;     // process's kernel stack
   proc->trapframe->kernel_satp = read_csr(satp); // kernel page table
   proc->trapframe->kernel_trap = (uint64)smode_trap_handler;
-	proc->trapframe->kernel_schedule = (uint64)schedule;
+  proc->trapframe->kernel_schedule = (uint64)schedule;
 
   // SSTATUS_SPP and SSTATUS_SPIE are defined in kernel/riscv.h
   // set S Previous Privilege mode (the SSTATUS_SPP bit in sstatus register) to
   // User mode,to to enable interrupts, and sret destination.
 
-  write_csr(sstatus, ( (read_csr(sstatus) & ~SSTATUS_SPP) | SSTATUS_SPIE ));
+  write_csr(sstatus, ((read_csr(sstatus) & ~SSTATUS_SPP) | SSTATUS_SPIE));
 
   // set S Exception Program Counter (sepc register) to the elf entry pc.
   write_csr(sepc, proc->trapframe->epc);
@@ -143,7 +142,7 @@ process *alloc_process() {
 
   // 创建进程信号量，在wait(pid)系统调用中使用。
   ps->sem_index = sem_new(0);
-	ps->ktrapframe = NULL;
+  ps->ktrapframe = NULL;
 
   return ps;
 }
@@ -155,22 +154,20 @@ int free_process(process *proc) {
   return 0;
 }
 
-void fork_segment(process *parent, process *child, int segnum, int copy,
-                  uint64 perm) {
+void fork_segment(process *parent, process *child, int segnum, int choice) {
   mapped_region *mapped_info = &parent->mapped_info[segnum];
   uint64 va = mapped_info->va;
   for (int i = 0; i < mapped_info->npages; i++) {
-    uint64 pa;
-    if (copy) {
-      pa = (uint64)Alloc_page();
-      memcpy((void *)pa,
-             (void *)lookup_pa(parent->pagetable, mapped_info->va + i * PGSIZE),
-             PGSIZE);
+    uint64 pa = lookup_pa(parent->pagetable, mapped_info->va + i * PGSIZE);
+    if (choice == FORK_COPY) {
+      uint64 newpa = (uint64)Alloc_page();
+      memcpy((void *)newpa, (void *)pa, PGSIZE);
+      user_vm_map((pagetable_t)child->pagetable, mapped_info->va + i * PGSIZE,
+                  PGSIZE, newpa, prot_to_type(PROT_WRITE | PROT_READ, 1));
     } else {
-      pa = lookup_pa(parent->pagetable, mapped_info->va + i * PGSIZE);
+      user_vm_map((pagetable_t)child->pagetable, mapped_info->va + i * PGSIZE,
+                  PGSIZE, pa, prot_to_type(PROT_EXEC | PROT_READ, 1));
     }
-    user_vm_map((pagetable_t)child->pagetable, mapped_info->va + i * PGSIZE,
-                PGSIZE, pa, perm);
   }
   memcpy(&(child->mapped_info[segnum]), mapped_info, sizeof(mapped_region));
   child->total_mapped_region++;
@@ -188,26 +185,22 @@ int do_fork(process *parent) {
       *child->trapframe = *parent->trapframe;
       break;
     case STACK_SEGMENT:
-      fork_segment(parent, child, i, FORK_COPY,
-                   prot_to_type(PROT_WRITE | PROT_READ, 1));
+      fork_segment(parent, child, i, FORK_COPY);
       break;
     case HEAP_SEGMENT:
-      fork_segment(parent, child, i, FORK_COPY,
-                   prot_to_type(PROT_WRITE | PROT_READ, 1));
+      fork_segment(parent, child, i, FORK_COPY);
       break;
     case CODE_SEGMENT:
       // 代码段不需要复制
-      fork_segment(parent, child, i, FORK_MAP,
-                   prot_to_type(PROT_EXEC | PROT_READ, 1));
+      fork_segment(parent, child, i, FORK_MAP);
       break;
     case DATA_SEGMENT:
-      fork_segment(parent, child, i, FORK_COPY,
-                   prot_to_type(PROT_WRITE | PROT_READ, 1));
+      fork_segment(parent, child, i, FORK_COPY);
       break;
     }
   }
 
-  //child->status = READY;
+  // child->status = READY;
   child->trapframe->regs.a0 = 0;
   child->parent = parent;
   insert_to_ready_queue(child);

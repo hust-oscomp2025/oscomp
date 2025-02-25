@@ -46,8 +46,9 @@ enum segment_type {
 
 // types of a segment
 enum fork_choice {
-  FORK_MAP = 0,   // runtime stack segment
-  FORK_COPY, // trapframe segment
+  FORK_MAP = 0,   // 直接映射代码段
+  FORK_COPY, // 直接复制所有数据
+	FORK_COW,
 };
 
 // the VM regions mapped to a user process
