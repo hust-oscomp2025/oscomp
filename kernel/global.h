@@ -9,8 +9,6 @@
 //Two functions defined in kernel/usertrap.S
 extern char smode_trap_vector[];
 extern void return_to_user(trapframe *, uint64 satp);
-extern void block_kernel(trapframe*);
-extern void return_to_kernel(trapframe*);
 
 // trap_sec_start points to the beginning of S-mode trap segment (i.e., the entry point
 // of S-mode trap vector).

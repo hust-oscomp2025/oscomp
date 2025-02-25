@@ -75,20 +75,3 @@ return_to_user:
 
     # return to user mode and user pc.
     sret
-
-# 用来服务信号量的内核阻塞和保存上下文。
-# block_kernel() takes two parameter, sem_P() return value and, the pointer (a0 register) pointing to 
-# ktrapframe (defined in kernel/process.h) of the process.
-#
-.globl block_kernel
-block_kernel:
-	addi t6, a0, 0
-	store_all_registers
-	ld t0, 280(a0)
-	jr t0
-
-.globl return_to_kernel
-return_to_kernel:
-	addi t6, a0, 0
-	restore_all_registers
-	sret

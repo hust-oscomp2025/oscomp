@@ -38,9 +38,6 @@ void switch_to(process *proc) {
   assert(proc);
   current[read_tp()] = proc;
 
-	if(proc->ktrapframe != NULL){
-		return_to_kernel(proc->ktrapframe);
-	}
 
   write_csr(stvec, (uint64)smode_trap_vector);
   // set up trapframe values (in process structure) that smode_trap_vector will
