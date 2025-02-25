@@ -164,7 +164,15 @@ void fork_segment(process *parent, process *child, int segnum, int choice) {
       memcpy((void *)newpa, (void *)pa, PGSIZE);
       user_vm_map((pagetable_t)child->pagetable, mapped_info->va + i * PGSIZE,
                   PGSIZE, newpa, prot_to_type(PROT_WRITE | PROT_READ, 1));
-    } else {
+    }else if(choice == FORK_COW){
+      user_vm_map((pagetable_t)child->pagetable, mapped_info->va + i * PGSIZE,
+                  PGSIZE, pa, prot_to_type(PROT_READ, 1));
+      user_vm_unmap((pagetable_t)parent->pagetable, mapped_info->va + i * PGSIZE,
+                  PGSIZE, 0);
+			//sprint("debug");
+      user_vm_map((pagetable_t)parent->pagetable, mapped_info->va + i * PGSIZE,
+                  PGSIZE, pa, prot_to_type(PROT_READ, 1));
+		}else {
       user_vm_map((pagetable_t)child->pagetable, mapped_info->va + i * PGSIZE,
                   PGSIZE, pa, prot_to_type(PROT_EXEC | PROT_READ, 1));
     }
@@ -185,17 +193,17 @@ int do_fork(process *parent) {
       *child->trapframe = *parent->trapframe;
       break;
     case STACK_SEGMENT:
-      fork_segment(parent, child, i, FORK_COPY);
+      fork_segment(parent, child, i, FORK_COW);
       break;
     case HEAP_SEGMENT:
-      fork_segment(parent, child, i, FORK_COPY);
+      fork_segment(parent, child, i, FORK_COW);
       break;
     case CODE_SEGMENT:
       // 代码段不需要复制
       fork_segment(parent, child, i, FORK_MAP);
       break;
     case DATA_SEGMENT:
-      fork_segment(parent, child, i, FORK_COPY);
+      fork_segment(parent, child, i, FORK_COW);
       break;
     }
   }

@@ -221,7 +221,7 @@ void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free) {
   pte_t *pte;
   uint64 firstPage = ROUNDDOWN(va, PGSIZE);
   uint64 lastPage = ROUNDDOWN(va + size - 1, PGSIZE);
-  if (lastPage < va)
+  if (lastPage <= va)
     for (; firstPage <= lastPage; firstPage += PGSIZE) {
       if ((pte = page_walk(page_dir, firstPage, 1)) == 0)
         panic("user_vm_unmap failed to walk page table for va (0x%lx)",

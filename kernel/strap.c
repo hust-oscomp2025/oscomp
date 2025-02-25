@@ -3,16 +3,16 @@
  */
 
 #include "strap.h"
+#include "global.h"
 #include "memlayout.h"
 #include "pmm.h"
 #include "process.h"
 #include "riscv.h"
+#include "sched.h"
 #include "string.h"
 #include "syscall.h"
-#include "sched.h"
 #include "util/functions.h"
 #include "vmm.h"
-#include "global.h"
 
 #include "spike_interface/spike_utils.h"
 
@@ -60,21 +60,27 @@ void handle_mtimer_trap() {
 // stval: the virtual address that causes pagefault when being accessed.
 //
 void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
-	process* ps = current[read_tp()];
+  process *ps = current[read_tp()];
   // int hartid = read_tp();
   sprint("handle_page_fault: %lx\n", stval);
   switch (mcause) {
   case CAUSE_STORE_PAGE_FAULT:
-    if (stval >= ps->user_stack_bottom - PGSIZE) {
+    pte_t *pte = page_walk(ps->pagetable, stval, 0);
+    if (((uint64)*pte & PTE_W) == 0 && (*pte & PTE_X) == 0) { // 为只读的共享页
+      uint64 page_va = stval & (~0xfff);
+      uint64 newpa = (uint64)Alloc_page();
+      memcpy((void *)newpa, (void *)PTE2PA(*pte), PGSIZE);
+      user_vm_unmap((pagetable_t)ps->pagetable, page_va, PGSIZE, 0);
+			user_vm_map((pagetable_t)ps->pagetable, page_va, PGSIZE, newpa, prot_to_type(PROT_WRITE | PROT_READ, 1));
+    }else if (stval >= ps->user_stack_bottom - PGSIZE) {
       ps->user_stack_bottom -= PGSIZE;
       void *pa = Alloc_page();
-      user_vm_map((pagetable_t)ps->pagetable, ps->user_stack_bottom,
-                  PGSIZE, (uint64)pa, prot_to_type(PROT_WRITE | PROT_READ, 1));
-			ps->mapped_info[STACK_SEGMENT].va = ps->user_stack_bottom;
-			ps->mapped_info[STACK_SEGMENT].npages++;
+      user_vm_map((pagetable_t)ps->pagetable, ps->user_stack_bottom, PGSIZE,
+                  (uint64)pa, prot_to_type(PROT_WRITE | PROT_READ, 1));
+      ps->mapped_info[STACK_SEGMENT].va = ps->user_stack_bottom;
+      ps->mapped_info[STACK_SEGMENT].npages++;
 
-
-    }else{
+    } else {
       panic("this address is not available!");
     }
 
@@ -90,20 +96,21 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 //
 void rrsched() {
   // TODO (lab3_3): implements round-robin scheduling.
-  // hint: increase the tick_count member of current process by one, if it is bigger than
-  // TIME_SLICE_LEN (means it has consumed its time slice), change its status into READY,
-  // place it in the rear of ready queue, and finally schedule next process to run.
-  //panic( "You need to further implement the timer handling in lab3_3.\n" );
+  // hint: increase the tick_count member of current process by one, if it is
+  // bigger than TIME_SLICE_LEN (means it has consumed its time slice), change
+  // its status into READY, place it in the rear of ready queue, and finally
+  // schedule next process to run.
+  // panic( "You need to further implement the timer handling in lab3_3.\n" );
   int hartid = read_tp();
-  if(current[hartid]->tick_count >= TIME_SLICE_LEN){
+  if (current[hartid]->tick_count >= TIME_SLICE_LEN) {
     current[hartid]->tick_count = 0;
     sys_user_yield();
   }
 }
 
-
 //
-// kernel/smode_trap.S will pass control to smode_trap_handler, when a trap happens in S-mode.
+// kernel/smode_trap.S will pass control to smode_trap_handler, when a trap
+// happens in S-mode.
 //
 void smode_trap_handler(void) {
   int hartid = read_tp();
@@ -124,7 +131,7 @@ void smode_trap_handler(void) {
   switch (cause) {
   case CAUSE_USER_ECALL:
     handle_syscall(current[hartid]->trapframe);
-		//sprint("coming back from syscall\n");
+    // sprint("coming back from syscall\n");
     break;
   case CAUSE_MTIMER_S_TRAP:
     handle_mtimer_trap();
@@ -143,7 +150,7 @@ void smode_trap_handler(void) {
     panic("unexpected exception happened.\n");
     break;
   }
-	//sprint("calling switch_to, current[hartid] = 0x%x\n", current[hartid]);
+  // sprint("calling switch_to, current[hartid] = 0x%x\n", current[hartid]);
   // continue (come back to) the execution of current process.
   switch_to(current[hartid]);
 }
