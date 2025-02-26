@@ -31,7 +31,7 @@ int vfs_init() {
   if ((ret = hash_table_init(&vinode_hash_table, vinode_hash_equal,
                              vinode_hash_func, NULL, NULL, NULL)) != 0)
     return ret;
-	
+
   return 0;
 }
 
@@ -327,9 +327,9 @@ struct file *vfs_opendir(const char *path) {
 
   // additional open direntry operations for a specific file system
   // rfs needs duild dir cache.
-  if (file_dentry->dentry_inode->i_ops->viop_hook_opendir) {
-    if (file_dentry->dentry_inode->i_ops->
-        viop_hook_opendir(file_dentry->dentry_inode, file_dentry) != 0) {
+  if (file_dentry -> dentry_inode -> i_ops -> viop_hook_opendir) {
+    if (file_dentry->dentry_inode->i_ops->viop_hook_opendir(
+            file_dentry->dentry_inode, file_dentry) != 0) {
       sprint("vfs_opendir: hook opendir failed!\n");
     }
   }
@@ -406,8 +406,8 @@ int vfs_closedir(struct file *file) {
   // additional close direntry operations for a specific file system
   // rfs needs reclaim dir cache.
   if (file->f_dentry->dentry_inode->i_ops->viop_hook_closedir) {
-    if (file->f_dentry->dentry_inode->i_ops->
-        viop_hook_closedir(file->f_dentry->dentry_inode, file->f_dentry) != 0) {
+    if (file->f_dentry->dentry_inode->i_ops->viop_hook_closedir(
+            file->f_dentry->dentry_inode, file->f_dentry) != 0) {
       sprint("vfs_closedir: hook closedir failed!\n");
     }
   }
@@ -640,5 +640,3 @@ struct vinode *default_alloc_vinode(struct super_block *sb) {
   vinode->size = 0;
   return vinode;
 }
-
-
