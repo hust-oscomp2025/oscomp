@@ -321,7 +321,7 @@ ssize_t sys_user_close(int fd) {
 // lib call to opendir
 //
 ssize_t sys_user_opendir(char * pathva){
-  char * pathpa = (char*)user_va_to_pa((pagetable_t)(current->pagetable), pathva);
+  char * pathpa = (char*)user_va_to_pa((pagetable_t)(current[read_tp()]->pagetable), pathva);
   return do_opendir(pathpa);
 }
 
@@ -329,7 +329,7 @@ ssize_t sys_user_opendir(char * pathva){
 // lib call to readdir
 //
 ssize_t sys_user_readdir(int fd, struct dir *vdir){
-  struct dir * pdir = (struct dir *)user_va_to_pa((pagetable_t)(current->pagetable), vdir);
+  struct dir * pdir = (struct dir *)user_va_to_pa((pagetable_t)(current[read_tp()]->pagetable), vdir);
   return do_readdir(fd, pdir);
 }
 
@@ -337,7 +337,7 @@ ssize_t sys_user_readdir(int fd, struct dir *vdir){
 // lib call to mkdir
 //
 ssize_t sys_user_mkdir(char * pathva){
-  char * pathpa = (char*)user_va_to_pa((pagetable_t)(current->pagetable), pathva);
+  char * pathpa = (char*)user_va_to_pa((pagetable_t)(current[read_tp()]->pagetable), pathva);
   return do_mkdir(pathpa);
 }
 

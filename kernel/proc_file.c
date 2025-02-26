@@ -173,7 +173,7 @@ int do_opendir(char *pathname) {
   int fd = 0;
   struct file *pfile;
   for (fd = 0; fd < MAX_FILES; ++fd) {
-    pfile = &(current->pfiles->opened_files[fd]);
+    pfile = &(current[read_tp()]->pfiles->opened_files[fd]);
     if (pfile->status == FD_NONE) break;
   }
   if (pfile->status != FD_NONE)  // no free entry
@@ -182,7 +182,7 @@ int do_opendir(char *pathname) {
   // initialize this file structure
   memcpy(pfile, opened_file, sizeof(struct file));
 
-  ++current->pfiles->nfiles;
+  ++current[read_tp()]->pfiles->nfiles;
   return fd;
 }
 
@@ -203,7 +203,7 @@ int do_mkdir(char *pathname) {
 
 //
 // close a directory
-//
+// 
 int do_closedir(int fd) {
   struct file *pfile = get_opened_file(fd);
   return vfs_closedir(pfile);
