@@ -17,6 +17,8 @@ typedef struct trapframe_t {
 
   // kernel page table. added @lab2_1
   /* offset:272 */ uint64 kernel_satp;
+	// kernel scheduler, added @lab3_challenge2
+	/* offset:280 */ uint64 kernel_schedule;
 }trapframe;
 
 // riscv-pke kernel supports at most 32 processes
@@ -43,6 +45,13 @@ enum segment_type {
   DATA_SEGMENT,    // ELF segment
 };
 
+// types of a segment
+enum fork_choice {
+  FORK_MAP = 0,   // 直接映射代码段
+  FORK_COPY, // 直接复制所有数据
+	FORK_COW,
+};
+
 // the VM regions mapped to a user process
 typedef struct mapped_region {
   uint64 va;       // mapped virtual address
@@ -57,10 +66,20 @@ typedef struct process_heap_manager {
   uint64 heap_bottom;
 
   // the address of free pages in the heap
-  uint64 free_pages_address[MAX_HEAP_PAGES];
+  // uint64 free_pages_address[MAX_HEAP_PAGES];
   // the number of free pages in the heap
-  uint32 free_pages_count;
+  // uint32 free_pages_count;
 }process_heap_manager;
+
+// code file struct, including directory index and file name char pointer
+typedef struct {
+    uint64 dir; char *file;
+} code_file;
+
+// address-line number-file name table
+typedef struct {
+    uint64 addr, line, file;
+} addr_line;
 
 // the extremely simple definition of process, used for begining labs of PKE
 typedef struct process_t {
@@ -70,6 +89,23 @@ typedef struct process_t {
   pagetable_t pagetable;
   // trapframe storing the context of a (User mode) process.
   trapframe* trapframe;
+
+	// lab3_challenge2新增：内核上下文。用来从内核阻塞中恢复。
+	trapframe* ktrapframe;
+
+  // added @lab1_challenge2
+  char *debugline;
+  char **dir;
+  code_file *file;
+  addr_line *line;
+  int line_count;
+
+  // user stack bottom. added @lab2_challenge1
+  uint64 user_stack_bottom;
+
+  //heap_block* heap;
+  // size_t heap_size;
+
 
   // points to a page that contains mapped_regions. below are added @lab3_1
   mapped_region *mapped_info;
@@ -91,8 +127,10 @@ typedef struct process_t {
   // accounting. added @lab3_3
   int tick_count;
 
+	int sem_index;
   // file system. added @lab4_1
   proc_file_management *pfiles;
+
 }process;
 
 // switch to run user app
@@ -102,12 +140,17 @@ void switch_to(process*);
 void init_proc_pool();
 // allocate an empty process, init its vm space. returns its pid
 process* alloc_process();
+void init_user_stack(process* ps);
+void init_user_heap(process* ps);
+
+
+
 // reclaim a process, destruct its vm space and free physical pages.
 int free_process( process* proc );
 // fork a child from parent
 int do_fork(process* parent);
 
 // current running process
-extern process* current;
+// extern process* current[NCPU];
 
 #endif
