@@ -4,6 +4,7 @@
 
 #include "proc_file.h"
 
+#include "global.h"
 #include "hostfs.h"
 #include "pmm.h"
 #include "process.h"
@@ -23,12 +24,14 @@ void fs_init(void) {
   vfs_init();
 
   // register hostfs and mount it as the root
-  if( register_hostfs() < 0 ) panic( "fs_init: cannot register hostfs.\n" );
+  if (register_hostfs() < 0)
+    panic("fs_init: cannot register hostfs.\n");
   struct device *hostdev = init_host_device("HOSTDEV");
   vfs_mount("HOSTDEV", MOUNT_AS_ROOT);
 
   // register and mount rfs
-  if( register_rfs() < 0 ) panic( "fs_init: cannot register rfs.\n" );
+  if (register_rfs() < 0)
+    panic("fs_init: cannot register rfs.\n");
   struct device *ramdisk0 = init_rfs_device("RAMDISK0");
   rfs_format_dev(ramdisk0);
   vfs_mount("RAMDISK0", MOUNT_DEFAULT);
@@ -68,10 +71,12 @@ struct file *get_opened_file(int fd) {
 
   // browse opened file list to locate the fd
   for (int i = 0; i < MAX_FILES; ++i) {
-    pfile = &(current->pfiles->opened_files[i]);  // file entry
-    if (i == fd) break;
+    pfile = &(current[read_tp()]->pfiles->opened_files[i]); // file entry
+    if (i == fd)
+      break;
   }
-  if (pfile == NULL) panic("do_read: invalid fd!\n");
+  if (pfile == NULL)
+    panic("do_read: invalid fd!\n");
   return pfile;
 }
 
@@ -81,22 +86,24 @@ struct file *get_opened_file(int fd) {
 //
 int do_open(char *pathname, int flags) {
   struct file *opened_file = NULL;
-  if ((opened_file = vfs_open(pathname, flags)) == NULL) return -1;
+  if ((opened_file = vfs_open(pathname, flags)) == NULL)
+    return -1;
 
   int fd = 0;
-  if (current->pfiles->nfiles >= MAX_FILES) {
+  if (current[read_tp()]->pfiles->nfiles >= MAX_FILES) {
     panic("do_open: no file entry for current process!\n");
   }
   struct file *pfile;
   for (fd = 0; fd < MAX_FILES; ++fd) {
-    pfile = &(current->pfiles->opened_files[fd]);
-    if (pfile->status == FD_NONE) break;
+    pfile = &(current[read_tp()]->pfiles->opened_files[fd]);
+    if (pfile->status == FD_NONE)
+      break;
   }
 
   // initialize this file structure
   memcpy(pfile, opened_file, sizeof(struct file));
 
-  ++current->pfiles->nfiles;
+  ++current[read_tp()]->pfiles->nfiles;
   return fd;
 }
 
@@ -107,7 +114,8 @@ int do_open(char *pathname, int flags) {
 int do_read(int fd, char *buf, uint64 count) {
   struct file *pfile = get_opened_file(fd);
 
-  if (pfile->readable == 0) panic("do_read: no readable file!\n");
+  if (pfile->readable == 0)
+    panic("do_read: no readable file!\n");
 
   char buffer[count + 1];
   int len = vfs_read(pfile, buffer, count);
@@ -123,7 +131,8 @@ int do_read(int fd, char *buf, uint64 count) {
 int do_write(int fd, char *buf, uint64 count) {
   struct file *pfile = get_opened_file(fd);
 
-  if (pfile->writable == 0) panic("do_write: cannot write file!\n");
+  if (pfile->writable == 0)
+    panic("do_write: cannot write file!\n");
 
   int len = vfs_write(pfile, buf, count);
   return len;
@@ -166,23 +175,21 @@ int do_close(int fd) {
 // return: the fd of the directory file
 //
 int do_opendir(char *pathname) {
-  struct file *opened_file = NULL;
-  if ((opened_file = vfs_opendir(pathname)) == NULL) return -1;
+  struct file *opened_file = vfs_opendir(pathname);
+  if (opened_file == NULL)
+    return -1;
 
-  int fd = 0;
-  struct file *pfile;
-  for (fd = 0; fd < MAX_FILES; ++fd) {
-    pfile = &(current->pfiles->opened_files[fd]);
-    if (pfile->status == FD_NONE) break;
+	// 从进程控制块中分配fd
+  for (int fd = 0; fd < MAX_FILES; ++fd) {
+    struct file *pfile = &(current[read_tp()]->pfiles->opened_files[fd]);
+    if (pfile->status == FD_NONE) {
+      // initialize this file structure
+      memcpy(pfile, opened_file, sizeof(struct file));
+      current[read_tp()]->pfiles->nfiles++;
+      return fd;
+    }
   }
-  if (pfile->status != FD_NONE)  // no free entry
-    panic("do_opendir: no file entry for current process!\n");
-
-  // initialize this file structure
-  memcpy(pfile, opened_file, sizeof(struct file));
-
-  ++current->pfiles->nfiles;
-  return fd;
+  panic("do_opendir: no file entry for current process!\n");
 }
 
 //
@@ -196,9 +203,7 @@ int do_readdir(int fd, struct dir *dir) {
 //
 // make a new directory
 //
-int do_mkdir(char *pathname) {
-  return vfs_mkdir(pathname);
-}
+int do_mkdir(char *pathname) { return vfs_mkdir(pathname); }
 
 //
 // close a directory

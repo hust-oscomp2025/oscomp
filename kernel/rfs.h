@@ -58,8 +58,8 @@ struct rfs_dir_cache {
 int register_rfs();
 int rfs_format_dev(struct device *dev);
 
-int rfs_r1block(struct rfs_device *rfs_dev, int n_block);
-int rfs_w1block(struct rfs_device *rfs_dev, int n_block);
+
+
 struct rfs_dinode *rfs_read_dinode(struct rfs_device *rdev, int n_inode);
 int rfs_write_dinode(struct rfs_device *rdev, const struct rfs_dinode *dinode,
                      int n_inode);
