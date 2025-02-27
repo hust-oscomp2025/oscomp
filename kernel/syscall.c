@@ -352,8 +352,8 @@ ssize_t sys_user_closedir(int fd){
 // lib call to link
 //
 ssize_t sys_user_link(char * vfn1, char * vfn2){
-  char * pfn1 = (char*)user_va_to_pa((pagetable_t)(current->pagetable), (void*)vfn1);
-  char * pfn2 = (char*)user_va_to_pa((pagetable_t)(current->pagetable), (void*)vfn2);
+  char * pfn1 = (char*)user_va_to_pa((pagetable_t)(current[read_tp()]->pagetable), (void*)vfn1);
+  char * pfn2 = (char*)user_va_to_pa((pagetable_t)(current[read_tp()]->pagetable), (void*)vfn2);
   return do_link(pfn1, pfn2);
 }
 
@@ -361,7 +361,7 @@ ssize_t sys_user_link(char * vfn1, char * vfn2){
 // lib call to unlink
 //
 ssize_t sys_user_unlink(char * vfn){
-  char * pfn = (char*)user_va_to_pa((pagetable_t)(current->pagetable), (void*)vfn);
+  char * pfn = (char*)user_va_to_pa((pagetable_t)(current[read_tp()]->pagetable), (void*)vfn);
   return do_unlink(pfn);
 }
 

@@ -46,6 +46,7 @@
 #define SYS_user_print_backtrace (SYS_user_base + 32)
 #define SYS_user_test (SYS_user_base + 33)
 #define SYS_user_printpa (SYS_user_base + 34)
+
 long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, long a7);
 ssize_t sys_user_yield();
 #endif
