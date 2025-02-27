@@ -179,6 +179,7 @@ int do_opendir(char *pathname) {
   if (opened_file == NULL)
     return -1;
 
+	// 从进程控制块中分配fd
   for (int fd = 0; fd < MAX_FILES; ++fd) {
     struct file *pfile = &(current[read_tp()]->pfiles->opened_files[fd]);
     if (pfile->status == FD_NONE) {
