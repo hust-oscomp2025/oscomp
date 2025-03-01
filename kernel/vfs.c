@@ -402,7 +402,6 @@ int vfs_close(struct file *file) {
     }
   }
 
-  file->status = FD_NONE;
   return 0;
 }
 
