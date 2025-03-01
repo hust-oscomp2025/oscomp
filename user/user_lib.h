@@ -9,10 +9,22 @@
 
 int printu(const char *s, ...);
 int exit(int code);
-void* naive_malloc();
+void printRegs();
+int getRa(void);
+int print_backtrace(int depth);
+void* better_malloc(int n);
+void better_free(void* va);
 void naive_free(void* va);
+void* naive_malloc();
 int fork();
 void yield();
+int wait(int pid);
+void test_kernel(void);
+
+int sem_new(int initial_value);
+int sem_P(int sem_index);
+int sem_V(int sem_index);
+void printpa(int* va);
 
 // added @ lab4_1
 int open(const char *pathname, int flags);
@@ -37,3 +49,4 @@ int read_cwd(char *path);
 int change_cwd(const char *path);
 
 #endif
+
