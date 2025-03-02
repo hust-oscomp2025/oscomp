@@ -4,6 +4,7 @@
 
 #include "vfs.h"
 
+#include "global.h"
 #include "pmm.h"
 #include "spike_interface/spike_utils.h"
 #include "util/hash_table.h"
@@ -123,7 +124,7 @@ struct file *vfs_open(const char *path, int flags) {
 
   // path lookup.
   struct dentry *file_dentry = lookup_final_dentry(path, &parent, miss_name);
-
+	
   // file does not exist
   if (!file_dentry) {
     int creatable = flags & O_CREAT;
@@ -305,10 +306,12 @@ int vfs_link(const char *oldpath, const char *newpath) {
   }
 
   // do the real hard-link
-  new_file_dentry = alloc_vfs_dentry(basename, old_file_dentry->dentry_inode, parent);
-  int err =
-      viop_link(parent->dentry_inode, new_file_dentry, old_file_dentry->dentry_inode);
-  if (err) return -1;
+  new_file_dentry =
+      alloc_vfs_dentry(basename, old_file_dentry->dentry_inode, parent);
+  int err = viop_link(parent->dentry_inode, new_file_dentry,
+                      old_file_dentry->dentry_inode);
+  if (err)
+    return -1;
 
   // make a new dentry for the new link
   hash_put_dentry(new_file_dentry);
@@ -344,12 +347,13 @@ int vfs_unlink(const char *path) {
   // do the real unlink
   struct vinode *unlinked_vinode = file_dentry->dentry_inode;
   int err = viop_unlink(parent->dentry_inode, file_dentry, unlinked_vinode);
-  if (err) return -1;
+  if (err)
+    return -1;
 
   // remove the dentry from the hash table
   hash_erase_dentry(file_dentry);
   free_vfs_dentry(file_dentry);
-  unlinked_vinode->ref--; 
+  unlinked_vinode->ref--;
 
   // if this inode has been removed from disk
   if (unlinked_vinode->nlinks == 0) {
@@ -358,9 +362,12 @@ int vfs_unlink(const char *path) {
 
     // we don't write back the inode, because it has disappeared from the disk
     hash_erase_vinode(unlinked_vinode);
-    free_page(unlinked_vinode);  // free the vinode
+    free_page(unlinked_vinode); // free the vinode
   }
   
+  
+
+
 
   return 0;
 }
@@ -409,6 +416,8 @@ int vfs_close(struct file *file) {
 // open a dir at vfs layer. the directory must exist on disk.
 //
 struct file *vfs_opendir(const char *path) {
+  sprint("vfs_opendir: path = %s\n", path);
+
   struct dentry *parent = vfs_root_dentry;
   char miss_name[MAX_PATH_LEN];
 
@@ -425,7 +434,7 @@ struct file *vfs_opendir(const char *path) {
 
   // additional open direntry operations for a specific file system
   // rfs needs duild dir cache.
-  if (file_dentry -> dentry_inode -> i_ops -> viop_hook_opendir) {
+  if (file_dentry->dentry_inode->i_ops->viop_hook_opendir) {
     if (file_dentry->dentry_inode->i_ops->viop_hook_opendir(
             file_dentry->dentry_inode, file_dentry) != 0) {
       sprint("vfs_opendir: hook opendir failed!\n");
@@ -531,8 +540,44 @@ struct dentry *lookup_final_dentry(const char *path, struct dentry **parent,
   char *token = strtok(path_copy, "/");
   struct dentry *this = *parent;
 
+  // Handle special case ".." for parent directory
+  if (token && strcmp(token, "..") == 0) {
+    this = (*parent)->parent;
+    if (this == NULL) {
+      // We're at the root already
+      this = *parent;
+    }
+    *parent = this->parent;
+    token = strtok(NULL, "/");
+  }
+
+  // Handle special case "." for current directory
+  if (token && strcmp(token, ".") == 0) {
+    // sprint("lookup_final_dentry: token is .\n");
+    token = strtok(NULL, "/");
+  }
+
   while (token != NULL) {
     *parent = this;
+
+    // Handle ".." within the path
+    if (strcmp(token, "..") == 0) {
+      this = (*parent)->parent;
+      if (this == NULL) {
+        // We're at the root already
+        this = *parent;
+      }
+      *parent = this->parent;
+      token = strtok(NULL, "/");
+      continue;
+    }
+
+    // Handle "." within the path (just skip it)
+    if (strcmp(token, ".") == 0) {
+      token = strtok(NULL, "/");
+      continue;
+    }
+
     this = hash_get_dentry((*parent), token); // try hash first
     if (this == NULL) {
       // if not found in hash, try to find it in the directory
@@ -573,21 +618,62 @@ struct dentry *lookup_final_dentry(const char *path, struct dentry **parent,
 
 //
 // get the base name of a path
+// handles both absolute and relative paths
 //
 void get_base_name(const char *path, char *base_name) {
-  char path_copy[MAX_PATH_LEN];
-  strcpy(path_copy, path);
-
-  char *token = strtok(path_copy, "/");
-  char *last_token = NULL;
-  while (token != NULL) {
-    last_token = token;
-    token = strtok(NULL, "/");
+  // Handle NULL or empty path
+  if (!path || path[0] == '\0') {
+    strcpy(base_name, "");
+    return;
   }
 
-  strcpy(base_name, last_token);
-}
+  // Handle root path
+  if (strcmp(path, "/") == 0) {
+    strcpy(base_name, "/");
+    return;
+  }
 
+  // Handle paths that end with slash (directory paths)
+  char path_copy[MAX_PATH_LEN];
+  strcpy(path_copy, path);
+  path_copy[MAX_PATH_LEN - 1] = '\0';
+
+  // Remove trailing slashes
+  int len = strlen(path_copy);
+  while (len > 0 && path_copy[len - 1] == '/') {
+    path_copy[len - 1] = '\0';
+    len--;
+  }
+
+  // If path is empty after removing trailing slashes
+  if (path_copy[0] == '\0') {
+    strcpy(base_name, "/");
+    return;
+  }
+
+  // Split the path by '/' and find the last token
+  char *token = strtok(path_copy, "/");
+  char *last_token = token;
+  sprint("get_base_name: token = %s\n", token);
+  while (token != NULL) {
+    // Check for special directory names (for relative path handling)
+    if (strcmp(token, ".") == 0 || strcmp(token, "..") == 0) {
+      last_token = NULL;
+    } else {
+      last_token = token;
+      sprint("get_base_name: last_token = %s\n", last_token);
+    }
+    token = strtok(NULL, "/");
+    // sprint("get_base_name: token = %s\n", token);
+  }
+
+  // Copy the last token to base_name or default to "/"
+  if (last_token) {
+    strcpy(base_name, last_token);
+  } else {
+    strcpy(base_name, "/");
+  }
+}
 //
 // alloc a (virtual) file
 //

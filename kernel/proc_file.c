@@ -228,3 +228,73 @@ int do_link(char *oldpath, char *newpath) {
 int do_unlink(char *path) {
   return vfs_unlink(path);
 }
+
+//
+// Get the absolute path of current working directory
+// and copy it to the provided buffer
+//
+ssize_t do_rcwd(char* path) {
+    if (!path) {
+        return -1;  // Invalid buffer
+    }
+    
+    struct dentry* cwd = current[read_tp()]->pfiles->cwd;
+    if (!cwd) {
+        return -1;  // No current working directory
+    }
+    
+    // Special case: root directory
+    if (cwd == vfs_root_dentry) {
+        strcpy(path, "/");
+        return 0;
+    }
+    
+    // Build path by traversing up the dentry tree
+    char temp_path[MAX_PATH_LEN];
+    temp_path[0] = '\0';  // Initialize as empty string
+    
+    struct dentry* current_dentry = cwd;
+    int total_length = 0;
+    
+    // Traverse up until we reach the root
+    while (current_dentry && current_dentry != vfs_root_dentry) {
+        // Check if the path would exceed the buffer
+        int name_len = strlen(current_dentry->name);
+        total_length += name_len + 1;  // +1 for the '/'
+        
+        if (total_length >= MAX_PATH_LEN) {
+            // Path too long
+            path[0] = '\0';
+            return -1;
+        }
+        
+        // Prepend this component to the path
+        char temp_buffer[MAX_PATH_LEN];
+        strcpy(temp_buffer, "/");
+        strcat(temp_buffer, current_dentry->name);
+        strcat(temp_buffer, temp_path);
+        
+        strcpy(temp_path, temp_buffer);
+        
+        // Move up to parent
+        current_dentry = current_dentry->parent;
+    }
+    
+    // If the path is empty (should not happen), return root
+    if (temp_path[0] == '\0') {
+        strcpy(path, "/");
+    } else {
+        strcpy(path, temp_path);
+    }
+    
+    return 0;
+}
+
+
+ssize_t do_ccwd(char* path) {
+	struct file* dir_file = vfs_opendir(path);
+	if (dir_file == NULL)
+    return -1;
+	current[read_tp()]->pfiles->cwd = dir_file->f_dentry;
+	return 0;
+}
