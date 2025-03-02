@@ -4,37 +4,42 @@
 
 #include "vfs.h"
 
+#include "global.h"
 #include "pmm.h"
 #include "spike_interface/spike_utils.h"
+#include "util/hash_table.h"
 #include "util/string.h"
 #include "util/types.h"
-#include "util/hash_table.h"
 
-struct dentry *vfs_root_dentry;               // system root direntry
-struct super_block *vfs_sb_list[MAX_MOUNTS];  // system superblock list
-struct device *vfs_dev_list[MAX_VFS_DEV];     // system device list in vfs layer
+struct dentry *vfs_root_dentry;              // system root direntry
+struct super_block *vfs_sb_list[MAX_MOUNTS]; // system superblock list
+struct device *vfs_dev_list[MAX_VFS_DEV];    // system device list in vfs layer
 struct hash_table dentry_hash_table;
 struct hash_table vinode_hash_table;
+
+struct file_system_type *fs_list[MAX_SUPPORTED_FS];
 
 //
 // initializes the dentry hash list and vinode hash list
 //
 int vfs_init() {
   int ret;
-  ret = hash_table_init(&dentry_hash_table, dentry_hash_equal, dentry_hash_func,
-                            NULL, NULL, NULL);
-  if (ret != 0) return ret;
 
-  ret = hash_table_init(&vinode_hash_table, vinode_hash_equal, vinode_hash_func,
-                            NULL, NULL, NULL);
-  if (ret != 0) return ret;
-  return 0; 
+  if ((ret = hash_table_init(&dentry_hash_table, dentry_hash_equal,
+                             dentry_hash_func, NULL, NULL, NULL)) != 0)
+    return ret;
+
+  if ((ret = hash_table_init(&vinode_hash_table, vinode_hash_equal,
+                             vinode_hash_func, NULL, NULL, NULL)) != 0)
+    return ret;
+
+  return 0;
 }
 
 //
 // mount a file system from the device named "dev_name"
 // PKE does not support mounting a device at an arbitrary directory as in Linux,
-// but can only mount a device in one of the following two ways (according to 
+// but can only mount a device in one of the following two ways (according to
 // the mnt_type parameter) :
 // 1. when mnt_type = MOUNT_AS_ROOT
 //    Mount the device AS the root directory.
@@ -53,9 +58,11 @@ struct super_block *vfs_mount(const char *dev_name, int mnt_type) {
   // find the device entry in vfs_device_list named as dev_name
   for (int i = 0; i < MAX_VFS_DEV; ++i) {
     p_device = vfs_dev_list[i];
-    if (p_device && strcmp(p_device->dev_name, dev_name) == 0) break;
+    if (p_device && strcmp(p_device->dev_name, dev_name) == 0)
+      break;
   }
-  if (p_device == NULL) panic("vfs_mount: cannot find the device entry!\n");
+  if (p_device == NULL)
+    panic("vfs_mount: cannot find the device entry!\n");
 
   // add the super block into vfs_sb_list
   struct file_system_type *fs_type = p_device->fs_type;
@@ -72,7 +79,8 @@ struct super_block *vfs_mount(const char *dev_name, int mnt_type) {
       break;
     }
   }
-  if (err) panic("vfs_mount: too many mounts!\n");
+  if (err)
+    panic("vfs_mount: too many mounts!\n");
 
   // mount the root dentry of the file system to right place
   if (mnt_type == MOUNT_AS_ROOT) {
@@ -82,7 +90,8 @@ struct super_block *vfs_mount(const char *dev_name, int mnt_type) {
     hash_put_dentry(sb->s_root);
   } else if (mnt_type == MOUNT_DEFAULT) {
     if (!vfs_root_dentry)
-      panic("vfs_mount: root dentry not found, please mount the root device first!\n");
+      panic("vfs_mount: root dentry not found, please mount the root device "
+            "first!\n");
 
     struct dentry *mnt_point = sb->s_root;
 
@@ -109,12 +118,13 @@ struct super_block *vfs_mount(const char *dev_name, int mnt_type) {
 // return: the file pointer to the opened file.
 //
 struct file *vfs_open(const char *path, int flags) {
-  struct dentry *parent = vfs_root_dentry; // we start the path lookup from root.
+  struct dentry *parent =
+      vfs_root_dentry; // we start the path lookup from root.
   char miss_name[MAX_PATH_LEN];
 
   // path lookup.
   struct dentry *file_dentry = lookup_final_dentry(path, &parent, miss_name);
-
+	
   // file does not exist
   if (!file_dentry) {
     int creatable = flags & O_CREAT;
@@ -133,12 +143,13 @@ struct file *vfs_open(const char *path, int flags) {
       // create the file
       file_dentry = alloc_vfs_dentry(basename, NULL, parent);
       struct vinode *new_inode = viop_create(parent->dentry_inode, file_dentry);
-      if (!new_inode) panic("vfs_open: cannot create file!\n");
+      if (!new_inode)
+        panic("vfs_open: cannot create file!\n");
 
       file_dentry->dentry_inode = new_inode;
       new_inode->ref++;
       hash_put_dentry(file_dentry);
-      hash_put_vinode(new_inode); 
+      hash_put_vinode(new_inode);
     } else {
       sprint("vfs_open: cannot find the file!\n");
       return NULL;
@@ -154,20 +165,20 @@ struct file *vfs_open(const char *path, int flags) {
   int writable = 0;
   int readable = 0;
   switch (flags & MASK_FILEMODE) {
-    case O_RDONLY:
-      writable = 0;
-      readable = 1;
-      break;
-    case O_WRONLY:
-      writable = 1;
-      readable = 0;
-      break;
-    case O_RDWR:
-      writable = 1;
-      readable = 1;
-      break;
-    default:
-      panic("fs_open: invalid open flags!\n");
+  case O_RDONLY:
+    writable = 0;
+    readable = 1;
+    break;
+  case O_WRONLY:
+    writable = 1;
+    readable = 0;
+    break;
+  case O_RDWR:
+    writable = 1;
+    readable = 1;
+    break;
+  default:
+    panic("fs_open: invalid open flags!\n");
   }
 
   struct file *file = alloc_vfs_file(file_dentry, readable, writable, 0);
@@ -175,8 +186,8 @@ struct file *vfs_open(const char *path, int flags) {
   // additional open operations for a specific file system
   // hostfs needs to conduct actual file open.
   if (file_dentry->dentry_inode->i_ops->viop_hook_open) {
-    if (file_dentry->dentry_inode->i_ops->
-        viop_hook_open(file_dentry->dentry_inode, file_dentry) < 0) {
+    if (file_dentry->dentry_inode->i_ops->viop_hook_open(
+            file_dentry->dentry_inode, file_dentry) < 0) {
       sprint("vfs_open: hook_open failed!\n");
     }
   }
@@ -228,7 +239,8 @@ ssize_t vfs_lseek(struct file *file, ssize_t offset, int whence) {
     return -1;
   }
 
-  if (viop_lseek(file->f_dentry->dentry_inode, offset, whence, &(file->offset)) != 0) {
+  if (viop_lseek(file->f_dentry->dentry_inode, offset, whence,
+                 &(file->offset)) != 0) {
     sprint("vfs_lseek: lseek failed!\n");
     return -1;
   }
@@ -294,10 +306,12 @@ int vfs_link(const char *oldpath, const char *newpath) {
   }
 
   // do the real hard-link
-  new_file_dentry = alloc_vfs_dentry(basename, old_file_dentry->dentry_inode, parent);
-  int err =
-      viop_link(parent->dentry_inode, new_file_dentry, old_file_dentry->dentry_inode);
-  if (err) return -1;
+  new_file_dentry =
+      alloc_vfs_dentry(basename, old_file_dentry->dentry_inode, parent);
+  int err = viop_link(parent->dentry_inode, new_file_dentry,
+                      old_file_dentry->dentry_inode);
+  if (err)
+    return -1;
 
   // make a new dentry for the new link
   hash_put_dentry(new_file_dentry);
@@ -333,12 +347,13 @@ int vfs_unlink(const char *path) {
   // do the real unlink
   struct vinode *unlinked_vinode = file_dentry->dentry_inode;
   int err = viop_unlink(parent->dentry_inode, file_dentry, unlinked_vinode);
-  if (err) return -1;
+  if (err)
+    return -1;
 
   // remove the dentry from the hash table
   hash_erase_dentry(file_dentry);
   free_vfs_dentry(file_dentry);
-  unlinked_vinode->ref--; 
+  unlinked_vinode->ref--;
 
   // if this inode has been removed from disk
   if (unlinked_vinode->nlinks == 0) {
@@ -347,9 +362,12 @@ int vfs_unlink(const char *path) {
 
     // we don't write back the inode, because it has disappeared from the disk
     hash_erase_vinode(unlinked_vinode);
-    free_page(unlinked_vinode);  // free the vinode
+    free_page(unlinked_vinode); // free the vinode
   }
   
+  
+
+
 
   return 0;
 }
@@ -391,7 +409,6 @@ int vfs_close(struct file *file) {
     }
   }
 
-  file->status = FD_NONE;
   return 0;
 }
 
@@ -399,6 +416,8 @@ int vfs_close(struct file *file) {
 // open a dir at vfs layer. the directory must exist on disk.
 //
 struct file *vfs_opendir(const char *path) {
+  sprint("vfs_opendir: path = %s\n", path);
+
   struct dentry *parent = vfs_root_dentry;
   char miss_name[MAX_PATH_LEN];
 
@@ -416,8 +435,8 @@ struct file *vfs_opendir(const char *path) {
   // additional open direntry operations for a specific file system
   // rfs needs duild dir cache.
   if (file_dentry->dentry_inode->i_ops->viop_hook_opendir) {
-    if (file_dentry->dentry_inode->i_ops->
-        viop_hook_opendir(file_dentry->dentry_inode, file_dentry) != 0) {
+    if (file_dentry->dentry_inode->i_ops->viop_hook_opendir(
+            file_dentry->dentry_inode, file_dentry) != 0) {
       sprint("vfs_opendir: hook opendir failed!\n");
     }
   }
@@ -494,8 +513,8 @@ int vfs_closedir(struct file *file) {
   // additional close direntry operations for a specific file system
   // rfs needs reclaim dir cache.
   if (file->f_dentry->dentry_inode->i_ops->viop_hook_closedir) {
-    if (file->f_dentry->dentry_inode->i_ops->
-        viop_hook_closedir(file->f_dentry->dentry_inode, file->f_dentry) != 0) {
+    if (file->f_dentry->dentry_inode->i_ops->viop_hook_closedir(
+            file->f_dentry->dentry_inode, file->f_dentry) != 0) {
       sprint("vfs_closedir: hook closedir failed!\n");
     }
   }
@@ -521,9 +540,45 @@ struct dentry *lookup_final_dentry(const char *path, struct dentry **parent,
   char *token = strtok(path_copy, "/");
   struct dentry *this = *parent;
 
+  // Handle special case ".." for parent directory
+  if (token && strcmp(token, "..") == 0) {
+    this = (*parent)->parent;
+    if (this == NULL) {
+      // We're at the root already
+      this = *parent;
+    }
+    *parent = this->parent;
+    token = strtok(NULL, "/");
+  }
+
+  // Handle special case "." for current directory
+  if (token && strcmp(token, ".") == 0) {
+    // sprint("lookup_final_dentry: token is .\n");
+    token = strtok(NULL, "/");
+  }
+
   while (token != NULL) {
     *parent = this;
-    this = hash_get_dentry((*parent), token);  // try hash first
+
+    // Handle ".." within the path
+    if (strcmp(token, "..") == 0) {
+      this = (*parent)->parent;
+      if (this == NULL) {
+        // We're at the root already
+        this = *parent;
+      }
+      *parent = this->parent;
+      token = strtok(NULL, "/");
+      continue;
+    }
+
+    // Handle "." within the path (just skip it)
+    if (strcmp(token, ".") == 0) {
+      token = strtok(NULL, "/");
+      continue;
+    }
+
+    this = hash_get_dentry((*parent), token); // try hash first
     if (this == NULL) {
       // if not found in hash, try to find it in the directory
       this = alloc_vfs_dentry(token, NULL, *parent);
@@ -537,9 +592,11 @@ struct dentry *lookup_final_dentry(const char *path, struct dentry **parent,
         return NULL;
       }
 
-      struct vinode *same_inode = hash_get_vinode(found_vinode->sb, found_vinode->inum);
+      struct vinode *same_inode =
+          hash_get_vinode(found_vinode->sb, found_vinode->inum);
       if (same_inode != NULL) {
-        // the vinode is already in the hash table (i.e. we are opening another hard link)
+        // the vinode is already in the hash table (i.e. we are opening another
+        // hard link)
         this->dentry_inode = same_inode;
         same_inode->ref++;
         free_page(found_vinode);
@@ -561,26 +618,67 @@ struct dentry *lookup_final_dentry(const char *path, struct dentry **parent,
 
 //
 // get the base name of a path
+// handles both absolute and relative paths
 //
 void get_base_name(const char *path, char *base_name) {
-  char path_copy[MAX_PATH_LEN];
-  strcpy(path_copy, path);
-
-  char *token = strtok(path_copy, "/");
-  char *last_token = NULL;
-  while (token != NULL) {
-    last_token = token;
-    token = strtok(NULL, "/");
+  // Handle NULL or empty path
+  if (!path || path[0] == '\0') {
+    strcpy(base_name, "");
+    return;
   }
 
-  strcpy(base_name, last_token);
-}
+  // Handle root path
+  if (strcmp(path, "/") == 0) {
+    strcpy(base_name, "/");
+    return;
+  }
 
+  // Handle paths that end with slash (directory paths)
+  char path_copy[MAX_PATH_LEN];
+  strcpy(path_copy, path);
+  path_copy[MAX_PATH_LEN - 1] = '\0';
+
+  // Remove trailing slashes
+  int len = strlen(path_copy);
+  while (len > 0 && path_copy[len - 1] == '/') {
+    path_copy[len - 1] = '\0';
+    len--;
+  }
+
+  // If path is empty after removing trailing slashes
+  if (path_copy[0] == '\0') {
+    strcpy(base_name, "/");
+    return;
+  }
+
+  // Split the path by '/' and find the last token
+  char *token = strtok(path_copy, "/");
+  char *last_token = token;
+  sprint("get_base_name: token = %s\n", token);
+  while (token != NULL) {
+    // Check for special directory names (for relative path handling)
+    if (strcmp(token, ".") == 0 || strcmp(token, "..") == 0) {
+      last_token = NULL;
+    } else {
+      last_token = token;
+      sprint("get_base_name: last_token = %s\n", last_token);
+    }
+    token = strtok(NULL, "/");
+    // sprint("get_base_name: token = %s\n", token);
+  }
+
+  // Copy the last token to base_name or default to "/"
+  if (last_token) {
+    strcpy(base_name, last_token);
+  } else {
+    strcpy(base_name, "/");
+  }
+}
 //
 // alloc a (virtual) file
 //
-struct file *alloc_vfs_file(struct dentry *file_dentry, int readable, int writable,
-                        int offset) {
+struct file *alloc_vfs_file(struct dentry *file_dentry, int readable,
+                            int writable, int offset) {
   struct file *file = alloc_page();
   file->f_dentry = file_dentry;
   file_dentry->d_ref += 1;
@@ -596,11 +694,12 @@ struct file *alloc_vfs_file(struct dentry *file_dentry, int readable, int writab
 // alloc a (virtual) dir entry
 //
 struct dentry *alloc_vfs_dentry(const char *name, struct vinode *inode,
-                            struct dentry *parent) {
+                                struct dentry *parent) {
   struct dentry *dentry = (struct dentry *)alloc_page();
   strcpy(dentry->name, name);
   dentry->dentry_inode = inode;
-  if (inode) inode->ref++;
+  if (inode)
+    inode->ref++;
 
   dentry->parent = parent;
   dentry->d_ref = 0;
@@ -637,7 +736,8 @@ size_t dentry_hash_func(void *key) {
   size_t hash = 5381;
   int c;
 
-  while ((c = *name++)) hash = ((hash << 5) + hash) + c;  // hash * 33 + c
+  while ((c = *name++))
+    hash = ((hash << 5) + hash) + c; // hash * 33 + c
 
   hash = ((hash << 5) + hash) + (size_t)dentry_key->parent;
   return hash % HASH_TABLE_SIZE;
@@ -670,7 +770,8 @@ int hash_erase_dentry(struct dentry *dentry) {
 int vinode_hash_equal(void *key1, void *key2) {
   struct vinode_key *vinode_key1 = key1;
   struct vinode_key *vinode_key2 = key2;
-  if (vinode_key1->inum == vinode_key2->inum && vinode_key1->sb == vinode_key2->sb) {
+  if (vinode_key1->inum == vinode_key2->inum &&
+      vinode_key1->sb == vinode_key2->sb) {
     return 1;
   }
   return 0;
@@ -683,25 +784,29 @@ size_t vinode_hash_func(void *key) {
 
 // vinode hash table interface
 struct vinode *hash_get_vinode(struct super_block *sb, int inum) {
-  if (inum < 0) return NULL;
+  if (inum < 0)
+    return NULL;
   struct vinode_key key = {.sb = sb, .inum = inum};
   return (struct vinode *)vinode_hash_table.virtual_hash_get(&vinode_hash_table,
                                                              &key);
 }
 
 int hash_put_vinode(struct vinode *vinode) {
-  if (vinode->inum < 0) return -1;
+  if (vinode->inum < 0)
+    return -1;
   struct vinode_key *key = alloc_page();
   key->sb = vinode->sb;
   key->inum = vinode->inum;
 
   int ret = vinode_hash_table.virtual_hash_put(&vinode_hash_table, key, vinode);
-  if (ret != 0) free_page(key);
+  if (ret != 0)
+    free_page(key);
   return ret;
 }
 
 int hash_erase_vinode(struct vinode *vinode) {
-  if (vinode->inum < 0) return -1;
+  if (vinode->inum < 0)
+    return -1;
   struct vinode_key key = {.sb = vinode->sb, .inum = vinode->inum};
   return vinode_hash_table.virtual_hash_erase(&vinode_hash_table, &key);
 }
@@ -719,5 +824,3 @@ struct vinode *default_alloc_vinode(struct super_block *sb) {
   vinode->size = 0;
   return vinode;
 }
-
-struct file_system_type *fs_list[MAX_SUPPORTED_FS];
