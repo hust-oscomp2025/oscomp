@@ -158,7 +158,6 @@ int free_process(process *proc) {
 
 void fork_segment(process *parent, process *child, int segnum, int choice) {
   mapped_region *mapped_info = &parent->mapped_info[segnum];
-  uint64 va = mapped_info->va;
   for (int i = 0; i < mapped_info->npages; i++) {
     uint64 pa = lookup_pa(parent->pagetable, mapped_info->va + i * PGSIZE);
     if (choice == FORK_COPY) {
@@ -166,15 +165,15 @@ void fork_segment(process *parent, process *child, int segnum, int choice) {
       memcpy((void *)newpa, (void *)pa, PGSIZE);
       user_vm_map((pagetable_t)child->pagetable, mapped_info->va + i * PGSIZE,
                   PGSIZE, newpa, prot_to_type(PROT_WRITE | PROT_READ, 1));
-    }else if(choice == FORK_COW){
+    } else if (choice == FORK_COW) {
       user_vm_map((pagetable_t)child->pagetable, mapped_info->va + i * PGSIZE,
                   PGSIZE, pa, prot_to_type(PROT_READ, 1));
-      user_vm_unmap((pagetable_t)parent->pagetable, mapped_info->va + i * PGSIZE,
-                  PGSIZE, 0);
-			//sprint("debug");
+      user_vm_unmap((pagetable_t)parent->pagetable,
+                    mapped_info->va + i * PGSIZE, PGSIZE, 0);
+      // sprint("debug");
       user_vm_map((pagetable_t)parent->pagetable, mapped_info->va + i * PGSIZE,
                   PGSIZE, pa, prot_to_type(PROT_READ, 1));
-		}else {
+    } else {
       user_vm_map((pagetable_t)child->pagetable, mapped_info->va + i * PGSIZE,
                   PGSIZE, pa, prot_to_type(PROT_EXEC | PROT_READ, 1));
     }
@@ -217,4 +216,60 @@ int do_fork(process *parent) {
 
   // sprint("do_fork ends\n");
   return child->pid;
+}
+
+static void unmap_segment(process *ps, int segnum) {
+  mapped_region *mapped_info = &ps->mapped_info[segnum];
+  for (int i = 0; i < mapped_info->npages; i++) {
+    user_vm_unmap((pagetable_t)ps->pagetable, mapped_info->va + i * PGSIZE,
+                  PGSIZE, 1);
+  }
+  memset(mapped_info, 0, sizeof(mapped_region));
+  ps->total_mapped_region--;
+}
+
+
+/**
+ * @brief 执行可执行的ELF文件，或者shell脚本
+ */
+int do_exec(void *path) {
+  //, char **argv, u64 envp
+  // 当前只支持进程中仅有一个线程时进行 exec
+  process *cur = current[read_tp()];
+
+  for (int i = 0; i < cur->total_mapped_region; i++) {
+    switch (cur->mapped_info[i].seg_type) {
+    case STACK_SEGMENT:
+      unmap_segment(cur, i);
+      break;
+    case CONTEXT_SEGMENT:
+      break;
+    case SYSTEM_SEGMENT:
+      break;
+    case HEAP_SEGMENT:
+      cur->user_heap.heap_top = USER_FREE_ADDRESS_START;
+      cur->user_heap.heap_bottom = USER_FREE_ADDRESS_START;
+      unmap_segment(cur, i);
+      break;
+    case CODE_SEGMENT:
+			unmap_segment(cur, i);
+			break;
+    case DATA_SEGMENT:
+			unmap_segment(cur, i);
+      break;
+    default:
+      panic("unknown segment type encountered, segment type:%d.\n",
+            cur->mapped_info[i].seg_type);
+    }
+  }
+	init_user_stack(cur);
+	init_user_heap(cur);
+	load_elf_from_file(cur,path);
+	insert_to_ready_queue(cur);
+	schedule();
+
+
+
+	sprint("exec failed.\n");
+	return -1;
 }

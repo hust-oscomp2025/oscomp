@@ -48,5 +48,7 @@ int unlink_u(const char *fn);
 int read_cwd(char *path);
 int change_cwd(const char *path);
 
+int exec(const char* path);
+
 #endif
 

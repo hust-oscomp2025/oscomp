@@ -75,7 +75,7 @@ typedef struct elf_ctx_t {
 elf_status elf_init(elf_ctx *ctx, void *info);
 elf_status elf_load(elf_ctx *ctx);
 
-void load_bincode_from_host_elf(process *p);
+void load_elf_from_file(process *p, char* filename);
 
 //lab1_challenge1
 // ELF符号表结构体

@@ -237,7 +237,7 @@ void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free) {
 // 计算用户请求的内存大小，跳过堆元数据部分
 #define USER_MEM_SIZE(size) ((size) + sizeof(heap_block))
 
-void heap_init(process *ps) {
+void create_user_heap(process *ps) {
   heap_block *first_block = (heap_block *)Alloc_page();
   first_block->size = PGSIZE - sizeof(heap_block);
   first_block->prev = NULL;
@@ -256,7 +256,7 @@ void *vmalloc(size_t size) {
   int hartid = read_tp();
   process *ps = current[hartid];
   if (ps->user_heap.heap_top == ps->user_heap.heap_bottom) {
-    heap_init(ps);
+    create_user_heap(ps);
   }
 
   int required_size = ALIGN(size + sizeof(heap_block), 8);

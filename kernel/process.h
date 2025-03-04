@@ -37,12 +37,12 @@ enum proc_status {
 
 // types of a segment
 enum segment_type {
-  STACK_SEGMENT = 0,   // runtime stack segment
-  CONTEXT_SEGMENT, // trapframe segment
-  SYSTEM_SEGMENT,  // system segment
-  HEAP_SEGMENT,    // runtime heap segment
-  CODE_SEGMENT,    // ELF segment
-  DATA_SEGMENT,    // ELF segment
+  STACK_SEGMENT = 0,   // runtime stack segmentm from init_user_stack
+  CONTEXT_SEGMENT, // trapframe segment, from alloc_process
+  SYSTEM_SEGMENT,  // system segment,from alloc_process
+  HEAP_SEGMENT,    // runtime heap segment, from init_user_heap
+  CODE_SEGMENT,    // ELF segmentm from elf_load_segment
+  DATA_SEGMENT,    // ELF segment, from elf_load_segment
 };
 
 // types of a segment
@@ -149,6 +149,7 @@ void init_user_heap(process* ps);
 int free_process( process* proc );
 // fork a child from parent
 int do_fork(process* parent);
+int do_exec(void *path);
 
 // current running process
 // extern process* current[NCPU];

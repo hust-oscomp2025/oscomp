@@ -298,3 +298,12 @@ ssize_t do_ccwd(char* path) {
 	current[read_tp()]->pfiles->cwd = dir_file->f_dentry;
 	return 0;
 }
+
+static void release_proc_files(proc_file_management* pfiles) {
+	for (int i = 0; i < MAX_FILES; i++) {
+		if (pfiles->opened_files[i].status != FD_NONE) {
+			do_close(i);
+		}
+	}
+}
+
