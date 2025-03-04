@@ -212,7 +212,7 @@ int rfs_free_block(struct super_block *sb, int block_num) {
 // add a new directory entry to a directory
 //
 int rfs_add_direntry(struct vinode *dir, const char *name, int inum) {
-  if (dir->type != DIR_I) {
+  if (dir->type != S_IFDIR) {
     sprint("rfs_add_direntry: not a directory!\n");
     return -1;
   }
@@ -511,23 +511,23 @@ struct vinode *rfs_create(struct vinode *parent, struct dentry *sub_dentry) {
 }
 
 //
-// there are two types of seek (specify by whence): LSEEK_SET, SEEK_CUR
-// LSEEK_SET: set the file pointer to the offset
-// LSEEK_CUR: set the file pointer to the current offset plus the offset
+// there are two types of seek (specify by whence): SEEK_SET, SEEK_CUR
+// SEEK_SET: set the file pointer to the offset
+// SEEK_CUR: set the file pointer to the current offset plus the offset
 // return 0 if success, otherwise return -1
 //
 int rfs_lseek(struct vinode *f_inode, ssize_t new_offset, int whence, int *offset) {
   int file_size = f_inode->size;
 
   switch (whence) {
-    case LSEEK_SET:
+    case SEEK_SET:
       if (new_offset < 0 || new_offset > file_size) {
         sprint("rfs_lseek: invalid offset!\n");
         return -1;
       }
       *offset = new_offset;
       break;
-    case LSEEK_CUR:
+    case SEEK_CUR:
       if (*offset + new_offset < 0 || *offset + new_offset > file_size) {
         sprint("rfs_lseek: invalid offset!\n");
         return -1;

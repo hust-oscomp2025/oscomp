@@ -52,9 +52,9 @@ int spike_file_close(spike_file_t* f) {
 }
 
 void spike_file_decref(spike_file_t* f) {
-  if (atomic_add(&f->refcnt, -1) == 2) {
+  if (atomic_fetch_add(&f->refcnt, -1) == 2) {
     int kfd = f->kfd;
-    mb();
+    atomic_thread_fence(memory_order_seq_cst);
     atomic_set(&f->refcnt, 0);
 
     frontend_syscall(HTIFSYS_close, kfd, 0, 0, 0, 0, 0, 0);
@@ -62,7 +62,7 @@ void spike_file_decref(spike_file_t* f) {
 }
 
 void spike_file_incref(spike_file_t* f) {
-  long prev = atomic_add(&f->refcnt, 1);
+  long prev = atomic_fetch_add(&f->refcnt, 1);
   kassert(prev > 0);
 }
 
@@ -112,7 +112,7 @@ spike_file_t* spike_file_openat(int dirfd, const char* fn, int flags, int mode) 
 }
 
 spike_file_t* spike_file_open(const char* fn, int flags, int mode) {
-  return spike_file_openat(AT_FDCWD, fn, flags, mode);
+  return spike_file_openat(-100, fn, flags, mode);
 }
 
 ssize_t spike_file_pread(spike_file_t* f, void* buf, size_t size, off_t offset) {

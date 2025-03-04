@@ -4,6 +4,7 @@
 
 #ifndef _RISCV_ATOMIC_H_
 #define _RISCV_ATOMIC_H_
+#include <stdatomic.h>
 
 // Currently, interrupts are always disabled in M-mode.
 // todo: for PKE, wo turn on irq in lab_1_3_timer, so wo have to implement these two functions.
@@ -20,21 +21,9 @@ typedef struct {
 #define SPINLOCK_INIT \
   { 0 }
 
-#define mb() asm volatile("fence" ::: "memory")
 #define atomic_set(ptr, val) (*(volatile typeof(*(ptr))*)(ptr) = val)
 #define atomic_read(ptr) (*(volatile typeof(*(ptr))*)(ptr))
 
-#define atomic_binop(ptr, inc, op)         \
-  ({                                       \
-    long flags = disable_irqsave();        \
-    typeof(*(ptr)) res = atomic_read(ptr); \
-    atomic_set(ptr, op);                   \
-    enable_irqrestore(flags);              \
-    res;                                   \
-  })
-#define atomic_add(ptr, inc) atomic_binop(ptr, inc, res + (inc))
-#define atomic_or(ptr, inc) atomic_binop(ptr, inc, res | (inc))
-#define atomic_swap(ptr, inc) atomic_binop(ptr, inc, (inc))
 #define atomic_cas(ptr, cmp, swp)                           \
   ({                                                        \
     long flags = disable_irqsave();                         \
@@ -45,8 +34,8 @@ typedef struct {
   })
 
 static inline int spinlock_trylock(spinlock_t* lock) {
-  int res = atomic_swap(&lock->lock, -1);
-  mb();
+  int res = atomic_exchange(&lock->lock, -1);
+  atomic_thread_fence(memory_order_seq_cst);
   return res;
 }
 
@@ -58,7 +47,7 @@ static inline void spinlock_lock(spinlock_t* lock) {
 }
 
 static inline void spinlock_unlock(spinlock_t* lock) {
-  mb();
+  atomic_thread_fence(memory_order_seq_cst);
   atomic_set(&lock->lock, 0);
 }
 

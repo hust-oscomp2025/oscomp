@@ -4,23 +4,24 @@
 
 //#include <stdint.h>
 //#include <stdarg.h>
-//#include <stdbool.h>
+#include <stdbool.h>
+#include "types.h"
 
 #include "util/snprintf.h"
 
 int32 vsnprintf(char* out, size_t n, const char* s, va_list vl) {
-  bool format = FALSE;
-  bool longarg = FALSE;
+  bool format = false;
+  bool longarg = false;
   size_t pos = 0;
 
   for (; *s; s++) {
     if (format) {
       switch (*s) {
         case 'l':
-          longarg = TRUE;
+          longarg = true;
           break;
         case 'p':
-          longarg = TRUE;
+          longarg = true;
           if (++pos < n) out[pos - 1] = '0';
           if (++pos < n) out[pos - 1] = 'x';
         case 'x': {
@@ -29,8 +30,8 @@ int32 vsnprintf(char* out, size_t n, const char* s, va_list vl) {
             int d = (num >> (4 * i)) & 0xF;
             if (++pos < n) out[pos - 1] = (d < 10 ? '0' + d : 'a' + d - 10);
           }
-          longarg = FALSE;
-          format = FALSE;
+          longarg = false;
+          format = false;
           break;
         }
         case 'd': {
@@ -47,8 +48,8 @@ int32 vsnprintf(char* out, size_t n, const char* s, va_list vl) {
             num /= 10;
           }
           pos += digits;
-          longarg = FALSE;
-          format = FALSE;
+          longarg = false;
+          format = false;
           break;
         }
         case 's': {
@@ -57,21 +58,21 @@ int32 vsnprintf(char* out, size_t n, const char* s, va_list vl) {
             if (++pos < n) out[pos - 1] = *s2;
             s2++;
           }
-          longarg = FALSE;
-          format = FALSE;
+          longarg = false;
+          format = false;
           break;
         }
         case 'c': {
           if (++pos < n) out[pos - 1] = (char)va_arg(vl, int);
-          longarg = FALSE;
-          format = FALSE;
+          longarg = false;
+          format = false;
           break;
         }
         default:
           break;
       }
     } else if (*s == '%')
-      format = TRUE;
+      format = true;
     else if (++pos < n)
       out[pos - 1] = *s;
   }

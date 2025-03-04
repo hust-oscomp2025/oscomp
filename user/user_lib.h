@@ -27,7 +27,7 @@ int sem_V(int sem_index);
 void printpa(int* va);
 
 // added @ lab4_1
-int open(const char *pathname, int flags);
+// int open(const char *pathname, int flags);
 int read_u(int fd, void *buf, uint64 count);
 int write_u(int fd, void *buf, uint64 count);
 int lseek_u(int fd, int offset, int whence);

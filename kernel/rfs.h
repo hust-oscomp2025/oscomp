@@ -21,8 +21,8 @@
 #define RFS_BLK_OFFSET_FREE 12
 
 // dinode type
-#define R_FILE FILE_I
-#define R_DIR DIR_I
+#define R_FILE S_IFREG
+#define R_DIR S_IFDIR
 #define R_FREE 2
 
 // file system super block

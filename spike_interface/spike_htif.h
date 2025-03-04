@@ -89,7 +89,6 @@
 #define ERR_PTR(x) ((void*)(long)(x))
 #define PTR_ERR(x) ((long)(x))
 
-#define AT_FDCWD -100
 
 extern uint64 htif;
 void query_htif(uint64 dtb);

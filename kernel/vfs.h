@@ -124,7 +124,7 @@ struct vinode {
   int inum;                  // inode number of the disk inode
   int ref;                   // reference count
   int size;                  // size of the file (in bytes)
-  int type;                  // one of FILE_I, DIR_I
+  int type;                  // one of S_IFREG, S_IFDIR
   int nlinks;                // number of hard links to this file
   int blocks;                // number of blocks
   int addrs[DIRECT_BLKNUM];  // direct blocks

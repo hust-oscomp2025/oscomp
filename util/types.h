@@ -1,5 +1,9 @@
 #ifndef _TYPES_H_
 #define _TYPES_H_
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 typedef unsigned char uint8;
 typedef unsigned short uint16;
@@ -11,31 +15,13 @@ typedef signed short int16;
 typedef signed int int32;
 typedef signed long long int64;
 
-typedef int bool;
-
-typedef signed long ssize_t;
-typedef unsigned long size_t;
-
-
-#define NULL ((void *)0)
-#define TRUE 1
-#define FALSE 0
-
-#define LSEEK_SET 0      
-#define LSEEK_CUR 1      
+   
 
 #define MOUNT_DEFAULT 0
 #define MOUNT_AS_ROOT 1
 
-#define FILE_I 0
-#define DIR_I 1
 
 #define MASK_FILEMODE 0x003
-
-#define O_RDONLY  00  // read-only access
-#define O_WRONLY  01  // write-only access
-#define O_RDWR    02  // read-write
-#define O_CREAT 0100  // create
 
 #define FD_NONE 0
 #define FD_OPENED 1

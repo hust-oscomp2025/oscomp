@@ -148,9 +148,9 @@ void yield() {
 //
 // lib call to open
 //
-int open(const char *pathname, int flags) {
-  return do_user_call(SYS_user_open, (uint64)pathname, flags, 0, 0, 0, 0, 0);
-}
+//int open(const char *pathname, int flags) {
+//  return do_user_call(SYS_user_open, (uint64)pathname, flags, 0, 0, 0, 0, 0);
+//}
 
 //
 // lib call to read
