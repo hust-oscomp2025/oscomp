@@ -3,7 +3,7 @@
  */
 
 #include "strap.h"
-#include "global.h"
+
 #include "memlayout.h"
 #include "pmm.h"
 #include "process.h"

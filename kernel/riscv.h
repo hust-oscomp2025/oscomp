@@ -2,7 +2,8 @@
 #define _RISCV_H_
 
 #include "util/types.h"
-#include "config.h"
+#include "config.h" 
+#include <stdatomic.h>
 
 // fields of mstatus, the Machine mode Status register
 #define MSTATUS_MPP_MASK (3L << 11) // previous mode mask
@@ -103,11 +104,12 @@ static inline int supports_extension(char ext) {
 
 #define write_csr(reg, val) ({ asm volatile("csrw " #reg ", %0" ::"rK"(val)); })
 
-#define swap_csr(reg, val)                                            \
-  ({                                                                  \
+
+#define swap_csr(reg, val)                                             \
+   ({                                                                  \
     unsigned long __tmp;                                              \
     asm volatile("csrrw %0, " #reg ", %1" : "=r"(__tmp) : "rK"(val)); \
-    __tmp;                                                            \
+    __tmp;                                                         \
   })
 
 #define set_csr(reg, bit)                                             \
@@ -183,6 +185,9 @@ typedef struct riscv_regs_t {
 
 // following lines are added @lab2_1
 static inline void flush_tlb(void) { asm volatile("sfence.vma zero, zero"); }
+
+
+
 #define PGSIZE 4096  // bytes per page
 #define PGSHIFT 12   // offset bits within a page
 

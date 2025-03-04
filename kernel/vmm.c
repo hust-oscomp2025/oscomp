@@ -3,7 +3,7 @@
  */
 
 #include "vmm.h"
-#include "global.h"
+
 #include "memlayout.h"
 #include "pmm.h"
 #include "process.h"
@@ -163,10 +163,6 @@ void kern_vm_init(void) {
   sprint("physical address of _etext is: 0x%lx\n",
          lookup_pa(t_page_dir, (uint64)_etext));
 
-  kernel_heap_head.next = NULL;
-  kernel_heap_head.prev = NULL;
-  kernel_heap_head.free = 0;
-  kernel_heap_head.size = 0;
 
   g_kernel_pagetable = t_page_dir;
 }

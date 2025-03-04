@@ -7,7 +7,7 @@
 #include "spike_interface/spike_utils.h"
 #include "sync_utils.h"
 #include "vmm.h"
-#include "global.h"
+
 
 // _end is defined in kernel/kernel.lds, it marks the ending (virtual) address of PKE kernel
 extern char _end[];
@@ -25,6 +25,9 @@ typedef struct node {
 
 // g_free_mem_list is the head of the list of free physical memory pages
 static list_node g_free_mem_list;
+
+//内核堆的虚拟头节点
+heap_block kernel_heap_head;
 
 //
 // actually creates the freepage list. each page occupies 4KB (PGSIZE), i.e., small page.
@@ -194,4 +197,9 @@ void pmm_init() {
   sprint("kernel memory manager is initializing ...\n");
   // create the list of free pages
   create_freepage_list(free_mem_start_addr, free_mem_end_addr);
+
+  kernel_heap_head.next = NULL;
+  kernel_heap_head.prev = NULL;
+  kernel_heap_head.free = 0;
+  kernel_heap_head.size = 0;
 }

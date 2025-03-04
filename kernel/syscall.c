@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 #include "elf.h"
-#include "global.h"
+
 #include "pmm.h"
 #include "proc_file.h"
 #include "process.h"
@@ -21,6 +21,7 @@
 
 #include "sync_utils.h"
 #include "utils.h"
+#include "semaphore.h"
 
 //
 // implement the SYS_user_print syscall
@@ -101,49 +102,10 @@ ssize_t sys_user_fork() {
   return do_fork(current[hartid]);
 }
 
-volatile int sys_user_wait(int pid) {
-  // sprint("DEBUG LINE, pid = %d\n",pid);
-
-  int hartid = read_tp();
-  // int child_found_flag = 0;
-  if (pid == -1) {
-    while (1) {
-      for (int i = 0; i < NPROC; i++) {
-        // sprint("DEBUG LINE\n");
-
-        process *p = &(procs[i]);
-        // sprint("p = 0x%lx,\n",p);
-        if (p->parent != NULL && p->parent->pid == current[hartid]->pid &&
-            p->status == ZOMBIE) {
-          // sprint("DEBUG LINE\n");
-
-          free_process(p);
-          return i;
-        }
-      }
-      // sprint("current[hartid]->sem_index = %d\n",current[hartid]->sem_index);
-      sem_P(current[hartid]->sem_index);
-      // sprint("wait:return from blocking!\n");
-    }
-  }
-  if (0 < pid && pid < NPROC) {
-    // sprint("DEBUG LINE\n");
-
-    process *p = &procs[pid];
-    if (p->parent != current[hartid]) {
-      return -1;
-    } else if (p->status == ZOMBIE) {
-      free_process(p);
-      return pid;
-    } else {
-      sem_P(p->sem_index);
-      // sprint("return from blocking!\n");
-
-      return pid;
-    }
-  }
-  return -1;
+ssize_t sys_user_wait(int pid){
+	return do_wait(pid);
 }
+
 
 int sys_user_sem_new(int initial_value) {
   // int pid = current[read_tp()]->pid;
@@ -173,72 +135,6 @@ ssize_t sys_user_yield() {
   return 0;
 }
 
-int sys_user_test() {
-  // 第1步：通过 kmalloc 分配 100 字节的内存
-  char *test_mem = (char *)kmalloc(100); // 假设每次分配 100 字节
-  sprint("test_mem=0x%x\n", test_mem);
-
-  // 检查分配是否成功
-  if (test_mem == NULL) {
-    sprint("kmalloc failed to allocate memory\n");
-    return -1;
-  }
-
-  // 第2步：进行简单的写入操作（使用 kmalloc 分配的内存）
-  for (int i = 0; i < 100; i++) {
-    test_mem[i] = 'A' + (i % 26); // 填充字符 'A' 到 'Z'，然后循环
-  }
-
-  // 第3步：进行读取操作，验证写入是否正确
-  for (int i = 0; i < 100; i++) {
-    if (test_mem[i] != 'A' + (i % 26)) {
-      sprint("Test failed at index %d. Expected '%c' but got '%c'.\n", i,
-             'A' + (i % 26), test_mem[i]);
-      kfree(test_mem); // 释放内存
-      return -1;
-    }
-  }
-
-  sprint("kmalloc and memory write test passed!\n");
-
-  // 第4步：通过 kfree 释放内存
-  kfree(test_mem);
-
-  // 第5步：再次分配新的内存块，验证内存释放后能否正确使用
-  test_mem = (char *)kmalloc(50); // 试着分配 50 字节
-  sprint("test_mem=0x%x\n", test_mem);
-  test_mem = (char *)kmalloc(3950); // 试着分配 50 字节
-  sprint("test_mem=0x%x\n", test_mem);
-  test_mem = (char *)kmalloc(50); // 试着分配 50 字节
-  sprint("test_mem=0x%x\n", test_mem);
-  test_mem = (char *)kmalloc(4000); // 试着分配 50 字节
-  sprint("test_mem=0x%x\n", test_mem);
-  if (test_mem == NULL) {
-    sprint("kmalloc failed to allocate new memory after kfree\n");
-    return -1;
-  }
-
-  // 填充新分配的内存并验证
-  for (int i = 0; i < 50; i++) {
-    test_mem[i] = 'a' + (i % 26); // 填充字符 'a' 到 'z'，然后循环
-  }
-
-  // 验证是否写入正确
-  for (int i = 0; i < 50; i++) {
-    if (test_mem[i] != 'a' + (i % 26)) {
-      sprint("Test failed at index %d. Expected '%c' but got '%c'.\n", i,
-             'a' + (i % 26), test_mem[i]);
-      kfree(test_mem);
-      return -1;
-    }
-  }
-
-  sprint("kmalloc and kfree memory test passed again!\n");
-
-  // 释放新分配的内存
-  kfree(test_mem);
-  return 0;
-}
 
 ssize_t sys_user_printpa(uint64 va) {
   uint64 pa = (uint64)user_va_to_pa(
@@ -441,8 +337,6 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
     // sprint("do_syscall:return from blocking!\n");
 
     return sys_user_wait(a1);
-  case SYS_user_test:
-    return sys_user_test();
   case SYS_user_sem_new:
     return sys_user_sem_new(a1);
   case SYS_user_sem_P:

@@ -10,7 +10,7 @@
 #include "process.h"
 #include "config.h"
 #include "elf.h"
-#include "global.h"
+
 #include "memlayout.h"
 #include "pmm.h"
 #include "riscv.h"
@@ -19,6 +19,7 @@
 #include "strap.h"
 #include "string.h"
 #include "vmm.h"
+#include "semaphore.h"
 
 // moved to global.h
 //
@@ -30,14 +31,22 @@
 // process procs[NPROC];
 // process* current[NCPU];
 
+process procs[NPROC];
+process* current[NCPU];
 //
 // switch to a user-mode process
 //
+
+extern void return_to_user(trapframe *, uint64 satp);
+
+
+
 void switch_to(process *proc) {
 
   assert(proc);
   current[read_tp()] = proc;
-
+	
+	extern char smode_trap_vector[];
   write_csr(stvec, (uint64)smode_trap_vector);
   // set up trapframe values (in process structure) that smode_trap_vector will
   // need when the process next re-enters the kernel.
@@ -54,7 +63,6 @@ void switch_to(process *proc) {
 
   // set S Exception Program Counter (sepc register) to the elf entry pc.
   write_csr(sepc, proc->trapframe->epc);
-
   return_to_user(proc->trapframe, MAKE_SATP(proc->pagetable));
 }
 
@@ -112,6 +120,9 @@ process *find_empty_process() {
   panic("cannot find any free process structure.\n");
 }
 
+
+
+extern char trap_sec_start[];
 process *alloc_process() {
   // locate the first usable process structure
   process *ps = find_empty_process();
@@ -272,4 +283,49 @@ int do_exec(void *path) {
 
 	sprint("exec failed.\n");
 	return -1;
+}
+
+
+ssize_t do_wait(int pid) {
+  // sprint("DEBUG LINE, pid = %d\n",pid);
+	extern process procs[NPROC];
+  int hartid = read_tp();
+  // int child_found_flag = 0;
+  if (pid == -1) {
+    while (1) {
+      for (int i = 0; i < NPROC; i++) {
+        // sprint("DEBUG LINE\n");
+
+        process *p = &(procs[i]);
+        // sprint("p = 0x%lx,\n",p);
+        if (p->parent != NULL && p->parent->pid == current[hartid]->pid &&
+            p->status == ZOMBIE) {
+          // sprint("DEBUG LINE\n");
+
+          free_process(p);
+          return i;
+        }
+      }
+      // sprint("current[hartid]->sem_index = %d\n",current[hartid]->sem_index);
+      sem_P(current[hartid]->sem_index);
+      // sprint("wait:return from blocking!\n");
+    }
+  }
+  if (0 < pid && pid < NPROC) {
+    // sprint("DEBUG LINE\n");
+
+    process *p = &procs[pid];
+    if (p->parent != current[hartid]) {
+      return -1;
+    } else if (p->status == ZOMBIE) {
+      free_process(p);
+      return pid;
+    } else {
+      sem_P(p->sem_index);
+      // sprint("return from blocking!\n");
+
+      return pid;
+    }
+  }
+  return -1;
 }

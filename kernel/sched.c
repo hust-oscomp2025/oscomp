@@ -3,7 +3,7 @@
  */
 
 #include "sched.h"
-#include "global.h"
+
 #include "spike_interface/spike_utils.h"
 #include "pmm.h"
 
@@ -83,7 +83,7 @@
     )
 
 
-
+process* ready_queue = NULL;
 //
 // insert a process, proc, into the END of ready queue.
 //
@@ -116,8 +116,8 @@ void insert_to_ready_queue( process* proc ) {
 // process is still runnable, you should place it into the ready queue (by calling
 // ready_queue_insert), and then call schedule().
 //
-//extern process procs[NPROC];
 void schedule() {
+	extern process procs[NPROC];
 	int hartid = read_tp();
 	process* cur = current[hartid];
 			//sprint("debug\n");

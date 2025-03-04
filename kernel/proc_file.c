@@ -4,7 +4,7 @@
 
 #include "proc_file.h"
 
-#include "global.h"
+
 #include "hostfs.h"
 #include "pmm.h"
 #include "process.h"

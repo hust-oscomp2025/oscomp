@@ -41,7 +41,6 @@
 
 //lab1_challenge1
 #define SYS_user_print_backtrace (SYS_user_base + 32)
-#define SYS_user_test (SYS_user_base + 33)
 #define SYS_user_printpa (SYS_user_base + 34)
 
 // lab4_challenge1

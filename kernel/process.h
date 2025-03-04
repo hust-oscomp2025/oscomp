@@ -4,6 +4,8 @@
 #include "riscv.h"
 #include "proc_file.h"
 
+
+
 typedef struct trapframe_t {
   // space to store context (all common registers)
   /* offset:0   */ riscv_regs regs;
@@ -150,7 +152,9 @@ int free_process( process* proc );
 // fork a child from parent
 int do_fork(process* parent);
 int do_exec(void *path);
-
+ssize_t do_wait(int pid);
+// current points to the currently running user-mode application.
+extern process* current[NCPU];
 // current running process
 // extern process* current[NCPU];
 

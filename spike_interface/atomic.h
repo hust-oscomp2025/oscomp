@@ -5,61 +5,65 @@
 #ifndef _RISCV_ATOMIC_H_
 #define _RISCV_ATOMIC_H_
 #include <stdatomic.h>
+#include <stdint.h>
 
-// Currently, interrupts are always disabled in M-mode.
-// todo: for PKE, wo turn on irq in lab_1_3_timer, so wo have to implement these two functions.
-#define disable_irqsave() (0)
-#define enable_irqrestore(flags) ((void)(flags))
+// 读取 `sstatus`
+static inline uint64_t read_sstatus() {
+    uint64_t value;
+    asm volatile("csrr %0, sstatus" : "=r"(value));
+    return value;
+}
+
+// 写入 `sstatus`
+static inline void write_sstatus(uint64_t value) {
+    asm volatile("csrw sstatus, %0" :: "r"(value));
+}
+
+// 禁用 S-mode 中断（清除 SIE 位）
+static inline uint64_t disable_irqsave() {
+    uint64_t sstatus = read_sstatus();
+    write_sstatus(sstatus & ~0x2); // 清除 SIE (bit 1)
+    return sstatus;
+}
+
+// 恢复 S-mode 中断
+static inline void enable_irqrestore(uint64_t flags) {
+    write_sstatus(flags);
+}
+
 
 typedef struct {
-  int lock;
-  // For debugging:
-  char* name;       // Name of lock.
-  struct cpu* cpu;  // The cpu holding the lock.
+  atomic_flag  lock;
 } spinlock_t;
 
-#define SPINLOCK_INIT \
-  { 0 }
+#define SPINLOCK_INIT  ATOMIC_FLAG_INIT 
 
-#define atomic_set(ptr, val) (*(volatile typeof(*(ptr))*)(ptr) = val)
-#define atomic_read(ptr) (*(volatile typeof(*(ptr))*)(ptr))
 
-#define atomic_cas(ptr, cmp, swp)                           \
-  ({                                                        \
-    long flags = disable_irqsave();                         \
-    typeof(*(ptr)) res = *(volatile typeof(*(ptr))*)(ptr);  \
-    if (res == (cmp)) *(volatile typeof(ptr))(ptr) = (swp); \
-    enable_irqrestore(flags);                               \
-    res;                                                    \
-  })
+
 
 static inline int spinlock_trylock(spinlock_t* lock) {
-  int res = atomic_exchange(&lock->lock, -1);
-  atomic_thread_fence(memory_order_seq_cst);
-  return res;
+    return atomic_flag_test_and_set(&lock->lock) == 0;  // 成功返回 1
 }
 
 static inline void spinlock_lock(spinlock_t* lock) {
-  do {
-    while (atomic_read(&lock->lock))
-      ;
-  } while (spinlock_trylock(lock));
+    while (atomic_flag_test_and_set(&lock->lock)) {
+        // 自旋等待
+    }
 }
 
 static inline void spinlock_unlock(spinlock_t* lock) {
-  atomic_thread_fence(memory_order_seq_cst);
-  atomic_set(&lock->lock, 0);
+    atomic_flag_clear(&lock->lock);
 }
 
 static inline long spinlock_lock_irqsave(spinlock_t* lock) {
-  long flags = disable_irqsave();
-  spinlock_lock(lock);
-  return flags;
+    long flags = disable_irqsave();
+    while (atomic_flag_test_and_set(&lock->lock)) {
+        // 自旋等待
+    }
+    return flags;
 }
-
 static inline void spinlock_unlock_irqrestore(spinlock_t* lock, long flags) {
-  spinlock_unlock(lock);
-  enable_irqrestore(flags);
+    atomic_flag_clear(&lock->lock);
+    enable_irqrestore(flags);
 }
-
 #endif

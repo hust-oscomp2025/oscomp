@@ -1,10 +1,11 @@
 #include "semaphore.h"
 
-#include "global.h"
+
 #include "pmm.h"
 #include "sched.h"
 #include "spike_interface/spike_utils.h"
-
+//信号灯库
+semaphore sem_pool[NSEM];
 // 获取一个新的信号灯编号，成功返回0-64，失败返回-1
 int sem_new(int initial_value) {
   for (int i = 0; i < NSEM; i++) {

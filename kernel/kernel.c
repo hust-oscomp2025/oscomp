@@ -15,7 +15,7 @@
 #include "vfs.h"
 #include "rfs.h"
 #include "ramdev.h"
-#include "global.h"
+
 #include "utils.h"
 //
 // trap_sec_start points to the beginning of S-mode trap segment (i.e., the entry point of

@@ -4,7 +4,7 @@
 
 #include "vfs.h"
 
-#include "global.h"
+
 #include "pmm.h"
 #include "spike_interface/spike_utils.h"
 #include "util/hash_table.h"
