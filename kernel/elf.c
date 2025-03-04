@@ -8,8 +8,8 @@
 #include "riscv.h"
 #include "spike_interface/spike_utils.h"
 #include "string.h"
-#include "vmm.h"
 #include "utils.h"
+#include "vmm.h"
 
 typedef struct elf_info_t {
   spike_file_t *f;
@@ -46,29 +46,30 @@ elf_status elf_load_segment(elf_ctx *ctx, elf_prog_header *ph_addr) {
       first_pa = pa;
     // actual loading
     size_t load_bytes;
-    if(i == num_pages - 1){
+    if (i == num_pages - 1) {
       load_bytes = num_bytes % PGSIZE;
-    }else{
+    } else {
       load_bytes = PGSIZE;
     }
-    if (elf_fpread(ctx, pa, load_bytes, ph_addr->off + i * PGSIZE) != load_bytes)
+    if (elf_fpread(ctx, pa, load_bytes, ph_addr->off + i * PGSIZE) !=
+        load_bytes)
       return EL_EIO;
   }
-  mapped_region* mapped_info_write = NULL;
-  for(int j = 0;j < PGSIZE/sizeof(mapped_region);j++){
-    if(target_ps->mapped_info[j].va == 0x0){
+  mapped_region *mapped_info_write = NULL;
+  for (int j = 0; j < PGSIZE / sizeof(mapped_region); j++) {
+    if (target_ps->mapped_info[j].va == 0x0) {
       mapped_info_write = &(target_ps->mapped_info[j]);
       mapped_info_write->va = ph_addr->vaddr;
       mapped_info_write->npages = num_pages;
-      if(ph_addr->flags == (SEGMENT_READABLE | SEGMENT_EXECUTABLE)){
+      if (ph_addr->flags == (SEGMENT_READABLE | SEGMENT_EXECUTABLE)) {
         mapped_info_write->seg_type = CODE_SEGMENT;
         sprint("CODE_SEGMENT added at mapped info offset:%d\n", j);
-      }else if(ph_addr->flags == (SEGMENT_READABLE | SEGMENT_WRITABLE)){
+      } else if (ph_addr->flags == (SEGMENT_READABLE | SEGMENT_WRITABLE)) {
         mapped_info_write->seg_type = DATA_SEGMENT;
         sprint("DATA_SEGMENT added at mapped info offset:%d\n", j);
-      }else{
+      } else {
         panic("unknown program segment encountered, segment flag:%d.\n",
-            ph_addr->flags);
+              ph_addr->flags);
       }
       target_ps->total_mapped_region++;
       break;
@@ -76,9 +77,6 @@ elf_status elf_load_segment(elf_ctx *ctx, elf_prog_header *ph_addr) {
   }
   return EL_OK;
 }
-
-
-
 
 //
 // init elf_ctx, a data structure that loads the elf.
@@ -344,29 +342,53 @@ elf_status elf_load(elf_ctx *ctx) {
       return EL_ERR;
 
     elf_status ret;
-    if((ret = elf_load_segment(ctx,&ph_addr)) != EL_OK){
+    if ((ret = elf_load_segment(ctx, &ph_addr)) != EL_OK) {
       return ret;
     }
   }
-  /* lab1_challenge1 & lab1_challenge2 */
-  // int ret;
-  // if ((ret = load_debug_infomation(ctx)) != EL_OK)
-  // return ret;
 
+  // elf_sect_header symbol_section_header;
+  // elf_sect_header string_section_header;
+  // elf_sect_header shstr_section_header;
+  // uint64 shstr_offset;
+  // shstr_offset = ctx->ehdr.shoff + ctx->ehdr.shstrndx * sizeof(elf_sect_header);
+  // elf_fpread(ctx, (void *)&shstr_section_header, sizeof(shstr_section_header),
+  //            shstr_offset);
+  // char shstr_buffer[256 * 100];
+	// shstr_buffer[256*100 -1 ] = '\0';
+  // elf_fpread(ctx, &shstr_buffer, shstr_section_header.size,
+  //            shstr_section_header.offset);
+	// process *target_ps = ((elf_info *)ctx->info)->p;
+  // for (int i = 0, offset = ctx->ehdr.shoff; i < ctx->ehdr.shnum;
+  //      i++, offset += sizeof(elf_sect_header)) {
+		
+  //   elf_sect_header sh;
+  //   if (elf_fpread(ctx, (void *)&sh, sizeof(sh), offset) != sizeof(sh))
+  //     return EL_EIO;
+  //   if (strcmp(shstr_buffer + sh.name, ".sdata") == 0) {
+	// 		sprint("i=%d,ctx->ehdr.shnum=%d!\n",i,ctx->ehdr.shnum);
+	// 		target_ps->trapframe->regs.gp = sh.addr + 0x800;
+	// 		sprint("Found .sdata at: 0x%lx, setting gp to 0x%lx\n", sh.addr, target_ps->trapframe->regs.gp);
+  //     //((elf_info *)ctx->info)->p->ktrapframe->regs.gp = sh.addr + 0x800;
+  //     //sprint("Found .sdata at: 0x%lx, setting gp to 0x%lx\n", sh.addr,((elf_info *)ctx->info)->p->ktrapframe->regs.gp);
+  //   }
+  // }
   return EL_OK;
 }
 
-
+/* lab1_challenge1 & lab1_challenge2 */
+// int ret;
+// if ((ret = load_debug_infomation(ctx)) != EL_OK)
+// return ret;
 
 //
 // load the elf of user application, by using the spike file interface.
 //
-void load_elf_from_file(process *p, char* filename) {
+void load_elf_from_file(process *p, char *filename) {
   int hartid = read_tp();
 
-
-  //Sprint("Application: %s\n", arg_bug_msg.argv[hartid]);
-	Sprint("Application: %s\n", filename);
+  // Sprint("Application: %s\n", arg_bug_msg.argv[hartid]);
+  Sprint("Application: %s\n", filename);
   // elf loading. elf_ctx is defined in kernel/elf.h, used to track the loading
   // process.
   elf_ctx elfloader;

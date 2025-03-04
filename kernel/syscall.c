@@ -19,9 +19,9 @@
 #include "util/types.h"
 #include "vmm.h"
 
+#include "semaphore.h"
 #include "sync_utils.h"
 #include "utils.h"
-#include "semaphore.h"
 
 //
 // implement the SYS_user_print syscall
@@ -102,10 +102,7 @@ ssize_t sys_user_fork() {
   return do_fork(current[hartid]);
 }
 
-ssize_t sys_user_wait(int pid){
-	return do_wait(pid);
-}
-
+ssize_t sys_user_wait(int pid) { return do_wait(pid); }
 
 int sys_user_sem_new(int initial_value) {
   // int pid = current[read_tp()]->pid;
@@ -134,7 +131,6 @@ ssize_t sys_user_yield() {
   schedule();
   return 0;
 }
-
 
 ssize_t sys_user_printpa(uint64 va) {
   uint64 pa = (uint64)user_va_to_pa(
@@ -271,25 +267,24 @@ ssize_t sys_user_unlink(char *vfn) {
 }
 
 ssize_t sys_user_rcwd(char *vpath) {
-	char *path = (char *)user_va_to_pa(
-			(pagetable_t)(current[read_tp()]->pagetable), (void *)vpath);
-	return do_rcwd(path);
+  char *path = (char *)user_va_to_pa(
+      (pagetable_t)(current[read_tp()]->pagetable), (void *)vpath);
+  return do_rcwd(path);
 }
 
 ssize_t sys_user_ccwd(char *vpath) {
-	char *path = (char *)user_va_to_pa(
-			(pagetable_t)(current[read_tp()]->pagetable), (void *)vpath);
-	return do_ccwd(path);
+  char *path = (char *)user_va_to_pa(
+      (pagetable_t)(current[read_tp()]->pagetable), (void *)vpath);
+  return do_ccwd(path);
 }
 
 ssize_t sys_user_exec(char *vpath) {
-	char *path = (char *)user_va_to_pa(
-			(pagetable_t)(current[read_tp()]->pagetable), (void *)vpath);
-	// we shall never reach here
-	return do_exec(path);;
+  char *path = (char *)user_va_to_pa(
+      (pagetable_t)(current[read_tp()]->pagetable), (void *)vpath);
+  // we shall never reach here
+  return do_exec(path);
+  ;
 }
-
-
 
 //
 // [a0]: the syscall number; [a1] ... [a7]: arguments to the syscalls.
@@ -297,6 +292,9 @@ ssize_t sys_user_exec(char *vpath) {
 //
 long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
                 long a7) {
+  sprint("do_syscall: syscall number: %ld\n", a7);
+  sprint("Arguments: %ld, %ld, %ld, %ld, %ld, %ld, %ld\n", a0, a1, a2, a3, a4,
+         a5, a6);
   switch (a0) {
   case SYS_user_print:
     return sys_user_print((const char *)a1, a2);
@@ -357,12 +355,12 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
     return sys_user_link((char *)a1, (char *)a2);
   case SYS_user_unlink:
     return sys_user_unlink((char *)a1);
-	case SYS_user_rcwd:
-		return sys_user_rcwd((char *)a1);
-	case SYS_user_ccwd:
-		return sys_user_ccwd((char *)a1);
-	case SYS_user_exec:
-		return sys_user_exec((char *)a1);
+  case SYS_user_rcwd:
+    return sys_user_rcwd((char *)a1);
+  case SYS_user_ccwd:
+    return sys_user_ccwd((char *)a1);
+  case SYS_user_exec:
+    return sys_user_exec((char *)a1);
   default:
     panic("Unknown syscall %ld \n", a0);
   }

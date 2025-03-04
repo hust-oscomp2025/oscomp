@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(riscv-pke C ASM)
-
+# ✅ 添加用户态程序的编译（调用 user/ 目录的 CMakeLists.txt）
+add_subdirectory(user)
 # Set cross-compiler
 set(CMAKE_SYSTEM_NAME Generic)
 set(CMAKE_C_COMPILER riscv64-unknown-elf-gcc)
@@ -64,23 +65,10 @@ target_link_libraries(riscv-pke util spike_interface)
 # Set the linker script for kernel
 set_target_properties(riscv-pke PROPERTIES LINK_FLAGS "-T ${CMAKE_CURRENT_SOURCE_DIR}/kernel/kernel.lds")
 
-# Build user applications
-add_executable(app_exec "user/app_exec.c" "user/user_lib.c")
-target_link_libraries(app_exec util)
-set_target_properties(app_exec PROPERTIES LINK_FLAGS "--entry=main")
-
-add_executable(app_ls "user/app_ls.c" "user/user_lib.c")
-target_link_libraries(app_ls util)
-set_target_properties(app_ls PROPERTIES LINK_FLAGS "--entry=main")
-
-# Install user applications
-install(TARGETS app_exec app_ls
-        RUNTIME DESTINATION ${CMAKE_BINARY_DIR}/hostfs_root/bin)
-
 # Custom targets for convenience
 add_custom_target(run
     COMMAND spike ${CMAKE_BINARY_DIR}/bin/riscv-pke /bin/app_exec
-    DEPENDS riscv-pke app_exec app_ls
+    DEPENDS riscv-pke app_exec
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMENT "Running HUST PKE with spike"
 )

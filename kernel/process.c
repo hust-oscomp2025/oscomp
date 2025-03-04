@@ -79,7 +79,7 @@ void init_proc_pool() {
 }
 
 void init_user_stack(process *ps) {
-  ps->trapframe->regs.sp = USER_STACK_TOP; // virtual address of user stack top
+  ps->trapframe->regs.sp = USER_STACK_TOP - 8; // virtual address of user stack top
   uint64 user_stack =
       (uint64)Alloc_page(); // phisical address of user stack bottom
   // map user stack in userspace

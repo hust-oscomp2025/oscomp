@@ -62,7 +62,7 @@ void handle_mtimer_trap() {
 void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
   process *ps = current[read_tp()];
   // int hartid = read_tp();
-  sprint("handle_page_fault: %lx\n", stval);
+  sprint("sepc=%lx,handle_page_fault: %lx\n",sepc, stval);
   switch (mcause) {
   case CAUSE_STORE_PAGE_FAULT:
     pte_t *pte = page_walk(ps->pagetable, stval, 0);

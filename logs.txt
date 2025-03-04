@@ -1,0 +1,27 @@
+HTIF is available!
+(Emulated) memory size: 2048 MB
+In m_start, hartid:0
+Enter supervisor mode...
+PKE kernel start 0x0000000080000000, PKE kernel end: 0x0000000080079000, PKE kernel size: 0x0000000000079000 .
+free physical memory address: [0x0000000080079000, 0x0000000087ffffff] 
+kernel memory manager is initializing ...
+KERN_BASE 0x0000000080000000
+physical address of _etext is: 0x000000008000c000
+kernel page table is on 
+RAMDISK0: base address of RAMDISK0 is: 0x0000000087f35000
+RFS: format RAMDISK0 done!
+Switch to user mode...
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+User application is loading.
+Application: build/bin/app_exec
+CODE_SEGMENT added at mapped info offset:4
+DATA_SEGMENT added at mapped info offset:5
+Application program entry point (virtual address): 0x000000000001014c
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+do_syscall: syscall number: 80
+Arguments: 1, 2147478952, 2147479152, 0, 1, 8201, 13
+Unknown syscall 2280816440 
+
+System is shutting down with exit code -1.
