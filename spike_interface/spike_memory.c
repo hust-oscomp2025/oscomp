@@ -1,18 +1,18 @@
 /*
  * scanning the emulated memory from the DTS (Device Tree String).
- * output: the availability and the size (stored in "uint64 g_mem_size") of emulated memory.
+ * output: the availability and the size (stored in "__uint64_t g_mem_size") of emulated memory.
  *
  * codes are borrowed from riscv-pk (https://github.com/riscv/riscv-pk)
  */
 #include "dts_parse.h"
 #include "spike_interface/spike_utils.h"
-#include "string.h"
+#include <util/string.h>
 
-uint64 g_mem_size;
+__uint64_t g_mem_size;
 
 struct mem_scan {
   int memory;
-  const uint32 *reg_value;
+  const __uint32_t *reg_value;
   int reg_len;
 };
 
@@ -33,15 +33,15 @@ static void mem_prop(const struct fdt_scan_prop *prop, void *extra) {
 
 static void mem_done(const struct fdt_scan_node *node, void *extra) {
   struct mem_scan *scan = (struct mem_scan *)extra;
-  const uint32 *value = scan->reg_value;
-  const uint32 *end = value + scan->reg_len / 4;
-  uint64 self = (uint64)mem_done;
+  const __uint32_t *value = scan->reg_value;
+  const __uint32_t *end = value + scan->reg_len / 4;
+  __uint64_t self = (__uint64_t)mem_done;
 
   if (!scan->memory) return;
   assert(scan->reg_value && scan->reg_len % 4 == 0);
 
   while (end - value > 0) {
-    uint64 base, size;
+    __uint64_t base, size;
     value = fdt_get_address(node->parent, value, &base);
     value = fdt_get_size(node->parent, value, &size);
     if (base <= self && self <= base + size) {
@@ -52,7 +52,7 @@ static void mem_done(const struct fdt_scan_node *node, void *extra) {
 }
 
 // scanning the emulated memory
-void query_mem(uint64 fdt) {
+void query_mem(__uint64_t fdt) {
   struct fdt_cb cb;
   struct mem_scan scan;
 

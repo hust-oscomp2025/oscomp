@@ -1,6 +1,6 @@
 #include "util/hash_table.h"
-#include "util/types.h"
-#include "kernel/pmm.h"
+#include <kernel/types.h>
+#include <kernel/pmm.h>
 
 static int default_equal(void *key1, void *key2) { return key1 == key2; }
 

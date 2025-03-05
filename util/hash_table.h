@@ -1,6 +1,6 @@
 #ifndef _HASH_TABLE_H
 #define _HASH_TABLE_H
-#include "util/types.h"
+#include <kernel/types.h>
 
 #define HASH_TABLE_SIZE 128
 

@@ -12,9 +12,9 @@
 #include "spike_file.h"
 
 //=============    encapsulating htif syscalls, invoking Spike functions    =============
-long frontend_syscall(long n, uint64 a0, uint64 a1, uint64 a2, uint64 a3, uint64 a4,
-      uint64 a5, uint64 a6) {
-  static volatile uint64 magic_mem[8];
+long frontend_syscall(long n, __uint64_t a0, __uint64_t a1, __uint64_t a2, __uint64_t a3, __uint64_t a4,
+      __uint64_t a5, __uint64_t a6) {
+  static volatile __uint64_t magic_mem[8];
 
   static spinlock_t lock = SPINLOCK_INIT;
   spinlock_lock(&lock);
@@ -37,7 +37,7 @@ long frontend_syscall(long n, uint64 a0, uint64 a1, uint64 a2, uint64 a3, uint64
 }
 
 //===============    Spike-assisted printf, output string to terminal    ===============
-static uintptr_t mcall_console_putchar(uint8 ch) {
+static uintptr_t mcall_console_putchar(__uint8_t ch) {
   if (htif) {
     htif_console_putchar(ch);
   }

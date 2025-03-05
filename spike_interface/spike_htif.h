@@ -2,7 +2,7 @@
 #define _SPIKE_HTIF_H_
 
 #include <stdint.h>
-#include "util/types.h"
+#include <sys/types.h>
 
 #if __riscv_xlen == 64
 #define TOHOST_CMD(dev, cmd, payload) \
@@ -90,11 +90,11 @@
 #define PTR_ERR(x) ((long)(x))
 
 
-extern uint64 htif;
-void query_htif(uint64 dtb);
+extern __uint64_t htif;
+void query_htif(__uint64_t dtb);
 
 // Spike HTIF functionalities
-void htif_syscall(uint64);
+void htif_syscall(__uint64_t);
 
 void htif_console_putchar(uint8_t);
 int htif_console_getchar();

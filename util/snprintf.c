@@ -5,7 +5,7 @@
 //#include <stdint.h>
 //#include <stdarg.h>
 #include <stdbool.h>
-#include "types.h"
+#include <kernel/types.h>
 
 #include "util/snprintf.h"
 

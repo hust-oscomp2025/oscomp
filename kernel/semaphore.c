@@ -1,8 +1,8 @@
-#include "semaphore.h"
+#include <kernel/semaphore.h>
 
 
-#include "pmm.h"
-#include "sched.h"
+#include <kernel/pmm.h>
+#include <kernel/sched.h>
 #include "spike_interface/spike_utils.h"
 //信号灯库
 semaphore sem_pool[NSEM];

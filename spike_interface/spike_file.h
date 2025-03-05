@@ -4,11 +4,11 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
-#include "util/types.h"
+#include <sys/types.h>
 
 typedef struct file_t {
   int kfd;  // file descriptor of the host file
-  uint32 refcnt;
+  __uint32_t refcnt;
 } spike_file_t;
 
 extern spike_file_t spike_files[];
@@ -25,26 +25,26 @@ extern spike_file_t spike_files[];
 #define INIT_FILE_REF 3
 
 struct frontend_stat {
-  uint64 dev;
-  uint64 ino;
-  uint32 mode;
-  uint32 nlink;
-  uint32 uid;
-  uint32 gid;
-  uint64 rdev;
-  uint64 __pad1;
-  uint64 size;
-  uint32 blksize;
-  uint32 __pad2;
-  uint64 blocks;
-  uint64 atime;
-  uint64 __pad3;
-  uint64 mtime;
-  uint64 __pad4;
-  uint64 ctime;
-  uint64 __pad5;
-  uint32 __unused4;
-  uint32 __unused5;
+  __uint64_t dev;
+  __uint64_t ino;
+  __uint32_t mode;
+  __uint32_t nlink;
+  __uint32_t uid;
+  __uint32_t gid;
+  __uint64_t rdev;
+  __uint64_t __pad1;
+  __uint64_t size;
+  __uint32_t blksize;
+  __uint32_t __pad2;
+  __uint64_t blocks;
+  __uint64_t atime;
+  __uint64_t __pad3;
+  __uint64_t mtime;
+  __uint64_t __pad4;
+  __uint64_t ctime;
+  __uint64_t __pad5;
+  __uint32_t __unused4;
+  __uint32_t __unused5;
 };
 
 void copy_stat(struct stat* dest, struct frontend_stat* src);

@@ -1,15 +1,15 @@
 #ifndef _SPIKE_UTILS_H_
 #define _SPIKE_UTILS_H_
 
-#include "util/types.h"
+#include <sys/types.h>
 #include "spike_file.h"
 #include "spike_memory.h"
 #include "spike_htif.h"
 
-long frontend_syscall(long n, uint64 a0, uint64 a1, uint64 a2, uint64 a3, uint64 a4, uint64 a5,
-                      uint64 a6);
+long frontend_syscall(long n, __uint64_t a0, __uint64_t a1, __uint64_t a2, __uint64_t a3, __uint64_t a4, __uint64_t a5,
+                      __uint64_t a6);
 
-void poweroff(uint16 code) __attribute((noreturn));
+void poweroff(__uint16_t code) __attribute((noreturn));
 void sprint(const char* s, ...);
 void putstring(const char* s);
 void shutdown(int) __attribute__((noreturn));

@@ -11,7 +11,7 @@
 #include "atomic.h"
 #include "spike_htif.h"
 #include "spike_interface/spike_utils.h"
-#include "string.h"
+#include <util/string.h>
 #include "util/functions.h"
 // #include "../kernel/config.h"
 
@@ -47,9 +47,9 @@ void copy_stat(struct stat *dest_va, struct frontend_stat *src) {
 
 int spike_file_stat(spike_file_t *f, struct stat *s) {
   struct frontend_stat buf;
-  uint64 pa = (uint64)&buf;
+  __uint64_t pa = (__uint64_t)&buf;
   long ret =
-      frontend_syscall(HTIFSYS_fstat, f->kfd, (uint64)&buf, 0, 0, 0, 0, 0);
+      frontend_syscall(HTIFSYS_fstat, f->kfd, (__uint64_t)&buf, 0, 0, 0, 0, 0);
   copy_stat(s, &buf);
   return ret;
 }
@@ -81,7 +81,7 @@ void spike_file_incref(spike_file_t *f) {
 }
 
 ssize_t spike_file_write(spike_file_t *f, const void *buf, size_t size) {
-  return frontend_syscall(HTIFSYS_write, f->kfd, (uint64)buf, size, 0, 0, 0, 0);
+  return frontend_syscall(HTIFSYS_write, f->kfd, (__uint64_t)buf, size, 0, 0, 0, 0);
 }
 
 static spike_file_t *spike_file_get_free(void) {
@@ -118,7 +118,7 @@ spike_file_t *spike_file_openat(int dirfd, const char *fn, int flags,
     return ERR_PTR(-ENOMEM);
 
   size_t fn_size = strlen(fn) + 1;
-  long ret = frontend_syscall(HTIFSYS_openat, dirfd, (uint64)fn, fn_size, flags,
+  long ret = frontend_syscall(HTIFSYS_openat, dirfd, (__uint64_t)fn, fn_size, flags,
                               mode, 0, 0);
   if (ret >= 0) {
     f->kfd = ret;
@@ -135,12 +135,12 @@ spike_file_t *spike_file_open(const char *fn, int flags, int mode) {
 
 ssize_t spike_file_pread(spike_file_t *f, void *buf, size_t size,
                          off_t offset) {
-  return frontend_syscall(HTIFSYS_pread, f->kfd, (uint64)buf, size, offset, 0,
+  return frontend_syscall(HTIFSYS_pread, f->kfd, (__uint64_t)buf, size, offset, 0,
                           0, 0);
 }
 
 ssize_t spike_file_read(spike_file_t *f, void *buf, size_t size) {
-  return frontend_syscall(HTIFSYS_read, f->kfd, (uint64)buf, size, 0, 0, 0, 0);
+  return frontend_syscall(HTIFSYS_read, f->kfd, (__uint64_t)buf, size, 0, 0, 0, 0);
 }
 
 ssize_t spike_file_lseek(spike_file_t *f, size_t ptr, int dir) {

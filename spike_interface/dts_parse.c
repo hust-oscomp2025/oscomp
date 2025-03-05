@@ -6,15 +6,15 @@
 
 #include "dts_parse.h"
 #include "spike_interface/spike_utils.h"
-#include "string.h"
+#include <util/string.h>
 
-static inline uint32 bswap(uint32 x) {
-  uint32 y = (x & 0x00FF00FF) << 8 | (x & 0xFF00FF00) >> 8;
-  uint32 z = (y & 0x0000FFFF) << 16 | (y & 0xFFFF0000) >> 16;
+static inline __uint32_t bswap(__uint32_t x) {
+  __uint32_t y = (x & 0x00FF00FF) << 8 | (x & 0xFF00FF00) >> 8;
+  __uint32_t z = (y & 0x0000FFFF) << 16 | (y & 0xFFFF0000) >> 16;
   return z;
 }
 
-static uint32 *fdt_scan_helper(uint32 *lex, const char *strings, struct fdt_scan_node *node,
+static __uint32_t *fdt_scan_helper(__uint32_t *lex, const char *strings, struct fdt_scan_node *node,
                                const struct fdt_cb *cb) {
   struct fdt_scan_node child;
   struct fdt_scan_prop prop;
@@ -48,7 +48,7 @@ static uint32 *fdt_scan_helper(uint32 *lex, const char *strings, struct fdt_scan
         break;
       }
       case FDT_BEGIN_NODE: {
-        uint32 *lex_next;
+        __uint32_t *lex_next;
         if (!last && node && cb->done) cb->done(node, cb->extra);
         last = 1;
         child.name = (const char *)(lex + 1);
@@ -71,29 +71,29 @@ static uint32 *fdt_scan_helper(uint32 *lex, const char *strings, struct fdt_scan
   }
 }
 
-const uint32 *fdt_get_address(const struct fdt_scan_node *node, const uint32 *value,
-                              uint64 *result) {
+const __uint32_t *fdt_get_address(const struct fdt_scan_node *node, const __uint32_t *value,
+                              __uint64_t *result) {
   *result = 0;
   for (int cells = node->address_cells; cells > 0; --cells)
     *result = (*result << 32) + bswap(*value++);
   return value;
 }
 
-const uint32 *fdt_get_size(const struct fdt_scan_node *node, const uint32 *value, uint64 *result) {
+const __uint32_t *fdt_get_size(const struct fdt_scan_node *node, const __uint32_t *value, __uint64_t *result) {
   *result = 0;
   for (int cells = node->size_cells; cells > 0; --cells)
     *result = (*result << 32) + bswap(*value++);
   return value;
 }
 
-void fdt_scan(uint64 fdt, const struct fdt_cb *cb) {
+void fdt_scan(__uint64_t fdt, const struct fdt_cb *cb) {
   struct fdt_header *header = (struct fdt_header *)fdt;
 
   // Only process FDT that we understand
   if (bswap(header->magic) != FDT_MAGIC || bswap(header->last_comp_version) > FDT_VERSION) return;
 
   const char *strings = (const char *)(fdt + bswap(header->off_dt_strings));
-  uint32 *lex = (uint32 *)(fdt + bswap(header->off_dt_struct));
+  __uint32_t *lex = (__uint32_t *)(fdt + bswap(header->off_dt_struct));
 
   fdt_scan_helper(lex, strings, 0, cb);
 }

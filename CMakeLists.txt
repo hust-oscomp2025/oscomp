@@ -38,30 +38,30 @@ file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/hostfs_root/bin)
 # Include directories
 include_directories(.)
 
+
+
 # Build util library
 file(GLOB UTIL_SOURCES "util/*.c")
 add_library(util STATIC ${UTIL_SOURCES})
+target_include_directories(util PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/util {CMAKE_SOURCE_DIR}/spike_interface)
 
 # Build spike_interface library
 file(GLOB SPIKE_INF_SOURCES "spike_interface/*.c")
 add_library(spike_interface STATIC ${SPIKE_INF_SOURCES})
 target_link_libraries(spike_interface util)
 
-# Build kernel
-file(GLOB KERNEL_SOURCES 
-    "kernel/*.c" 
-    "kernel/machine/*.c" 
-    "kernel/util/*.c"
-)
-file(GLOB KERNEL_ASM_SOURCES 
-    "kernel/*.S" 
-    "kernel/machine/*.S" 
-    "kernel/util/*.S"
-)
+# 递归获取 kernel 目录及其所有子目录中的 C 源文件
+file(GLOB_RECURSE KERNEL_SOURCES "kernel/**/*.c")
+file(GLOB_RECURSE KERNEL_SOURCES "kernel/*.c")
+
+# 递归获取 kernel 目录及其所有子目录中的 汇编（.S）源文件
+file(GLOB_RECURSE KERNEL_ASM_SOURCES "kernel/**/*.S")
+file(GLOB_RECURSE KERNEL_ASM_SOURCES "kernel/*.S")
+
 
 add_executable(riscv-pke ${KERNEL_SOURCES} ${KERNEL_ASM_SOURCES})
 target_link_libraries(riscv-pke util spike_interface)
-
+target_include_directories(riscv-pke PRIVATE ${CMAKE_SOURCE_DIR}/include)
 # Set the linker script for kernel
 set_target_properties(riscv-pke PROPERTIES LINK_FLAGS "-T ${CMAKE_CURRENT_SOURCE_DIR}/kernel/kernel.lds")
 

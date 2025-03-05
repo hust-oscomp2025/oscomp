@@ -1,6 +1,6 @@
 /*
  * HTIF (Host-Target InterFace) scanning. 
- * output: the availability of HTIF (indicated by "uint64 htif")
+ * output: the availability of HTIF (indicated by "__uint64_t htif")
  *
  * HTIF is a powerful utility provided by the underlying emulator, i.e., Spike.
  * with HTIF, target environment (i.e., the RISC-V machine we use) can leverage 
@@ -10,14 +10,14 @@
  * codes are borrowed from riscv-pk (https://github.com/riscv/riscv-pk)
  */
 
-#include "util/types.h"
+#include <sys/types.h>
 #include "spike_htif.h"
 #include "atomic.h"
 #include "spike_interface/spike_utils.h"
 #include "dts_parse.h"
-#include "string.h"
+#include <util/string.h>
 
-uint64 htif;  //is Spike HTIF avaiable? initially 0 (false)
+__uint64_t htif;  //is Spike HTIF avaiable? initially 0 (false)
 
 ///////////////////////////    Spike HTIF discovering    //////////////////////////////
 struct htif_scan {
@@ -44,7 +44,7 @@ static void htif_done(const struct fdt_scan_node *node, void *extra) {
 }
 
 // scanning the HTIF
-void query_htif(uint64 fdt) {
+void query_htif(__uint64_t fdt) {
   struct fdt_cb cb;
   struct htif_scan scan;
 
@@ -66,8 +66,8 @@ extern uint64_t __htif_base;
 #define TOHOST(base_int) (uint64_t *)(base_int + TOHOST_OFFSET)
 #define FROMHOST(base_int) (uint64_t *)(base_int + FROMHOST_OFFSET)
 
-#define TOHOST_OFFSET ((uint64)tohost - (uint64)__htif_base)
-#define FROMHOST_OFFSET ((uint64)fromhost - (uint64)__htif_base)
+#define TOHOST_OFFSET ((__uint64_t)tohost - (__uint64_t)__htif_base)
+#define FROMHOST_OFFSET ((__uint64_t)fromhost - (__uint64_t)__htif_base)
 
 volatile int htif_console_buf;
 static spinlock_t htif_lock = SPINLOCK_INIT;
@@ -90,12 +90,12 @@ static void __check_fromhost(void) {
   }
 }
 
-static void __set_tohost(uint64 dev, uint64 cmd, uint64 data) {
+static void __set_tohost(__uint64_t dev, __uint64_t cmd, __uint64_t data) {
   while (tohost) __check_fromhost();
   tohost = TOHOST_CMD(dev, cmd, data);
 }
 
-static void do_tohost_fromhost(uint64 dev, uint64 cmd, uint64 data) {
+static void do_tohost_fromhost(__uint64_t dev, __uint64_t cmd, __uint64_t data) {
   spinlock_lock(&htif_lock);
   __set_tohost(dev, cmd, data);
 
@@ -113,7 +113,7 @@ static void do_tohost_fromhost(uint64 dev, uint64 cmd, uint64 data) {
 }
 
 /////////////////////    Encapsulated Spike HTIF functionalities    //////////////////
-void htif_syscall(uint64 arg) { do_tohost_fromhost(0, 0, arg); }
+void htif_syscall(__uint64_t arg) { do_tohost_fromhost(0, 0, arg); }
 
 // htif fuctionalities
 void htif_console_putchar(uint8_t ch) {
@@ -122,9 +122,9 @@ void htif_console_putchar(uint8_t ch) {
   volatile uint64_t magic_mem[8];
   magic_mem[0] = HTIFSYS_write;
   magic_mem[1] = 1;
-  magic_mem[2] = (uint64)&ch;
+  magic_mem[2] = (__uint64_t)&ch;
   magic_mem[3] = 1;
-  do_tohost_fromhost(0, 0, (uint64)magic_mem);
+  do_tohost_fromhost(0, 0, (__uint64_t)magic_mem);
 #else
   spinlock_lock(&htif_lock);
   __set_tohost(1, 1, ch);

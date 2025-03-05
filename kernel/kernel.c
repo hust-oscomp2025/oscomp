@@ -2,21 +2,21 @@
  * Supervisor-mode startup codes
  */
 
-#include "riscv.h"
-#include "string.h"
-#include "elf.h"
-#include "process.h"
-#include "pmm.h"
-#include "vmm.h"
-#include "sched.h"
-#include "memlayout.h"
+#include "kernel/riscv.h"
+#include <util/string.h>
+#include <kernel/elf.h>
+#include <kernel/process.h>
+#include <kernel/pmm.h>
+#include <kernel/vmm.h>
+#include <kernel/sched.h>
+#include <kernel/memlayout.h>
 #include "spike_interface/spike_utils.h"
-#include "util/types.h"
-#include "vfs.h"
-#include "rfs.h"
-#include "ramdev.h"
+#include <kernel/types.h>
+#include <kernel/vfs.h>
+#include <kernel/rfs.h>
+#include <kernel/ramdev.h>
 
-#include "utils.h"
+
 //
 // trap_sec_start points to the beginning of S-mode trap segment (i.e., the entry point of
 // S-mode trap vector). added @lab2_1
@@ -32,7 +32,7 @@ void enable_paging() {
 
   // refresh tlb to invalidate its content.
   flush_tlb();
-  Sprint("kernel page table is on \n");
+  sprint("kernel page table is on \n");
 }
 
 
@@ -78,7 +78,7 @@ process* load_user_program() {
 	init_user_heap(proc);
 
 	
-  Sprint("User application is loading.\n");
+  sprint("User application is loading.\n");
   arg_buf arg_bug_msg;
   // retrieve command line arguements
   size_t argc = parse_args(&arg_bug_msg);
@@ -94,7 +94,7 @@ process* load_user_program() {
 volatile static int sig = 1;
 int s_start(void) {
 
-  Sprint("Enter supervisor mode...\n");
+  sprint("Enter supervisor mode...\n");
   write_csr(satp, 0);
 
   int hartid = read_tp();
@@ -116,7 +116,7 @@ int s_start(void) {
   // init file system, added @lab4_1
   fs_init();
 
-  Sprint("Switch to user mode...\n");
+  sprint("Switch to user mode...\n");
   // the application code (elf) is first loaded into memory, and then put into execution
   // added @lab3_1
   insert_to_ready_queue( load_user_program() );
