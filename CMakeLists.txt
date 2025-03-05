@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(riscv-pke C ASM)
 # ✅ 添加用户态程序的编译（调用 user/ 目录的 CMakeLists.txt）
 add_subdirectory(user)
+add_subdirectory(kernel)
 # Set cross-compiler
 set(CMAKE_SYSTEM_NAME Generic)
 set(CMAKE_C_COMPILER riscv64-unknown-elf-gcc)
@@ -11,19 +12,6 @@ set(CMAKE_RANLIB riscv64-unknown-elf-ranlib)
 
 # Compiler flags
 set(CMAKE_C_FLAGS "-Wall -Werror -gdwarf-3 -fno-builtin -nostdlib -D__NO_INLINE__ -mcmodel=medany -g -Og -std=gnu99 -Wno-unused -Wno-attributes -fno-delete-null-pointer-checks -fno-PIE -fno-omit-frame-pointer")
-
-# Additional march flag if provided
-if(DEFINED MARCH)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=${MARCH}")
-  
-  # Set MABI based on MARCH
-  string(FIND ${MARCH} "32" IS_32BIT)
-  if(NOT ${IS_32BIT} EQUAL -1)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mabi=ilp32")
-  else()
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mabi=lp64")
-  endif()
-endif()
 
 # Apply the same flags to ASM
 set(CMAKE_ASM_FLAGS "${CMAKE_C_FLAGS}")
@@ -48,22 +36,16 @@ target_include_directories(util PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOUR
 # Build spike_interface library
 file(GLOB SPIKE_INF_SOURCES "spike_interface/*.c")
 add_library(spike_interface STATIC ${SPIKE_INF_SOURCES})
+
+# 确保 spike_interface 和 util 先编译完成
+add_dependencies(spike_interface util)
 target_link_libraries(spike_interface util)
+target_include_directories(spike_interface PRIVATE 
+	${CMAKE_SOURCE_DIR}/include 
+	${CMAKE_SOURCE_DIR}/util
+	${CMAKE_SOURCE_DIR}
+)
 
-# 递归获取 kernel 目录及其所有子目录中的 C 源文件
-file(GLOB_RECURSE KERNEL_SOURCES "kernel/**/*.c")
-file(GLOB_RECURSE KERNEL_SOURCES "kernel/*.c")
-
-# 递归获取 kernel 目录及其所有子目录中的 汇编（.S）源文件
-file(GLOB_RECURSE KERNEL_ASM_SOURCES "kernel/**/*.S")
-file(GLOB_RECURSE KERNEL_ASM_SOURCES "kernel/*.S")
-
-
-add_executable(riscv-pke ${KERNEL_SOURCES} ${KERNEL_ASM_SOURCES})
-target_link_libraries(riscv-pke util spike_interface)
-target_include_directories(riscv-pke PRIVATE ${CMAKE_SOURCE_DIR}/include)
-# Set the linker script for kernel
-set_target_properties(riscv-pke PROPERTIES LINK_FLAGS "-T ${CMAKE_CURRENT_SOURCE_DIR}/kernel/kernel.lds")
 
 # Custom targets for convenience
 add_custom_target(run
