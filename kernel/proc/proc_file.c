@@ -3,39 +3,15 @@
  */
 
 #include <kernel/proc_file.h>
-
-
-#include <kernel/hostfs.h>
 #include <kernel/pmm.h>
 #include <kernel/process.h>
-#include <kernel/ramdev.h>
-#include <kernel/rfs.h>
 #include <kernel/riscv.h>
 #include "spike_interface/spike_file.h"
 #include "spike_interface/spike_utils.h"
 #include "util/functions.h"
 #include <util/string.h>
 
-//
-// initialize file system
-//
-void fs_init(void) {
-  // initialize the vfs
-  vfs_init();
 
-  // register hostfs and mount it as the root
-  if (register_hostfs() < 0)
-    panic("fs_init: cannot register hostfs.\n");
-  struct device *hostdev = init_host_device("HOSTDEV");
-  vfs_mount("HOSTDEV", MOUNT_AS_ROOT);
-
-  // register and mount rfs
-  if (register_rfs() < 0)
-    panic("fs_init: cannot register rfs.\n");
-  struct device *ramdisk0 = init_rfs_device("RAMDISK0");
-  rfs_format_dev(ramdisk0);
-  vfs_mount("RAMDISK0", MOUNT_DEFAULT);
-}
 
 //
 // initialize a proc_file_management data structure for a process.

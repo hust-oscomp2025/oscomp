@@ -10,6 +10,8 @@
 #include "util/hash_table.h"
 #include <util/string.h>
 #include <kernel/types.h>
+#include <kernel/rfs.h>
+#include <kernel/hostfs.h>
 
 struct dentry *vfs_root_dentry;              // system root direntry
 struct super_block *vfs_sb_list[MAX_MOUNTS]; // system superblock list
@@ -18,6 +20,28 @@ struct hash_table dentry_hash_table;
 struct hash_table vinode_hash_table;
 
 struct file_system_type *fs_list[MAX_SUPPORTED_FS];
+
+
+//
+// initialize file system
+//
+void fs_init(void) {
+  // initialize the vfs
+  vfs_init();
+
+  // register hostfs and mount it as the root
+  if (register_hostfs() < 0)
+    panic("fs_init: cannot register hostfs.\n");
+  struct device *hostdev = init_host_device("HOSTDEV");
+  vfs_mount("HOSTDEV", MOUNT_AS_ROOT);
+
+  // register and mount rfs
+  if (register_rfs() < 0)
+    panic("fs_init: cannot register rfs.\n");
+  struct device *ramdisk0 = init_rfs_device("RAMDISK0");
+  rfs_format_dev(ramdisk0);
+  vfs_mount("RAMDISK0", MOUNT_DEFAULT);
+}
 
 //
 // initializes the dentry hash list and vinode hash list
