@@ -4,10 +4,6 @@
 
 #define HOSTFS_TYPE 1
 
-// dinode type
-#define H_FILE S_IFREG
-#define H_DIR S_IFDIR
-
 // root directory
 #define H_ROOT_DIR "./hostfs_root"
 

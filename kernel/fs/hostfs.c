@@ -121,7 +121,7 @@ int hostfs_write_back_vinode(struct inode *vinode) { return 0; }
 int hostfs_update_vinode(struct inode *vinode) {
   spike_file_t *f = vinode->i_private;
   if ((int64)f < 0) {  // is a direntry
-    vinode->type = H_DIR;
+    vinode->i_mode = S_IFDIR;
     return -1;
   }
 
@@ -129,14 +129,14 @@ int hostfs_update_vinode(struct inode *vinode) {
   spike_file_stat(f, &stat);
 
   vinode->i_ino = stat.st_ino;
-  vinode->size = stat.st_size;
-  vinode->nlinks = stat.st_nlink;
+  vinode->i_size = stat.st_size;
+  vinode->i_nlink = stat.st_nlink;
   vinode->blocks = stat.st_blocks;
 
   if (S_ISDIR(stat.st_mode)) {
-    vinode->type = H_DIR;
+    vinode->i_mode = S_IFDIR;
   } else if (S_ISREG(stat.st_mode)) {
-    vinode->type = H_FILE;
+    vinode->i_mode = S_IFREG;
   } else {
     sprint("hostfs_lookup:unknown file type!");
     return -1;
@@ -289,7 +289,7 @@ struct super_block *hostfs_get_superblock(struct device *dev) {
   sb->s_dev = dev;
 
   struct inode *root_inode = hostfs_alloc_vinode(sb);
-  root_inode->type = H_DIR;
+  root_inode->i_mode = S_IFDIR;
 
   struct dentry *root_dentry = alloc_vfs_dentry("/", root_inode, NULL);
   sb->s_root = root_dentry;

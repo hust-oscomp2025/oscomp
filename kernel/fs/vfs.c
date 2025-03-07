@@ -179,7 +179,7 @@ struct file *vfs_open(const char *path, int flags) {
     }
   }
 
-  if (file_dentry->dentry_inode->type != S_IFREG) {
+  if (file_dentry->dentry_inode->i_mode != S_IFREG) {
     sprint("vfs_open: cannot open a directory!\n");
     return NULL;
   }
@@ -227,7 +227,7 @@ ssize_t vfs_read(struct file *file, char *buf, size_t count) {
     sprint("vfs_read: file is not readable!\n");
     return -1;
   }
-  if (file->f_dentry->dentry_inode->type != S_IFREG) {
+  if (file->f_dentry->dentry_inode->i_mode != S_IFREG) {
     sprint("vfs_read: cannot read a directory!\n");
     return -1;
   }
@@ -244,7 +244,7 @@ ssize_t vfs_write(struct file *file, const char *buf, size_t count) {
     sprint("vfs_write: file is not writable!\n");
     return -1;
   }
-  if (file->f_dentry->dentry_inode->type != S_IFREG) {
+  if (file->f_dentry->dentry_inode->i_mode != S_IFREG) {
     sprint("vfs_read: cannot write a directory!\n");
     return -1;
   }
@@ -257,7 +257,7 @@ ssize_t vfs_write(struct file *file, const char *buf, size_t count) {
 // return: the new offset on success, -1 on failure.
 //
 ssize_t vfs_lseek(struct file *file, ssize_t offset, int whence) {
-  if (file->f_dentry->dentry_inode->type != S_IFREG) {
+  if (file->f_dentry->dentry_inode->i_mode != S_IFREG) {
     sprint("vfs_read: cannot seek a directory!\n");
     return -1;
   }
@@ -276,9 +276,9 @@ ssize_t vfs_lseek(struct file *file, ssize_t offset, int whence) {
 //
 int vfs_stat(struct file *file, struct istat *istat) {
   istat->st_inum = file->f_dentry->dentry_inode->i_ino;
-  istat->st_size = file->f_dentry->dentry_inode->size;
-  istat->st_type = file->f_dentry->dentry_inode->type;
-  istat->st_nlinks = file->f_dentry->dentry_inode->nlinks;
+  istat->st_size = file->f_dentry->dentry_inode->i_size;
+  istat->st_type = file->f_dentry->dentry_inode->i_mode;
+  istat->st_nlinks = file->f_dentry->dentry_inode->i_nlink;
   istat->st_blocks = file->f_dentry->dentry_inode->blocks;
   return 0;
 }
@@ -307,7 +307,7 @@ int vfs_link(const char *oldpath, const char *newpath) {
     return -1;
   }
 
-  if (old_file_dentry->dentry_inode->type != S_IFREG) {
+  if (old_file_dentry->dentry_inode->i_mode != S_IFREG) {
     sprint("vfs_link: cannot link a directory!\n");
     return -1;
   }
@@ -358,7 +358,7 @@ int vfs_unlink(const char *path) {
     return -1;
   }
 
-  if (file_dentry->dentry_inode->type != S_IFREG) {
+  if (file_dentry->dentry_inode->i_mode != S_IFREG) {
     sprint("vfs_unlink: cannot unlink a directory!\n");
     return -1;
   }
@@ -380,7 +380,7 @@ int vfs_unlink(const char *path) {
 	atomic_dec(&unlinked_vinode->i_count);
 
   // if this inode has been removed from disk
-  if (unlinked_vinode->nlinks == 0) {
+  if (unlinked_vinode->i_nlink == 0) {
     // no one will remember a dead inode
     assert(atomic_read(&unlinked_vinode->i_count) == 0);
 
@@ -396,7 +396,7 @@ int vfs_unlink(const char *path) {
 // close a file at vfs layer.
 //
 int vfs_close(struct file *file) {
-  if (file->f_dentry->dentry_inode->type != S_IFREG) {
+  if (file->f_dentry->dentry_inode->i_mode != S_IFREG) {
     sprint("vfs_close: cannot close a directory!\n");
     return -1;
   }
@@ -444,7 +444,7 @@ struct file *vfs_opendir(const char *path) {
   // lookup the dir
   struct dentry *file_dentry = lookup_final_dentry(path, &parent, miss_name);
 
-  if (!file_dentry || file_dentry->dentry_inode->type != S_IFDIR) {
+  if (!file_dentry || file_dentry->dentry_inode->i_mode != S_IFDIR) {
     sprint("vfs_opendir: cannot find the direntry!\n");
     return NULL;
   }
@@ -469,7 +469,7 @@ struct file *vfs_opendir(const char *path) {
 // the read direntry entry is stored in "dir"
 //
 int vfs_readdir(struct file *file, struct dir *dir) {
-  if (file->f_dentry->dentry_inode->type != S_IFDIR) {
+  if (file->f_dentry->dentry_inode->i_mode != S_IFDIR) {
     sprint("vfs_readdir: cannot read a file!\n");
     return -1;
   }
@@ -519,7 +519,7 @@ int vfs_mkdir(const char *path) {
 // close a directory at vfs layer
 //
 int vfs_closedir(struct file *file) {
-  if (file->f_dentry->dentry_inode->type != S_IFDIR) {
+  if (file->f_dentry->dentry_inode->i_mode != S_IFDIR) {
     sprint("vfs_closedir: cannot close a file!\n");
     return -1;
   }
@@ -824,9 +824,9 @@ struct inode *default_alloc_vinode(struct super_block *sb) {
   struct inode *vinode = (struct inode *)alloc_page();
   vinode->blocks = 0;
   vinode->i_ino = 0;
-  vinode->nlinks = 0;
+  vinode->i_nlink = 0;
 	atomic_set(&vinode->i_count, 0);
   vinode->sb = sb;
-  vinode->size = 0;
+  vinode->i_size = 0;
   return vinode;
 }

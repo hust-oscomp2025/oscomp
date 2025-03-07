@@ -27,9 +27,10 @@ struct inode {
 	imode_t i_mode;            // file mode
   uint64 i_ino;                  // inode number of the disk inode
   atomic_t i_count;                   // reference count
-  loff_t size;                  // size of the file (in bytes)
-  int type;                  // one of S_IFREG, S_IFDIR
-  int nlinks;                // number of hard links to this file
+  loff_t i_size;                  // size of the file (in bytes)
+  int i_nlink;                // number of hard links to this file
+	//struct address_space	*i_mapping;
+
   int blocks;                // number of blocks
   int addrs[DIRECT_BLKNUM];  // direct blocks
 

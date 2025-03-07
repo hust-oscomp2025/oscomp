@@ -212,14 +212,14 @@ int rfs_free_block(struct super_block *sb, int block_num) {
 // add a new directory entry to a directory
 //
 int rfs_add_direntry(struct inode *dir, const char *name, int inum) {
-  if (dir->type != S_IFDIR) {
+  if (dir->i_mode != S_IFDIR) {
     sprint("rfs_add_direntry: not a directory!\n");
     return -1;
   }
 	// 直接将子文件目录项的磁盘号附加到目录的数据块后面
 	// 这个代码没有考虑到一个目录可以有多个目录块
-  int block_index = dir->addrs[dir->size / RFS_BLKSIZE];
-	uint64 offset = dir->size % RFS_BLKSIZE;
+  int block_index = dir->addrs[dir->i_size / RFS_BLKSIZE];
+	uint64 offset = dir->i_size % RFS_BLKSIZE;
 
   struct rfs_device *rdev = rfs_device_list[dir->sb->s_dev->dev_id];
 
@@ -240,7 +240,7 @@ int rfs_add_direntry(struct inode *dir, const char *name, int inum) {
   }
 
   // update its parent dir state
-  dir->size += sizeof(struct rfs_direntry);
+  dir->i_size += sizeof(struct rfs_direntry);
 
   // write the parent dir inode back to disk
   if (rfs_write_back_vinode(dir) != 0) {
@@ -266,10 +266,10 @@ struct inode *rfs_alloc_vinode(struct super_block *sb) {
 int rfs_write_back_vinode(struct inode *vinode) {
   // copy vinode info to disk inode
   struct rfs_dinode dinode;
-  dinode.size = vinode->size;
-  dinode.nlinks = vinode->nlinks;
+  dinode.size = vinode->i_size;
+  dinode.nlinks = vinode->i_nlink;
   dinode.blocks = vinode->blocks;
-  dinode.type = vinode->type;
+  dinode.type = vinode->i_mode;
   for (int i = 0; i < RFS_DIRECT_BLKNUM; ++i) {
     dinode.addrs[i] = vinode->addrs[i];
   }
@@ -293,10 +293,10 @@ int rfs_update_vinode(struct inode *vinode) {
     sprint("rfs_update_vinode: failed to read disk inode!\n");
     return -1;
   }
-  vinode->size = dinode->size;
-  vinode->nlinks = dinode->nlinks;
+  vinode->i_size = dinode->size;
+  vinode->i_nlink = dinode->nlinks;
   vinode->blocks = dinode->blocks;
-  vinode->type = dinode->type;
+  vinode->i_mode = dinode->type;
   for (int i = 0; i < RFS_DIRECT_BLKNUM; ++i) {
     vinode->addrs[i] = dinode->addrs[i];
   }
@@ -313,10 +313,10 @@ int rfs_update_vinode(struct inode *vinode) {
 ssize_t rfs_read(struct inode *f_inode, char *r_buf, ssize_t len,
                  int *offset) {
   // obtain disk inode from vfs inode
-  if (f_inode->size < *offset)
+  if (f_inode->i_size < *offset)
     panic("rfs_read:offset should less than file size!");
 
-  if (f_inode->size < (*offset + len)) len = f_inode->size - *offset;
+  if (f_inode->i_size < (*offset + len)) len = f_inode->i_size - *offset;
 
   char buffer[len + 1];
 
@@ -370,7 +370,7 @@ ssize_t rfs_read(struct inode *f_inode, char *r_buf, ssize_t len,
 //
 ssize_t rfs_write(struct inode *f_inode, const char *w_buf, ssize_t len,
                   int *offset) {
-  if (f_inode->size < *offset) {
+  if (f_inode->i_size < *offset) {
     panic("rfs_write:offset should less than file size!");
   }
 
@@ -428,8 +428,8 @@ ssize_t rfs_write(struct inode *f_inode, const char *w_buf, ssize_t len,
   }
 
   // update file size
-  f_inode->size =
-      (f_inode->size < *offset + len ? *offset + len : f_inode->size);
+  f_inode->i_size =
+      (f_inode->i_size < *offset + len ? *offset + len : f_inode->i_size);
 
   *offset += len;
   return len;
@@ -445,7 +445,7 @@ struct inode *rfs_lookup(struct inode *parent, struct dentry *sub_dentry) {
   struct rfs_direntry *p_direntry = NULL;
   struct inode *child_vinode = NULL;
 
-  int total_direntrys = parent->size / sizeof(struct rfs_direntry);
+  int total_direntrys = parent->i_size / sizeof(struct rfs_direntry);
   int one_block_direntrys = RFS_BLKSIZE / sizeof(struct rfs_direntry);
 
   struct rfs_device *rdev = rfs_device_list[parent->sb->s_dev->dev_id];
@@ -517,7 +517,7 @@ struct inode *rfs_create(struct inode *parent, struct dentry *sub_dentry) {
 // return 0 if success, otherwise return -1
 //
 int rfs_lseek(struct inode *f_inode, ssize_t new_offset, int whence, int *offset) {
-  int file_size = f_inode->size;
+  int file_size = f_inode->i_size;
 
   switch (whence) {
     case SEEK_SET:
@@ -588,7 +588,7 @@ int rfs_link(struct inode *parent, struct dentry *sub_dentry, struct inode *link
 	int result;
 
 
-	sub_dentry->dentry_inode->nlinks++;
+	sub_dentry->dentry_inode->i_nlink++;
 	rfs_write_back_vinode(sub_dentry->dentry_inode);
 	
 	if((result = rfs_add_direntry(parent,sub_dentry->name,sub_dentry->dentry_inode->i_ino ) ) != 0){
@@ -608,7 +608,7 @@ int rfs_unlink(struct inode *parent, struct dentry *sub_dentry, struct inode *un
   struct rfs_device *rdev = rfs_device_list[parent->sb->s_dev->dev_id];
 
   // ** find the direntry in the directory file
-  int total_direntrys = parent->size / sizeof(struct rfs_direntry);
+  int total_direntrys = parent->i_size / sizeof(struct rfs_direntry);
   int one_block_direntrys = RFS_BLKSIZE / sizeof(struct rfs_direntry);
 
   struct rfs_direntry *p_direntry = NULL;
@@ -637,13 +637,13 @@ int rfs_unlink(struct inode *parent, struct dentry *sub_dentry, struct inode *un
 
   // if this assertion fails, it indicates that the previous modification to nlinks
   // was not written back to disk, which is not allowed
-  assert(unlink_vinode->nlinks == unlink_dinode->nlinks);
+  assert(unlink_vinode->i_nlink == unlink_dinode->nlinks);
 
   // ** decrease vinode nlinks by 1
-  unlink_vinode->nlinks--;
+  unlink_vinode->i_nlink--;
 
   // ** update disk inode nlinks
-  unlink_dinode->nlinks = unlink_vinode->nlinks;
+  unlink_dinode->nlinks = unlink_vinode->i_nlink;
 
   // ** if nlinks == 0, free the disk inode and disk blocks
   if (unlink_dinode->nlinks == 0) {
@@ -708,7 +708,7 @@ int rfs_unlink(struct inode *parent, struct dentry *sub_dentry, struct inode *un
   }
 
   // ** update the directory file's size
-  parent->size -= sizeof(struct rfs_direntry);
+  parent->i_size -= sizeof(struct rfs_direntry);
 
   // ** write the directory file's inode back to disk
   if (rfs_write_back_vinode(parent) != 0) {
@@ -773,7 +773,7 @@ int rfs_hook_closedir(struct inode *dir_vinode, struct dentry *dentry) {
 // return: 0 on success, -1 when there are no more entry (end of the list).
 //
 int rfs_readdir(struct inode *dir_vinode, struct dir *dir, int *offset) {
-  int total_direntrys = dir_vinode->size / sizeof(struct rfs_direntry);
+  int total_direntrys = dir_vinode->i_size / sizeof(struct rfs_direntry);
   int one_block_direntrys = RFS_BLKSIZE / sizeof(struct rfs_direntry);
 
   int direntry_index = *offset;
