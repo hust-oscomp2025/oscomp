@@ -262,8 +262,8 @@ int do_munmap(process *proc, uint64 addr, size_t length) {
     // 检查是否有重叠
     if (addr < vma->vm_end && end > vma->vm_start) {
       // 计算重叠区域
-      __user uint64 overlap_start = MAX(addr, vma->vm_start);
-      __user uint64 overlap_end = MIN(end, vma->vm_end);
+      uaddr overlap_start = MAX(addr, vma->vm_start);
+      uaddr overlap_end = MIN(end, vma->vm_end);
 
       // 计算页索引
       int start_idx = (overlap_start - vma->vm_start) / PGSIZE;
@@ -342,7 +342,7 @@ int do_munmap(process *proc, uint64 addr, size_t length) {
 /**
  * 分配一个页并映射到指定地址
  */
-void *user_alloc_page(process *proc, __user uint64 addr, int prot) {
+void *user_alloc_page(process *proc, uaddr addr, int prot) {
   if (!proc || !proc->pagetable)
     return NULL;
 
@@ -355,7 +355,7 @@ void *user_alloc_page(process *proc, __user uint64 addr, int prot) {
   void *pa = page_to_virt(page);
 
   // 映射到用户虚拟地址空间
-  int result = map_pages(proc->pagetable, __user addr, PGSIZE, (uint64)pa,
+  int result = map_pages(proc->pagetable, addr, PGSIZE, (uint64)pa,
                          prot_to_type(prot, 1));
 
   if (result != 0) {
@@ -366,9 +366,9 @@ void *user_alloc_page(process *proc, __user uint64 addr, int prot) {
 
   // 记录映射关系
   if (proc->mm) {
-    struct vm_area_struct *vma = find_vma(proc->mm, __user addr);
+    struct vm_area_struct *vma = find_vma(proc->mm, addr);
     if (vma) {
-      int page_idx = (__user addr - vma->vm_start) / PGSIZE;
+      int page_idx = (addr - vma->vm_start) / PGSIZE;
       if (page_idx >= 0 && page_idx < vma->page_count) {
         vma->pages[page_idx] = page;
       }

@@ -4,13 +4,12 @@
 #include <kernel/syscall.h>
 
 
-
 // 按字母顺序排列
 struct syscall_function sys_table[] = {
     [1023] = {0, 0},
     // [SYS_accept] = {sys_accept, "accept"},
     // [SYS_bind] = {sys_bind, "bind"},
-    // [SYS_brk] = {sys_brk, "brk"},
+    [SYS_brk] = {sys_brk, "brk"},
     // [SYS_chdir] = {sys_chdir, "chdir"},
     // [SYS_clock_gettime] = {sys_clock_gettime, "clock_gettime"},
     // [SYS_clock_nanosleep] = {sys_clock_nanosleep, "clock_nanosleep"},
@@ -56,10 +55,12 @@ struct syscall_function sys_table[] = {
     // [SYS_madvise] = {sys_madvise, "sys_madvise"},
     // [SYS_membarrier] = {sys_membarrier, "membarrier"},
     // [SYS_mkdirat] = {sys_mkdirat, "mkdirat"},
+
+		[SYS_mmap] = {sys_mmap, "mkdirat"},
     // [SYS_mount] = {sys_mount, "mount"},
-    // [SYS_mprotect] = {sys_mprotect, "mprotect"},
+    [SYS_mprotect] = {sys_mprotect, "mprotect"},
     // [SYS_msync] = {sys_msync, "msync"},
-    // [SYS_munmap] = {sys_unmap, "munmap"},
+    [SYS_munmap] = {sys_unmap, "munmap"},
     // [SYS_nanosleep] = {sys_nanosleep, "nanosleep"},
     // [SYS_openat] = {sys_openat, "openat"},
     // [SYS_pipe2] = {sys_pipe2, "pipe2"},

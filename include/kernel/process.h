@@ -40,16 +40,6 @@ enum proc_status {
 };
 
 // types of a segment
-enum segment_type {
-  STACK_SEGMENT = 0,   // runtime stack segmentm from init_user_stack
-  CONTEXT_SEGMENT, // trapframe segment, from alloc_process
-  SYSTEM_SEGMENT,  // system segment,from alloc_process
-  HEAP_SEGMENT,    // runtime heap segment, from init_user_heap
-  CODE_SEGMENT,    // ELF segmentm from elf_load_segment
-  DATA_SEGMENT,    // ELF segment, from elf_load_segment
-};
-
-// types of a segment
 enum fork_choice {
   FORK_MAP = 0,   // 直接映射代码段
   FORK_COPY, // 直接复制所有数据
@@ -128,7 +118,6 @@ void init_proc_pool();
 // allocate an empty process, init its vm space. returns its pid
 process* alloc_process();
 void init_user_stack(process* ps);
-void init_user_heap(process* ps);
 
 
 

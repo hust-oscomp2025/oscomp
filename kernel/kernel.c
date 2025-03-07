@@ -2,19 +2,22 @@
  * Supervisor-mode startup codes
  */
 
-#include "kernel/riscv.h"
-#include <util/string.h>
+#include <kernel/riscv.h>
 #include <kernel/elf.h>
 #include <kernel/process.h>
 #include <kernel/pmm.h>
 #include <kernel/vmm.h>
 #include <kernel/sched.h>
 #include <kernel/memlayout.h>
-#include <spike_interface/spike_utils.h>
 #include <kernel/types.h>
 #include <kernel/vfs.h>
 #include <kernel/rfs.h>
 #include <kernel/ramdev.h>
+#include <kernel/user_heap.h>
+
+#include <util/string.h>
+
+#include <spike_interface/spike_utils.h>
 
 
 //

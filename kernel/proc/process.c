@@ -92,21 +92,6 @@ void init_user_stack(process *ps) {
   ps->total_mapped_region++;
 }
 
-void init_user_heap(process *ps) {
-  // initialize the process's heap manager
-  ps->user_heap.heap_top = USER_FREE_ADDRESS_START;
-  ps->user_heap.heap_bottom = USER_FREE_ADDRESS_START;
-  // ps->user_heap.free_pages_address = USER_FREE_ADDRESS_START;
-  // ps->user_heap.free_pages_count = 0;
-
-  // map user heap in userspace
-  ps->mapped_info[HEAP_SEGMENT].va = USER_FREE_ADDRESS_START;
-  ps->mapped_info[HEAP_SEGMENT].npages = 0;
-  ps->mapped_info[HEAP_SEGMENT].seg_type = HEAP_SEGMENT;
-  // sprint("ps->user_heap.heap_bottom=%lx\n",ps->user_heap.heap_bottom);
-  ps->total_mapped_region++;
-}
-
 //
 // allocate an empty process, init its vm space. returns the pointer to
 // process strcuture. added @lab3_1

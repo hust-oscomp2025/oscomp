@@ -36,7 +36,7 @@ typedef struct elf_prog_header_t {
   uint32 type;   /* Segment type */
   uint32 flags;  /* Segment flags */
   uint64 off;    /* Segment file offset */
-  __user uint64 vaddr;  /* Segment virtual address */
+  uaddr vaddr;  /* Segment virtual address */
   uint64 paddr;  /* Segment physical address */
   uint64 filesz; /* Segment size in file */
   uint64 memsz;  /* Segment size in memory */

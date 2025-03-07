@@ -36,10 +36,10 @@ struct file_operations {
 	loff_t (*llseek) (struct file *, loff_t, int);
 
 	/* 基本的文件读操作 */
-	ssize_t (*read) (struct file *, char __user *, size_t, loff_t *);
+	ssize_t (*read) (struct file *, uaddr, size_t, loff_t *);
 
 	/* 基本的文件写操作 */
-	ssize_t (*write) (struct file *, const char __user *, size_t, loff_t *);
+	ssize_t (*write) (struct file *, uaddr, size_t, loff_t *);
 
 	/*
 	 * 以下函数在完整的 Linux 内核中用于实现更多高级特性，

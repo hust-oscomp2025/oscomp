@@ -26,8 +26,8 @@ enum vma_type {
  */
 struct vm_area_struct {
     // 虚拟地址范围
-    __user uint64 vm_start;        // 起始虚拟地址
-    __user uint64 vm_end;          // 结束虚拟地址（不包含）
+    uaddr vm_start;        // 起始虚拟地址
+    uaddr vm_end;          // 结束虚拟地址（不包含）
     
     // 保护标志
     int vm_prot;            // 保护标志 (PROT_READ, PROT_WRITE, PROT_EXEC)
@@ -71,17 +71,17 @@ struct mm_struct {
     int map_count;             // VMA数量
     
     // 地址空间边界
-    __user uint64 start_code;
-		__user uint64 end_code;       // 代码段范围
+    uaddr start_code;
+		uaddr end_code;       // 代码段范围
 
-    __user uint64 start_data;
-		__user uint64 end_data;       // 数据段范围
+    uaddr start_data;
+		uaddr end_data;       // 数据段范围
 
-    __user uint64 start_brk;
-		__user uint64 brk;             // 堆范围
+    uaddr start_brk;
+		uaddr brk;             // 堆范围
 
-    __user uint64 start_stack;
-		__user uint64 end_stack;     // 栈范围
+    uaddr start_stack;
+		uaddr end_stack;     // 栈范围
     
     // 锁和引用计数
     spinlock_t mm_lock;       // mm锁
@@ -164,7 +164,7 @@ int do_munmap(process *proc, uint64 addr, size_t length);
  * @param prot 保护标志
  * @return 成功返回映射的地址，失败返回NULL
  */
-void *user_alloc_page(process *proc, __user uint64 addr, int prot);
+void *user_alloc_page(process *proc, uaddr addr, int prot);
 
 
 /**
