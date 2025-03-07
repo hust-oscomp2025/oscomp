@@ -11,12 +11,12 @@ void error_printer()
   int hartid = read_tp();
   uint64 exception_addr = read_csr(mepc);
 
-  addr_line *line_list = current[hartid]->line;
-  code_file *file_list = current[hartid]->file;
-  char **dir_list = current[hartid]->dir;
-  int line_count = current[hartid]->line_count;
+  addr_line *line_list = current_percpu[hartid]->line;
+  code_file *file_list = current_percpu[hartid]->file;
+  char **dir_list = current_percpu[hartid]->dir;
+  int line_count = current_percpu[hartid]->line_count;
 
-  for (int i = 0; i < current[hartid]->line_count; i++)
+  for (int i = 0; i < current_percpu[hartid]->line_count; i++)
   {
     if (exception_addr < line_list[i].addr)
     { // illegal instruction is on line (i-1)

@@ -513,7 +513,7 @@ struct vinode *rfs_create(struct vinode *parent, struct dentry *sub_dentry) {
 //
 // there are two types of seek (specify by whence): SEEK_SET, SEEK_CUR
 // SEEK_SET: set the file pointer to the offset
-// SEEK_CUR: set the file pointer to the current offset plus the offset
+// SEEK_CUR: set the file pointer to the current_percpu offset plus the offset
 // return 0 if success, otherwise return -1
 //
 int rfs_lseek(struct vinode *f_inode, ssize_t new_offset, int whence, int *offset) {

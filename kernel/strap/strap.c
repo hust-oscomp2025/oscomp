@@ -49,7 +49,7 @@ void handle_mtimer_trap() {
   // sip register.\n" );
   g_ticks++;
   int hartid = read_tp();
-  current[hartid]->tick_count++;
+  current_percpu[hartid]->tick_count++;
 
   write_csr(sip, read_csr(sip) & ~SIP_SSIP);
 }
@@ -60,7 +60,7 @@ void handle_mtimer_trap() {
 // stval: the virtual address that causes pagefault when being accessed.
 //
 void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
-  process *ps = current[read_tp()];
+  process *ps = current_percpu[read_tp()];
   // int hartid = read_tp();
   sprint("sepc=%lx,handle_page_fault: %lx\n",sepc, stval);
   switch (mcause) {
@@ -102,8 +102,8 @@ void rrsched() {
   // schedule next process to run.
   // panic( "You need to further implement the timer handling in lab3_3.\n" );
   int hartid = read_tp();
-  if (current[hartid]->tick_count >= TIME_SLICE_LEN) {
-    current[hartid]->tick_count = 0;
+  if (current_percpu[hartid]->tick_count >= TIME_SLICE_LEN) {
+    current_percpu[hartid]->tick_count = 0;
     sys_user_yield();
   }
 }
@@ -119,9 +119,9 @@ void smode_trap_handler(void) {
   if ((read_csr(sstatus) & SSTATUS_SPP) != 0)
     panic("usertrap: not from user mode");
 
-  assert(current[hartid]);
+  assert(current_percpu[hartid]);
   // save user process counter.
-  current[hartid]->trapframe->epc = read_csr(sepc);
+  current_percpu[hartid]->trapframe->epc = read_csr(sepc);
 
   // if the cause of trap is syscall from user application.
   // read_csr() and CAUSE_USER_ECALL are macros defined in kernel/riscv.h
@@ -130,7 +130,7 @@ void smode_trap_handler(void) {
   // use switch-case instead of if-else, as there are many cases since lab2_3.
   switch (cause) {
   case CAUSE_USER_ECALL:
-    handle_syscall(current[hartid]->trapframe);
+    handle_syscall(current_percpu[hartid]->trapframe);
     // sprint("coming back from syscall\n");
     break;
   case CAUSE_MTIMER_S_TRAP:
@@ -150,7 +150,7 @@ void smode_trap_handler(void) {
     panic("unexpected exception happened.\n");
     break;
   }
-  // sprint("calling switch_to, current[hartid] = 0x%x\n", current[hartid]);
+  // sprint("calling switch_to, current = 0x%x\n", current);
   // continue (come back to) the execution of current process.
-  switch_to(current[hartid]);
+  switch_to(current_percpu[hartid]);
 }

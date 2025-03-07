@@ -119,7 +119,7 @@ void insert_to_ready_queue( process* proc ) {
 void schedule() {
 	extern process procs[NPROC];
 	int hartid = read_tp();
-	process* cur = current[hartid];
+	process* cur = current_percpu[hartid];
 			//sprint("debug\n");
 	if(cur && cur->status == BLOCKED && cur->ktrapframe == NULL){
 		cur->ktrapframe = Alloc_page();
@@ -163,7 +163,7 @@ void schedule() {
   cur = ready_queue;
 	assert( cur->status == READY );
 	ready_queue = ready_queue->queue_next;
-	current[hartid] = cur;
+	current_percpu[hartid] = cur;
 	cur->status = RUNNING;
 	if(cur->ktrapframe != NULL){
 

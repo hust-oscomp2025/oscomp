@@ -5,6 +5,11 @@
 #include <kernel/proc_file.h>
 
 
+// riscv-pke kernel supports at most 32 processes
+#define NPROC 32
+// maximum number of pages in a process's heap
+#define MAX_HEAP_PAGES 32
+
 
 typedef struct trapframe_t {
   // space to store context (all common registers)
@@ -23,10 +28,7 @@ typedef struct trapframe_t {
 	/* offset:280 */ uint64 kernel_schedule;
 }trapframe;
 
-// riscv-pke kernel supports at most 32 processes
-#define NPROC 32
-// maximum number of pages in a process's heap
-#define MAX_HEAP_PAGES 32
+
 
 // possible status of a process
 enum proc_status {
@@ -153,9 +155,10 @@ int free_process( process* proc );
 int do_fork(process* parent);
 int do_exec(void *path);
 ssize_t do_wait(int pid);
-// current points to the currently running user-mode application.
-extern process* current[NCPU];
-// current running process
-// extern process* current[NCPU];
+// current_percpu points to the currently running user-mode application.
+extern process* current_percpu[NCPU];
+#define current (current_percpu[read_tp()])
+// current_percpu running process
+// extern process* current_percpu[NCPU];
 
 #endif

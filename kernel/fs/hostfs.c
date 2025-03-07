@@ -157,7 +157,7 @@ ssize_t hostfs_read(struct vinode *f_inode, char *r_buf, ssize_t len,
     return -1;
   }
   int read_len = spike_file_read(pf, r_buf, len);
-  // obtain current offset
+  // obtain current_percpu offset
   *offset = spike_file_lseek(pf, 0, 1);
   return read_len;
 }
@@ -173,7 +173,7 @@ ssize_t hostfs_write(struct vinode *f_inode, const char *w_buf, ssize_t len,
     return -1;
   }
   int write_len = spike_file_write(pf, w_buf, len);
-  // obtain current offset
+  // obtain current_percpu offset
   *offset = spike_file_lseek(pf, 0, 1);
   return write_len;
 }

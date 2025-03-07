@@ -3,13 +3,12 @@
  */
 
 #include <kernel/proc_file.h>
-#include <kernel/pmm.h>
+#include <kernel/mm.h>
 #include <kernel/process.h>
-#include <kernel/riscv.h>
+#include <riscv.h>
 #include "spike_interface/spike_file.h"
-#include "spike_interface/spike_utils.h"
-#include "util/functions.h"
-#include <util/string.h>
+#include <spike_interface/spike_utils.h>
+#include <kstdlib.h>
 
 
 
@@ -47,7 +46,7 @@ struct file *get_opened_file(int fd) {
 
   // browse opened file list to locate the fd
   for (int i = 0; i < MAX_FILES; ++i) {
-    pfile = &(current_percpu[read_tp()]->pfiles->opened_files[i]); // file entry
+    pfile = &(current->pfiles->opened_files[i]); // file entry
     if (i == fd)
       break;
   }
@@ -66,12 +65,12 @@ int do_open(char *pathname, int flags) {
     return -1;
 
   int fd = 0;
-  if (current_percpu[read_tp()]->pfiles->nfiles >= MAX_FILES) {
+  if (current->pfiles->nfiles >= MAX_FILES) {
     panic("do_open: no file entry for current process!\n");
   }
   struct file *pfile;
   for (fd = 0; fd < MAX_FILES; ++fd) {
-    pfile = &(current_percpu[read_tp()]->pfiles->opened_files[fd]);
+    pfile = &(current->pfiles->opened_files[fd]);
     if (pfile->status == FD_NONE)
       break;
   }
@@ -79,7 +78,7 @@ int do_open(char *pathname, int flags) {
   // initialize this file structure
   memcpy(pfile, opened_file, sizeof(struct file));
 
-  ++current_percpu[read_tp()]->pfiles->nfiles;
+  ++current->pfiles->nfiles;
   return fd;
 }
 
@@ -125,7 +124,7 @@ int do_lseek(int fd, int offset, int whence) {
 //
 // read the vinode information
 //
-int do_fstat(int fd, struct istat *istat) {
+int do_stat(int fd, struct stat *istat) {
   struct file *pfile = get_opened_file(fd);
   return vfs_stat(pfile, istat);
 }
@@ -133,8 +132,7 @@ int do_fstat(int fd, struct istat *istat) {
 //
 // read the inode information on the disk
 //
-int do_stat(int fd, struct istat *istat) {
-	sprint("do_stat\n");
+int do_disk_stat(int fd, struct stat *istat) {
   struct file *pfile = get_opened_file(fd);
   return vfs_disk_stat(pfile, istat);
 }
@@ -160,11 +158,11 @@ int do_opendir(char *pathname) {
 
 	// 从进程控制块中分配fd
   for (int fd = 0; fd < MAX_FILES; ++fd) {
-    struct file *pfile = &(current_percpu[read_tp()]->pfiles->opened_files[fd]);
+    struct file *pfile = &(current->pfiles->opened_files[fd]);
     if (pfile->status == FD_NONE) {
       // initialize this file structure
       memcpy(pfile, opened_file, sizeof(struct file));
-      current_percpu[read_tp()]->pfiles->nfiles++;
+      current->pfiles->nfiles++;
       return fd;
     }
   }
@@ -215,7 +213,7 @@ ssize_t do_rcwd(char* path) {
         return -1;  // Invalid buffer
     }
     
-    struct dentry* cwd = current_percpu[read_tp()]->pfiles->cwd;
+    struct dentry* cwd = current->pfiles->cwd;
     if (!cwd) {
         return -1;  // No current working directory
     }
@@ -272,7 +270,7 @@ ssize_t do_ccwd(char* path) {
 	struct file* dir_file = vfs_opendir(path);
 	if (dir_file == NULL)
     return -1;
-	current_percpu[read_tp()]->pfiles->cwd = dir_file->f_dentry;
+	current->pfiles->cwd = dir_file->f_dentry;
 	return 0;
 }
 

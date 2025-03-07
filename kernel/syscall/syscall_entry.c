@@ -1,13 +1,12 @@
 /*copyright: 2023 farmos*/
 #include <kernel/syscall_ids.h>
+#include <kernel/syscall_file.h>
+#include <kernel/syscall.h>
 
-typedef struct syscall_function_t {
-	void *func;
-	const char *name;
-} syscall_function;
+
 
 // 按字母顺序排列
-static syscall_function sys_table[] = {
+struct syscall_function sys_table[] = {
     [1023] = {0, 0},
     // [SYS_accept] = {sys_accept, "accept"},
     // [SYS_bind] = {sys_bind, "bind"},
@@ -26,7 +25,7 @@ static syscall_function sys_table[] = {
     // [SYS_faccessat] = {sys_faccessat, "faccessat"},
     // [SYS_fchmod] = {sys_fchmod, "fchmod"},
     // [SYS_fcntl] = {sys_fcntl, "fcntl"},
-    // [SYS_fstat] = {sys_fstat, "fstat"},
+    [SYS_fstat] = {sys_fstat, "fstat"},
     // [SYS_fstatat] = {sys_fstatat, "fstatat"},
     // [SYS_fsync] = {sys_fsync, "fsync"},
     // [SYS_ftruncate] = {sys_ftruncate, "ftruncate"},

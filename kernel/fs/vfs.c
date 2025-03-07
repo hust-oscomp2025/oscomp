@@ -575,7 +575,7 @@ struct dentry *lookup_final_dentry(const char *path, struct dentry **parent,
     token = strtok(NULL, "/");
   }
 
-  // Handle special case "." for current directory
+  // Handle special case "." for current_percpu directory
   if (token && strcmp(token, ".") == 0) {
     // sprint("lookup_final_dentry: token is .\n");
     token = strtok(NULL, "/");

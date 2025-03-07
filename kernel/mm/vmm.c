@@ -74,8 +74,8 @@ pte_t *page_walk(pagetable_t page_dir, uint64 va, int alloc) {
   // as we use risc-v sv39 paging scheme, there will be 3 layers: page dir,
   // page medium dir, and page table.
   for (int level = 2; level > 0; level--) {
-    // macro "PX" gets the PTE index in page table of current level
-    // "pte" points to the entry of current level
+    // macro "PX" gets the PTE index in page table of current_percpu level
+    // "pte" points to the entry of current_percpu level
     pte_t *pte = pt + PX(level, va);
 
     // now, we need to know if above pte is valid (established mapping to a
@@ -172,7 +172,7 @@ void kern_vm_init(void) {
 // convert and return the corresponding physical address of a virtual address
 // (va) of application.
 //
-void *user_va_to_pa(pagetable_t page_dir, void *va) {
+void *user_va_to_pa(pagetable_t page_dir, void* va) {
   // TODO (lab2_1): implement user_va_to_pa to convert a given user virtual
   // address "va" to its corresponding physical address, i.e., "pa". To do it,
   // we need to walk through the page table, starting from its directory
@@ -250,7 +250,7 @@ void *vmalloc(size_t size) {
   if (size == 0)
     return NULL;
   int hartid = read_tp();
-  process *ps = current[hartid];
+  process *ps = current_percpu[hartid];
   if (ps->user_heap.heap_top == ps->user_heap.heap_bottom) {
     create_user_heap(ps);
   }
@@ -331,7 +331,7 @@ void free(void *ptr) {
 
   // 获取指向 heap_block 的指针，跳过用户数据区域
   heap_block *block = (heap_block *)((uintptr_t)ptr - sizeof(heap_block));
-  heap_block *pa_block = user_va_to_pa(current[hartid]->pagetable, block);
+  heap_block *pa_block = user_va_to_pa(current_percpu[hartid]->pagetable, block);
   // 如果该块已经是空闲的，说明已经释放过了，直接返回
   if (pa_block->free) {
     return;
@@ -342,10 +342,10 @@ void free(void *ptr) {
 
   heap_block *block_prev = pa_block->prev;
   heap_block *pa_block_prev =
-      user_va_to_pa(current[hartid]->pagetable, block_prev);
+      user_va_to_pa(current_percpu[hartid]->pagetable, block_prev);
   heap_block *block_next = pa_block->next;
   heap_block *pa_block_next =
-      user_va_to_pa(current[hartid]->pagetable, block_next);
+      user_va_to_pa(current_percpu[hartid]->pagetable, block_next);
   // 合并前面的空闲块
   if (block_prev != NULL && pa_block_prev->free) {
     // 合并前一个空闲块
@@ -370,7 +370,7 @@ void free(void *ptr) {
 
   // 合并会自动设置好堆的头指针，所以不需要做更多工作。
   // if (block_prev == NULL) {
-  //  current[hartid]->heap = block; // 更新堆的头部
+  //  current_percpu[hartid]->heap = block; // 更新堆的头部
   //}
 }
 

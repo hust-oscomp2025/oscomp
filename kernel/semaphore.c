@@ -42,7 +42,7 @@ int sem_P(int sem_index) {
   } else {
     // sprint("BLOCK!\n");
     int hartid = read_tp();
-    process *cur = current[hartid];
+    process *cur = current_percpu[hartid];
     cur->status = BLOCKED;
     cur->queue_next = sem->wait_queue;
     sem->wait_queue = cur;
@@ -65,7 +65,7 @@ int sem_V(int sem_index) {
 
   if (sem->value == 0 && sem->wait_queue != NULL) {
     insert_to_ready_queue(sem->wait_queue);
-		//insert_to_ready_queue(current[read_tp()]);
+		//insert_to_ready_queue(current);
     // sem->wait_queue->status = READY;
     sem->wait_queue = sem->wait_queue->queue_next;
     //schedule();
