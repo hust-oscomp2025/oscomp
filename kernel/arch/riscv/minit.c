@@ -5,7 +5,7 @@
 #include <kernel/config.h>
 #include <kernel/riscv.h>
 #include <kernel/sync_utils.h>
-#include "spike_interface/spike_utils.h"
+#include <spike_interface/spike_utils.h>
 #include <kernel/types.h>
 
 //

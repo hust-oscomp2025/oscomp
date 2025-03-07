@@ -5,7 +5,7 @@
 
 #include <kernel/pmm.h>
 #include "spike_interface/spike_file.h"
-#include "spike_interface/spike_utils.h"
+#include <spike_interface/spike_utils.h>
 #include <util/string.h>
 #include <kernel/types.h>
 #include <kernel/vfs.h>

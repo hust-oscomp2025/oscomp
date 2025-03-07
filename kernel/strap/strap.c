@@ -7,7 +7,7 @@
 #include <kernel/memlayout.h>
 #include <kernel/pmm.h>
 #include <kernel/page.h>
-#include <kernel/user_mem.h>
+#include <kernel/user_mm.h>
 #include <kernel/process.h>
 #include <kernel/riscv.h>
 #include <kernel/sched.h>
@@ -16,7 +16,7 @@
 
 #include <kernel/vmm.h>
 
-#include "spike_interface/spike_utils.h"
+#include <spike_interface/spike_utils.h>
 
 //
 // handling the syscalls. will call do_syscall() defined in kernel/syscall.c

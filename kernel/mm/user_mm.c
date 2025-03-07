@@ -1,10 +1,10 @@
-#include "spike_interface/spike_utils.h"
+#include <spike_interface/spike_utils.h>
 #include <kernel/atomic.h>
 #include <kernel/memlayout.h>
 #include <kernel/page.h>
 #include <kernel/pmm.h>
 #include <kernel/process.h>
-#include <kernel/user_mem.h>
+#include <kernel/user_mm.h>
 #include <kernel/vmm.h>
 #include <util/string.h>
 

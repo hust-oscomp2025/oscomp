@@ -3,7 +3,7 @@
 #include <kernel/spinlock.h>
 #include <kernel/list.h>
 #include <util/string.h>
-#include "spike_interface/spike_utils.h"
+#include <spike_interface/spike_utils.h>
 #include <kernel/sync_utils.h>
 
 // 页结构数组，用于跟踪所有物理页

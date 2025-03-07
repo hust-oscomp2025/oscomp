@@ -14,7 +14,7 @@
 
 #include <kernel/pmm.h>
 #include <kernel/ramdev.h>
-#include "spike_interface/spike_utils.h"
+#include <spike_interface/spike_utils.h>
 //#include <util/string.h>
 #include <kernel/vfs.h>
 #include <util/string.h>

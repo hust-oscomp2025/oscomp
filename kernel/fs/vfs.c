@@ -4,7 +4,7 @@
 
 #include <kernel/vfs.h>
 
-#include "spike_interface/spike_utils.h"
+#include <spike_interface/spike_utils.h>
 #include "util/hash_table.h"
 #include <kernel/hostfs.h>
 #include <kernel/pmm.h>

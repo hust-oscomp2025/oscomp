@@ -4,8 +4,8 @@
  * codes are borrowed from riscv-pk (https://github.com/riscv/riscv-pk)
  */
 
-#include "dts_parse.h"
-#include "spike_interface/spike_utils.h"
+#include <spike_interface/dts_parse.h>
+#include <spike_interface/spike_utils.h>
 #include <util/string.h>
 
 static inline __uint32_t bswap(__uint32_t x) {

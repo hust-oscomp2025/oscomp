@@ -2,9 +2,9 @@
 #define _SPIKE_UTILS_H_
 
 #include <sys/types.h>
-#include "spike_file.h"
+#include <spike_interface/spike_file.h>
 #include "spike_memory.h"
-#include "spike_htif.h"
+#include <spike_interface/spike_htif.h>
 
 long frontend_syscall(long n, __uint64_t a0, __uint64_t a1, __uint64_t a2, __uint64_t a3, __uint64_t a4, __uint64_t a5,
                       __uint64_t a6);

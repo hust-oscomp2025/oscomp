@@ -12,9 +12,9 @@
 
 #include <sys/types.h>
 #include <kernel/spinlock.h>
-#include "spike_htif.h"
-#include "spike_interface/spike_utils.h"
-#include "dts_parse.h"
+#include <spike_interface/spike_htif.h>
+#include <spike_interface/spike_utils.h>
+#include <spike_interface/dts_parse.h>
 #include <util/string.h>
 
 __uint64_t htif;  //is Spike HTIF avaiable? initially 0 (false)

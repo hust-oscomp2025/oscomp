@@ -7,11 +7,11 @@
  * codes are borrowed from riscv-pk (https://github.com/riscv/riscv-pk)
  */
 
-#include "spike_file.h"
+#include <spike_interface/spike_file.h>
 #include <kernel/atomic.h>
 #include <kernel/spinlock.h>
-#include "spike_htif.h"
-#include "spike_interface/spike_utils.h"
+#include <spike_interface/spike_htif.h>
+#include <spike_interface/spike_utils.h>
 #include <util/string.h>
 #include <kernel/types.h>
 // #include "../kernel/config.h"

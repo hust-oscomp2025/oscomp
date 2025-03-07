@@ -20,31 +20,6 @@ set(CMAKE_ASM_FLAGS "${CMAKE_C_FLAGS}")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-# Create hostfs_root/bin directory
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/hostfs_root/bin)
-
-# Include directories
-include_directories(.)
-
-
-
-# Build util library
-file(GLOB UTIL_SOURCES "util/*.c")
-add_library(util STATIC ${UTIL_SOURCES})
-target_include_directories(util PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/util {CMAKE_SOURCE_DIR}/spike_interface)
-
-# Build spike_interface library
-file(GLOB SPIKE_INF_SOURCES "spike_interface/*.c")
-add_library(spike_interface STATIC ${SPIKE_INF_SOURCES})
-
-# 确保 spike_interface 和 util 先编译完成
-add_dependencies(spike_interface util)
-target_link_libraries(spike_interface util)
-target_include_directories(spike_interface PRIVATE 
-	${CMAKE_SOURCE_DIR}/include 
-	${CMAKE_SOURCE_DIR}/util
-	${CMAKE_SOURCE_DIR}
-)
 
 
 # Custom targets for convenience

@@ -1,254 +1,438 @@
 /*
- * routines that scan and load a (host) Executable and Linkable Format (ELF)
- * file into the (emulated) memory.
+ * RISC-V OS Kernel
+ * 现代化的ELF加载器实现，用于加载和解析可执行文件
+ * 使用内核标准文件接口
  */
 
 #include <kernel/elf.h>
 #include <kernel/pmm.h>
+#include <kernel/proc_file.h>
+#include <kernel/process.h>
 #include <kernel/riscv.h>
-#include "spike_interface/spike_utils.h"
-#include <util/string.h>
+#include <kernel/user_mm.h>
+#include <kernel/vfs.h>
 #include <kernel/vmm.h>
-#include <kernel/user_mem.h>
+#include <util/string.h>
+#include <spike_interface/spike_utils.h>
 
-typedef struct elf_info_t {
-  spike_file_t *f;
-  process *p;
-} elf_info;
+/**
+ * ELF加载器的上下文信息
+ * 用于保存加载过程中的必要数据
+ */
+typedef struct elf_context {
+  int fd;             // 文件描述符
+  process *proc;      // 目标进程
+  elf_header ehdr;    // ELF头部
+  uint64 entry_point; // 入口点
+} elf_context;
 
-//
-// actual file reading, using the spike file interface.
-//
-static uint64 elf_fpread(elf_ctx *ctx, void *dest, uint64 nb, uint64 offset) {
-  elf_info *msg = (elf_info *)ctx->info;
-  // call spike file utility to load the content of elf file into memory.
-  // spike_file_pread will read the elf file (msg->f) from offset to memory
-  // (indicated by *dest) for nb bytes.
-  return spike_file_pread(msg->f, dest, nb, offset);
+/**
+ * 从文件的指定偏移读取数据
+ *
+ * @param ctx ELF上下文
+ * @param dest 目标缓冲区
+ * @param size 读取字节数
+ * @param offset 文件偏移
+ * @return 实际读取的字节数
+ */
+static ssize_t elf_read_at(elf_context *ctx, void *dest, size_t size,
+                           off_t offset) {
+  // 保存当前文件位置
+  int current_pos = do_lseek(ctx->fd, 0, SEEK_CUR);
+  if (current_pos < 0) {
+    sprint("Failed to get current file position\n");
+    return -1;
+  }
+
+  // 设置新的文件位置
+  if (do_lseek(ctx->fd, offset, SEEK_SET) < 0) {
+    sprint("Failed to seek to offset %ld\n", offset);
+    return -1;
+  }
+
+  // 读取数据
+  ssize_t bytes_read = do_read(ctx->fd, dest, size);
+
+  // 恢复文件位置
+  do_lseek(ctx->fd, current_pos, SEEK_SET);
+
+  return bytes_read;
 }
 
-elf_status elf_load_segment(elf_ctx *ctx, elf_prog_header *ph_addr) {
-  process *target_ps = ((elf_info *)ctx->info)->p;
-  size_t num_bytes = ph_addr->memsz;
-  uint64 num_pages = (ph_addr->memsz + PGSIZE - 1) / PGSIZE; // 向上取整
-  void *first_pa = NULL;
+/**
+ * 验证ELF头信息是否有效
+ *
+ * @param ehdr ELF头部
+ * @return 0表示有效，非0表示无效
+ */
+static int validate_elf_header(elf_header *ehdr) {
+  // 验证魔数
+  if (ehdr->magic != ELF_MAGIC) {
+    sprint("Invalid ELF magic number: 0x%x\n", ehdr->magic);
+    return -1;
+  }
+
+  // 验证架构（RISC-V 64位）
+  if (ehdr->machine != 0xf3) { // EM_RISCV
+    sprint("Unsupported architecture: 0x%x\n", ehdr->machine);
+    return -1;
+  }
+
+  // 验证类型（可执行文件）
+  if (ehdr->type != 2) { // ET_EXEC
+    sprint("Not an executable file: %d\n", ehdr->type);
+    return -1;
+  }
+
+  return 0;
+}
+
+/**
+ * 加载ELF段到进程内存
+ *
+ * @param ctx ELF上下文
+ * @param ph 程序头
+ * @return 0表示成功，非0表示失败
+ */
+static int load_segment(elf_context *ctx, elf_prog_header *ph) {
+  process *proc = ctx->proc;
+  struct mm_struct *mm = proc->mm;
+
+  // 只加载可加载的段
+  if (ph->type != ELF_PROG_LOAD) {
+    return 0;
+  }
+
+  // 验证段信息
+  if (ph->memsz < ph->filesz) {
+    sprint("Invalid segment: memory size < file size\n");
+    return -1;
+  }
+
+  // 检查地址溢出
+  if (ph->vaddr + ph->memsz < ph->vaddr) {
+    sprint("Segment address overflow\n");
+    return -1;
+  }
+
+  sprint("Loading segment: vaddr=0x%lx, size=0x%lx, flags=0x%x\n", ph->vaddr,
+         ph->memsz, ph->flags);
+
+  // 计算所需页数（向上取整）
+  uint64 num_pages = (ph->memsz + PGSIZE - 1) / PGSIZE;
+
+  // 确定VMA类型和权限
+  enum vma_type vma_type;
+  int prot = 0;
+  uint64 vma_flags = 0;
+
+  // 设置权限和段类型
+  if (ph->flags & SEGMENT_READABLE)
+    prot |= PROT_READ;
+  if (ph->flags & SEGMENT_WRITABLE)
+    prot |= PROT_WRITE;
+  if (ph->flags & SEGMENT_EXECUTABLE) {
+    prot |= PROT_EXEC;
+    vma_type = VMA_CODE;
+    vma_flags |= VM_EXEC;
+
+    // 更新代码段范围
+    if (mm->start_code == 0 || ph->vaddr < mm->start_code)
+      mm->start_code = ph->vaddr;
+    if (ph->vaddr + ph->memsz > mm->end_code)
+      mm->end_code = ph->vaddr + ph->memsz;
+  } else {
+    vma_type = VMA_DATA;
+
+    // 更新数据段范围
+    if (mm->start_data == 0 || ph->vaddr < mm->start_data)
+      mm->start_data = ph->vaddr;
+    if (ph->vaddr + ph->memsz > mm->end_data)
+      mm->end_data = ph->vaddr + ph->memsz;
+  }
+
+  // 设置VMA标志
+  if (ph->flags & SEGMENT_WRITABLE)
+    vma_flags |= VM_WRITE;
+  if (ph->flags & SEGMENT_READABLE)
+    vma_flags |= VM_READ;
+
+  // 创建VMA以管理该段
+  struct vm_area_struct *vma = create_vma(mm, ph->vaddr, ph->vaddr + ph->memsz,
+                                          prot, vma_type, vma_flags);
+  if (!vma) {
+    sprint("Failed to create VMA for segment\n");
+    return -1;
+  }
+
+  // 为段分配物理内存并映射
   for (uint64 i = 0; i < num_pages; i++) {
-    void *pa = user_alloc_page(((elf_info *)ctx->info)->p,ph_addr->vaddr + i*PGSIZE, PROT_WRITE | PROT_READ | PROT_EXEC);
-    if (i == 0)
-      first_pa = pa;
-    // actual loading
-    size_t load_bytes;
-    if (i == num_pages - 1) {
-      load_bytes = num_bytes % PGSIZE;
-    } else {
-      load_bytes = PGSIZE;
+    uint64 vaddr = ph->vaddr + i * PGSIZE;
+    void *page = user_alloc_page(proc, vaddr, prot);
+    if (!page) {
+      sprint("Failed to allocate page for segment\n");
+      return -1;
     }
-    if (elf_fpread(ctx, pa, load_bytes, ph_addr->off + i * PGSIZE) !=
-        load_bytes)
-      return EL_EIO;
-  }
 
+    // 计算这一页需要从文件中加载的字节数
+    uint64 page_offset = i * PGSIZE;
+    uint64 file_offset = ph->off + page_offset;
+    uint64 bytes_to_copy = 0;
 
-	
-  mapped_region *mapped_info_write = NULL;
-  for (int j = 0; j < PGSIZE / sizeof(mapped_region); j++) {
-    if (target_ps->mapped_info[j].va == 0x0) {
-      mapped_info_write = &(target_ps->mapped_info[j]);
-      mapped_info_write->va = ph_addr->vaddr;
-      mapped_info_write->npages = num_pages;
-      if (ph_addr->flags == (SEGMENT_READABLE | SEGMENT_EXECUTABLE)) {
-        mapped_info_write->seg_type = CODE_SEGMENT;
-        sprint("CODE_SEGMENT added at mapped info offset:%d\n", j);
-      } else if (ph_addr->flags == (SEGMENT_READABLE | SEGMENT_WRITABLE)) {
-        mapped_info_write->seg_type = DATA_SEGMENT;
-        sprint("DATA_SEGMENT added at mapped info offset:%d\n", j);
-      } else {
-        panic("unknown program segment encountered, segment flag:%d.\n",
-              ph_addr->flags);
+    // 确定需要复制多少数据
+    if (page_offset < ph->filesz) {
+      bytes_to_copy = MIN(PGSIZE, ph->filesz - page_offset);
+
+      // 从文件读取数据到分配的物理页
+      if (elf_read_at(ctx, page, bytes_to_copy, file_offset) != bytes_to_copy) {
+        sprint("Failed to read segment data\n");
+        return -1;
       }
-      target_ps->total_mapped_region++;
-      break;
+
+      // 如果此页有剩余部分，需要清零（.bss段的一部分）
+      if (bytes_to_copy < PGSIZE) {
+        memset((char *)page + bytes_to_copy, 0, PGSIZE - bytes_to_copy);
+      }
+    } else {
+      // 这一页完全是bss段，清零整个页
+      memset(page, 0, PGSIZE);
     }
   }
-  return EL_OK;
+
+  return 0;
 }
 
-//
-// init elf_ctx, a data structure that loads the elf.
-//
-elf_status elf_init(elf_ctx *ctx, void *info) {
-  ctx->info = info;
+/**
+ * 查找并设置.sdata段的全局指针
+ * RISC-V中gp寄存器通常指向.sdata段+0x800
+ *
+ * @param ctx ELF上下文
+ */
+static void setup_global_pointer(elf_context *ctx) {
+  elf_header *ehdr = &ctx->ehdr;
 
-  // load the elf header
-  if (elf_fpread(ctx, &ctx->ehdr, sizeof(ctx->ehdr), 0) != sizeof(ctx->ehdr))
-    return EL_EIO;
-
-  // check the signature (magic value) of the elf
-  if (ctx->ehdr.magic != ELF_MAGIC)
-    return EL_NOTELF;
-
-  return EL_OK;
-}
-
-// leb128 (little-endian base 128) is a variable-length
-// compression algoritm in DWARF
-void read_uleb128(uint64 *out, char **off) {
-  uint64 value = 0;
-  int shift = 0;
-  uint8 b;
-  for (;;) {
-    b = *(uint8 *)(*off);
-    (*off)++;
-    value |= ((uint64)b & 0x7F) << shift;
-    shift += 7;
-    if ((b & 0x80) == 0)
-      break;
+  // 读取节头字符串表
+  elf_sect_header shstr_section;
+  if (elf_read_at(ctx, &shstr_section, sizeof(shstr_section),
+                  ehdr->shoff + ehdr->shstrndx * sizeof(elf_sect_header)) !=
+      sizeof(shstr_section)) {
+    sprint("Failed to read section header string table\n");
+    return;
   }
-  if (out)
-    *out = value;
-}
-void read_sleb128(int64 *out, char **off) {
-  int64 value = 0;
-  int shift = 0;
-  uint8 b;
-  for (;;) {
-    b = *(uint8 *)(*off);
-    (*off)++;
-    value |= ((uint64_t)b & 0x7F) << shift;
-    shift += 7;
-    if ((b & 0x80) == 0)
-      break;
-  }
-  if (shift < 64 && (b & 0x40))
-    value |= -(1 << shift);
-  if (out)
-    *out = value;
-}
-// Since reading below types through pointer cast requires aligned address,
-// so we can only read them byte by byte
-void read_uint64(uint64 *out, char **off) {
-  *out = 0;
-  for (int i = 0; i < 8; i++) {
-    *out |= (uint64)(**off) << (i << 3);
-    (*off)++;
-  }
-}
-void read_uint32(uint32 *out, char **off) {
-  *out = 0;
-  for (int i = 0; i < 4; i++) {
-    *out |= (uint32)(**off) << (i << 3);
-    (*off)++;
-  }
-}
-void read_uint16(uint16 *out, char **off) {
-  *out = 0;
-  for (int i = 0; i < 2; i++) {
-    *out |= (uint16)(**off) << (i << 3);
-    (*off)++;
-  }
-}
 
+  // 分配缓冲区存储节名字符串
+  char *shstr_buffer = (char *)kmalloc(shstr_section.size);
+  if (!shstr_buffer) {
+    sprint("Failed to allocate section name buffer\n");
+    return;
+  }
 
-//
-// load the elf segments to memory regions.
-//
-elf_status elf_load(elf_ctx *ctx) {
-  // traverse the elf program segment headers
-  // sprint("%x\n", ctx->ehdr.phoff);
-  for (int i = 0, offset = ctx->ehdr.phoff; i < ctx->ehdr.phnum;
-       i++, offset += sizeof(elf_prog_header)) {
-    // elf_prog_header structure is defined in kernel/elf.h
-    elf_prog_header ph_addr;
+  // 读取节名字符串表
+  if (elf_read_at(ctx, shstr_buffer, shstr_section.size,
+                  shstr_section.offset) != shstr_section.size) {
+    sprint("Failed to read section names\n");
+    kfree(shstr_buffer);
+    return;
+  }
 
-    // read segment headers
-    if (elf_fpread(ctx, (void *)&ph_addr, sizeof(ph_addr), offset) !=
-        sizeof(ph_addr))
-      return EL_EIO;
+  // 遍历所有节头，查找.sdata段
+  for (int i = 0; i < ehdr->shnum; i++) {
+    elf_sect_header sh;
+    uint64 sh_offset = ehdr->shoff + i * sizeof(elf_sect_header);
 
-    if (ph_addr.type != ELF_PROG_LOAD)
+    if (elf_read_at(ctx, &sh, sizeof(sh), sh_offset) != sizeof(sh)) {
+      sprint("Failed to read section header %d\n", i);
       continue;
-    if (ph_addr.memsz < ph_addr.filesz)
-      return EL_ERR;
-    if (ph_addr.vaddr + ph_addr.memsz < ph_addr.vaddr)
-      return EL_ERR;
+    }
 
-    elf_status ret;
-    if ((ret = elf_load_segment(ctx, &ph_addr)) != EL_OK) {
-      return ret;
+    // 检查节名是否为.sdata
+    if (sh.name < shstr_section.size &&
+        strcmp(shstr_buffer + sh.name, ".sdata") == 0) {
+      // 找到.sdata节，设置gp寄存器
+      ctx->proc->trapframe->regs.gp = sh.addr + 0x800;
+      sprint("Found .sdata section at 0x%lx, setting gp to 0x%lx\n", sh.addr,
+             ctx->proc->trapframe->regs.gp);
+      break;
     }
   }
 
-  // elf_sect_header symbol_section_header;
-  // elf_sect_header string_section_header;
-  // elf_sect_header shstr_section_header;
-  // uint64 shstr_offset;
-  // shstr_offset = ctx->ehdr.shoff + ctx->ehdr.shstrndx * sizeof(elf_sect_header);
-  // elf_fpread(ctx, (void *)&shstr_section_header, sizeof(shstr_section_header),
-  //            shstr_offset);
-  // char shstr_buffer[256 * 100];
-	// shstr_buffer[256*100 -1 ] = '\0';
-  // elf_fpread(ctx, &shstr_buffer, shstr_section_header.size,
-  //            shstr_section_header.offset);
-	// process *target_ps = ((elf_info *)ctx->info)->p;
-  // for (int i = 0, offset = ctx->ehdr.shoff; i < ctx->ehdr.shnum;
-  //      i++, offset += sizeof(elf_sect_header)) {
-		
-  //   elf_sect_header sh;
-  //   if (elf_fpread(ctx, (void *)&sh, sizeof(sh), offset) != sizeof(sh))
-  //     return EL_EIO;
-  //   if (strcmp(shstr_buffer + sh.name, ".sdata") == 0) {
-	// 		sprint("i=%d,ctx->ehdr.shnum=%d!\n",i,ctx->ehdr.shnum);
-	// 		target_ps->trapframe->regs.gp = sh.addr + 0x800;
-	// 		sprint("Found .sdata at: 0x%lx, setting gp to 0x%lx\n", sh.addr, target_ps->trapframe->regs.gp);
-  //     //((elf_info *)ctx->info)->p->ktrapframe->regs.gp = sh.addr + 0x800;
-  //     //sprint("Found .sdata at: 0x%lx, setting gp to 0x%lx\n", sh.addr,((elf_info *)ctx->info)->p->ktrapframe->regs.gp);
-  //   }
-  // }
-  return EL_OK;
+  kfree(shstr_buffer);
 }
 
-/* lab1_challenge1 & lab1_challenge2 */
-// int ret;
-// if ((ret = load_debug_infomation(ctx)) != EL_OK)
-// return ret;
+/**
+ * 初始化ELF加载上下文
+ *
+ * @param ctx 要初始化的上下文
+ * @param fd 文件描述符
+ * @param proc 目标进程
+ * @return 0表示成功，非0表示失败
+ */
+static int init_elf_context(elf_context *ctx, int fd, process *proc) {
+  memset(ctx, 0, sizeof(elf_context));
+  ctx->fd = fd;
+  ctx->proc = proc;
 
-//
-// load the elf of user application, by using the spike file interface.
-//
-void load_elf_from_file(process *p, char *filename) {
-  int hartid = read_tp();
+  // 读取ELF头
+  if (elf_read_at(ctx, &ctx->ehdr, sizeof(ctx->ehdr), 0) != sizeof(ctx->ehdr)) {
+    sprint("Failed to read ELF header\n");
+    return -1;
+  }
 
-  // sprint("Application: %s\n", arg_bug_msg.argv[hartid]);
-  sprint("Application: %s\n", filename);
-  // elf loading. elf_ctx is defined in kernel/elf.h, used to track the loading
-  // process.
-  elf_ctx elfloader;
-  // elf_info is defined above, used to tie the elf file and its corresponding
-  // process.
-  elf_info info;
+  // 验证ELF头
+  if (validate_elf_header(&ctx->ehdr) != 0) {
+    return -1;
+  }
 
-  info.f = spike_file_open(filename, O_RDONLY, 0);
-  info.p = p;
-
-  // IS_ERR_VALUE is a macro defined in spike_interface/spike_htif.h
-  if (IS_ERR_VALUE(info.f))
-    panic("Fail on openning the input application program.\n");
-
-  // init elfloader context. elf_init() is defined above.
-  if (elf_init(&elfloader, &info) != EL_OK)
-    panic("fail to init elfloader.\n");
-
-  // load elf. elf_load() is defined above.
-  if (elf_load(&elfloader) != EL_OK)
-    panic("Fail on loading elf.\n");
-
-  // entry (virtual, also physical in lab1_x) address
-  p->trapframe->epc = elfloader.ehdr.entry;
-
-  // close the host spike file
-  spike_file_close(info.f);
-
-  sprint("Application program entry point (virtual address): 0x%lx\n",
-         p->trapframe->epc);
+  ctx->entry_point = ctx->ehdr.entry;
+  return 0;
 }
 
+/**
+ * 加载ELF文件到进程
+ *
+ * @param ctx ELF上下文
+ * @return 0表示成功，非0表示失败
+ */
+static int load_elf_binary(elf_context *ctx) {
+  elf_header *ehdr = &ctx->ehdr;
+  elf_prog_header ph;
+
+  // 遍历程序头表，加载各个段
+  for (int i = 0; i < ehdr->phnum; i++) {
+    uint64 ph_offset = ehdr->phoff + i * sizeof(ph);
+
+    // 读取程序头
+    if (elf_read_at(ctx, &ph, sizeof(ph), ph_offset) != sizeof(ph)) {
+      sprint("Failed to read program header %d\n", i);
+      return -1;
+    }
+
+    // 加载段
+    if (load_segment(ctx, &ph) != 0) {
+      sprint("Failed to load segment %d\n", i);
+      return -1;
+    }
+  }
+
+  // 设置全局指针
+  setup_global_pointer(ctx);
+
+  // 设置进程入口点
+  ctx->proc->trapframe->epc = ctx->entry_point;
+
+  sprint("ELF loaded successfully, entry point: 0x%lx\n", ctx->entry_point);
+  return 0;
+}
+
+/**
+ * 加载调试信息（若需要）
+ *
+ * @param ctx ELF上下文
+ * @return 0表示成功，非0表示失败
+ */
+static int load_debug_information(elf_context *ctx) {
+  // 这里可以实现加载调试信息的功能
+  return 0;
+}
+
+/**
+ * 从文件加载ELF可执行文件到进程
+ * 对外的主要接口函数
+ *
+ * @param proc 目标进程
+ * @param filename ELF文件名
+ */
+void load_elf_from_file(process *proc, char *filename) {
+  elf_context ctx;
+
+  sprint("Loading application: %s\n", filename);
+
+  // 使用内核标准文件接口打开ELF文件
+  int fd = do_open(filename, O_RDONLY);
+  if (fd < 0) {
+    panic("Failed to open application file: %s (error %d)\n", filename, fd);
+  }
+
+  // 确保进程有有效的内存布局
+  if (!proc->mm) {
+    proc->mm = user_mm_create();
+    if (!proc->mm) {
+      do_close(fd);
+      panic("Failed to create memory layout for process\n");
+    }
+  }
+
+  // 初始化ELF上下文
+  if (init_elf_context(&ctx, fd, proc) != 0) {
+    do_close(fd);
+    panic("Failed to initialize ELF context\n");
+  }
+
+  // 加载ELF二进制文件
+  if (load_elf_binary(&ctx) != 0) {
+    do_close(fd);
+    panic("Failed to load ELF binary\n");
+  }
+
+  // 如果需要，加载调试信息
+  load_debug_information(&ctx);
+
+  // 关闭文件
+  do_close(fd);
+
+  sprint(
+      "Application loaded successfully, entry point (virtual address): 0x%lx\n",
+      proc->trapframe->epc);
+}
+
+/**
+ * 加载ELF文件的符号表
+ * 用于调试和错误回溯
+ *
+ * @param filename ELF文件名
+ * @return 0表示成功，非0表示失败
+ */
+int load_elf_symbols(char *filename) {
+  int fd = do_open(filename, O_RDONLY);
+  if (fd < 0) {
+    sprint("Failed to open file for symbols: %s (error %d)\n", filename, fd);
+    return -1;
+  }
+
+  elf_context ctx;
+  memset(&ctx, 0, sizeof(ctx));
+  ctx.fd = fd;
+
+  // 读取ELF头
+  if (elf_read_at(&ctx, &ctx.ehdr, sizeof(elf_header), 0) !=
+      sizeof(elf_header)) {
+    sprint("Failed to read ELF header for symbols\n");
+    do_close(fd);
+    return -1;
+  }
+
+  if (validate_elf_header(&ctx.ehdr) != 0) {
+    do_close(fd);
+    return -1;
+  }
+
+  // 此处可以实现符号表加载逻辑
+  // ...
+
+  do_close(fd);
+  return 0;
+}
+
+/**
+ * 根据程序计数器值查找函数名
+ * 用于调试和错误回溯
+ *
+ * @param epc 程序计数器值（函数地址）
+ * @return 函数名，如果未找到则返回NULL
+ */
+char *locate_function_name(uint64 epc) {
+  // 默认实现 - 直接返回占位符
+  // 实际实现需要搜索已加载的符号表
+  static char unknown[] = "unknown_function";
+  return unknown;
+}

@@ -12,7 +12,7 @@
 #include <kernel/process.h>
 #include <kernel/sched.h>
 
-#include "spike_interface/spike_utils.h"
+#include <spike_interface/spike_utils.h>
 
 #include <kernel/syscall.h>
 #include <kernel/types.h>

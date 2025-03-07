@@ -8,7 +8,7 @@
 #include <kernel/riscv.h>
 #include <kernel/types.h>
 #include <util/string.h>
-#include "spike_interface/spike_utils.h"
+#include <spike_interface/spike_utils.h>
 #include <kernel/rfs.h>
 
 struct rfs_device *rfs_device_list[MAX_RAMDISK_COUNT];

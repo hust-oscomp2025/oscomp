@@ -15,7 +15,7 @@
 #include <kernel/pmm.h>
 #include <kernel/riscv.h>
 #include <kernel/sched.h>
-#include "spike_interface/spike_utils.h"
+#include <spike_interface/spike_utils.h>
 #include <kernel/strap.h>
 #include <util/string.h>
 #include <kernel/vmm.h>

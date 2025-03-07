@@ -3,9 +3,9 @@
  */
 
 #include <kernel/vmm.h>
-#include <kernel/user_mem.h>
+#include <kernel/user_mm.h>
 
-#include "spike_interface/spike_utils.h"
+#include <spike_interface/spike_utils.h>
 
 #include <kernel/memlayout.h>
 #include <kernel/pmm.h>

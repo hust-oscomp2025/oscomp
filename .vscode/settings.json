@@ -4,7 +4,7 @@
 			"vmm.h": "c",
 			"errno.h": "c",
 			"global.h": "c",
-			"spike_utils.h": "c",
+			<spike_interface/spike_utils.h>: "c",
 			"pmm.h": "c",
 			"process.h": "c",
 			"typeinfo": "c",
@@ -15,7 +15,7 @@
 			"file.h": "c",
 			"vfs.h": "c",
 			"spinlock.h": "c",
-			"spike_htif.h": "c",
+			<spike_interface/spike_htif.h>: "c",
 			"list.h": "c",
 			"config.h": "c"
 		},

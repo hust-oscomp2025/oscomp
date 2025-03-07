@@ -4,7 +4,7 @@
 
 #include <kernel/sched.h>
 
-#include "spike_interface/spike_utils.h"
+#include <spike_interface/spike_utils.h>
 #include <kernel/pmm.h>
 
 #define store_all_registers(t6) \
