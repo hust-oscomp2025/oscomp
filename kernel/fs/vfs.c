@@ -4,14 +4,13 @@
 
 #include <kernel/vfs.h>
 
-
-#include <kernel/pmm.h>
 #include "spike_interface/spike_utils.h"
 #include "util/hash_table.h"
-#include <util/string.h>
-#include <kernel/types.h>
-#include <kernel/rfs.h>
 #include <kernel/hostfs.h>
+#include <kernel/pmm.h>
+#include <kernel/rfs.h>
+#include <kernel/types.h>
+#include <util/string.h>
 
 struct dentry *vfs_root_dentry;              // system root direntry
 struct super_block *vfs_sb_list[MAX_MOUNTS]; // system superblock list
@@ -20,7 +19,6 @@ struct hash_table dentry_hash_table;
 struct hash_table vinode_hash_table;
 
 struct file_system_type *fs_list[MAX_SUPPORTED_FS];
-
 
 //
 // initialize file system
@@ -148,7 +146,7 @@ struct file *vfs_open(const char *path, int flags) {
 
   // path lookup.
   struct dentry *file_dentry = lookup_final_dentry(path, &parent, miss_name);
-	
+
   // file does not exist
   if (!file_dentry) {
     int creatable = flags & O_CREAT;
@@ -288,7 +286,7 @@ int vfs_stat(struct file *file, struct istat *istat) {
 // read the inode information on the disk
 //
 int vfs_disk_stat(struct file *file, struct istat *istat) {
-	sprint("do_stat\n");
+  sprint("do_stat\n");
   return viop_disk_stat(file->f_dentry->dentry_inode, istat);
 }
 
@@ -389,10 +387,6 @@ int vfs_unlink(const char *path) {
     hash_erase_vinode(unlinked_vinode);
     free_page(unlinked_vinode); // free the vinode
   }
-  
-  
-
-
 
   return 0;
 }
@@ -698,7 +692,6 @@ void get_base_name(const char *path, char *base_name) {
     strcpy(base_name, "/");
   }
 }
-
 
 //
 // alloc a (virtual) dir entry
