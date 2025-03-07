@@ -13,7 +13,6 @@
 #include <kernel/vfs.h>
 #include <kernel/rfs.h>
 #include <kernel/ramdev.h>
-#include <kernel/user_heap.h>
 
 #include <util/string.h>
 
@@ -77,8 +76,6 @@ process* load_user_program() {
   int hartid = read_tp();
   process* proc;
   proc = alloc_process();
-	init_user_stack(proc);
-	init_user_heap(proc);
 
 	
   sprint("User application is loading.\n");

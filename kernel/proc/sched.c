@@ -166,18 +166,9 @@ void schedule() {
 	CURRENT = cur;
 	cur->status = RUNNING;
 	if(cur->ktrapframe != NULL){
-
-		//cur->status = RUNNING;
-		//sprint("ready_queue=0x%x\n",ready_queue);
-		//sprint("ready_queue->queue_next=0x%x\n",ready_queue->queue_next);
-
-		
 		restore_all_registers(cur->ktrapframe);
-
 		free_page(cur->ktrapframe);
 		cur->ktrapframe = NULL;
-		//sprint("debug!\n");
-		
 		return;
 	}
   

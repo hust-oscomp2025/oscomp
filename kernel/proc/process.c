@@ -79,19 +79,6 @@ void init_proc_pool() {
   }
 }
 
-void init_user_stack(process *ps) {
-  ps->trapframe->regs.sp = USER_STACK_TOP - 8; // virtual address of user stack top
-  uint64 user_stack =
-      (uint64)Alloc_page(); // phisical address of user stack bottom
-  // map user stack in userspace
-  user_vm_map((pagetable_t)ps->pagetable, USER_STACK_TOP - PGSIZE, PGSIZE,
-              user_stack, prot_to_type(PROT_WRITE | PROT_READ, 1));
-  ps->mapped_info[STACK_SEGMENT].va = USER_STACK_TOP - PGSIZE;
-  ps->mapped_info[STACK_SEGMENT].npages = 1;
-  ps->mapped_info[STACK_SEGMENT].seg_type = STACK_SEGMENT;
-  ps->total_mapped_region++;
-}
-
 //
 // allocate an empty process, init its vm space. returns the pointer to
 // process strcuture. added @lab3_1

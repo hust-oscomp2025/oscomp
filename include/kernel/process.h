@@ -5,10 +5,10 @@
 #include <kernel/proc_file.h>
 
 
+
+
 // riscv-pke kernel supports at most 32 processes
 #define NPROC 32
-// maximum number of pages in a process's heap
-#define MAX_HEAP_PAGES 32
 
 
 typedef struct trapframe_t {
@@ -46,42 +46,11 @@ enum fork_choice {
 	FORK_COW,
 };
 
-// the VM regions mapped to a user process
-typedef struct mapped_region {
-  uint64 va;       // mapped virtual address
-  uint32 npages;   // mapping_info is unused if npages == 0
-  uint32 seg_type; // segment type, one of the segment_types
-} mapped_region;
-
-typedef struct process_heap_manager {
-  // points to the last free page in our simple heap.
-  uint64 heap_top;
-  // points to the bottom of our simple heap.
-  uint64 heap_bottom;
-
-  // the address of free pages in the heap
-  // uint64 free_pages_address[MAX_HEAP_PAGES];
-  // the number of free pages in the heap
-  // uint32 free_pages_count;
-}process_heap_manager;
-
-// code file struct, including directory index and file name char pointer
-typedef struct {
-    uint64 dir; char *file;
-} code_file;
-
-// address-line number-file name table
-typedef struct {
-    uint64 addr, line, file;
-} addr_line;
 
 // the extremely simple definition of process, used for begining labs of PKE
 typedef struct process_t {
-  // pointing to the stack used in trap handling.
-  uint64 kstack;
-  // user page table
+  uint64 kstack;		// 分配一个页面当内核栈，注意内核栈的范围是[kstack-PGSIZE, kstack)
   pagetable_t pagetable;
-  // trapframe storing the context of a (User mode) process.
   trapframe* trapframe;
 
 	// lab3_challenge2新增：内核上下文。用来从内核阻塞中恢复。
@@ -112,25 +81,19 @@ typedef struct process_t {
 
 // switch to run user app
 void switch_to(process*);
-
-// initialize process pool (the procs[] array)
 void init_proc_pool();
-// allocate an empty process, init its vm space. returns its pid
 process* alloc_process();
-void init_user_stack(process* ps);
-
-
-
-// reclaim a process, destruct its vm space and free physical pages.
 int free_process( process* proc );
+
 // fork a child from parent
 int do_fork(process* parent);
 int do_exec(void *path);
 ssize_t do_wait(int pid);
 // current_percpu points to the currently running user-mode application.
-extern process* current_percpu[NCPU];
-#define CURRENT (current_percpu[read_tp()])
+
 // current_percpu running process
 // extern process* current_percpu[NCPU];
+extern process* current_percpu[NCPU];
+#define CURRENT (current_percpu[read_tp()])
 
 #endif
