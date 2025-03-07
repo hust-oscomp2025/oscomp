@@ -63,6 +63,7 @@ void switch_to(process *proc) {
 
   // set S Exception Program Counter (sepc register) to the elf entry pc.
   write_csr(sepc, proc->trapframe->epc);
+	sprint("return to user\n");
   return_to_user(proc->trapframe, MAKE_SATP(proc->pagetable));
 }
 

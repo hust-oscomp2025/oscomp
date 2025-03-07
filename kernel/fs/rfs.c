@@ -546,6 +546,7 @@ int rfs_lseek(struct vinode *f_inode, ssize_t new_offset, int whence, int *offse
 //  read disk inode information from disk
 //
 int rfs_disk_stat(struct vinode *vinode, struct istat *istat) {
+	sprint("rfs_disk_stat\n");
   struct rfs_device *rdev = rfs_device_list[vinode->sb->s_dev->dev_id];
   struct rfs_dinode *dinode = rfs_read_dinode(rdev, vinode->inum);
   if (dinode == NULL) {

@@ -44,6 +44,17 @@ set_target_properties(riscv-pke PROPERTIES LINK_FLAGS "-T ${CMAKE_SOURCE_DIR}/ke
 
 
 
+set(DEBUG_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/debug)
+# ✅ 生成 objdump 和 ELF 解析文件
+add_custom_command(
+    TARGET riscv-pke
+    POST_BUILD
+    COMMAND mkdir -p ${DEBUG_OUTPUT_DIRECTORY}  # 确保 debug 目录存在
+    COMMAND riscv64-unknown-elf-objdump -d ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/riscv-pke > ${DEBUG_OUTPUT_DIRECTORY}/riscv-pke.dump
+    COMMAND riscv64-unknown-elf-readelf -a ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/riscv-pke > ${DEBUG_OUTPUT_DIRECTORY}/riscv-pke.elfinfo
+    COMMENT "Generating objdump and ELF analysis for riscv-pke in ${DEBUG_OUTPUT_DIRECTORY}"
+)
+
 
 
 

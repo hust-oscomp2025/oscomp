@@ -288,6 +288,7 @@ int vfs_stat(struct file *file, struct istat *istat) {
 // read the inode information on the disk
 //
 int vfs_disk_stat(struct file *file, struct istat *istat) {
+	sprint("do_stat\n");
   return viop_disk_stat(file->f_dentry->dentry_inode, istat);
 }
 

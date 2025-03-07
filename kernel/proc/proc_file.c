@@ -47,12 +47,12 @@ struct file *get_opened_file(int fd) {
 
   // browse opened file list to locate the fd
   for (int i = 0; i < MAX_FILES; ++i) {
-    pfile = &(current_percpu[read_tp()]->pfiles->opened_files[i]); // file entry
+    pfile = &(current->pfiles->opened_files[i]); // file entry
     if (i == fd)
       break;
   }
-  if (pfile == NULL)
-    panic("do_read: invalid fd!\n");
+	//sprint("get_opened_file: pfile = %lx\n", pfile);
+  if (pfile->status == FD_NONE)	panic("do_read: invalid fd!\n");
   return pfile;
 }
 
@@ -134,9 +134,15 @@ int do_fstat(int fd, struct istat *istat) {
 // read the inode information on the disk
 //
 int do_stat(int fd, struct istat *istat) {
-	sprint("do_stat\n");
+	
   struct file *pfile = get_opened_file(fd);
-  return vfs_disk_stat(pfile, istat);
+	if(pfile){
+		return vfs_disk_stat(pfile, istat);
+	}else{
+		sprint("empty fd\n");
+		return -1;
+	}
+  
 }
 
 //

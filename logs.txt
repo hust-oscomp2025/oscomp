@@ -20,9 +20,9 @@ DATA_SEGMENT added at mapped info offset:5
 Application program entry point (virtual address): 0x000000000001014c
 going to insert process 0 to ready queue.
 going to schedule process 0 to run.
+return to user
 do_syscall: syscall number: 80
-Arguments: 1, 2147478952, 2147479152, 0, 1, 8201, 13
-sys_fstat
-do_stat
-Misaligned AMO!
+Arguments: 1, 2147478936, 2147479136, 0, 1, 8201, 13
+do_read: invalid fd!
+
 System is shutting down with exit code -1.
