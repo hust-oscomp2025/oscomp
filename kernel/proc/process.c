@@ -44,7 +44,7 @@ extern void return_to_user(trapframe *, uint64 satp);
 void switch_to(process *proc) {
 
   assert(proc);
-  current_percpu[read_tp()] = proc;
+  CURRENT = proc;
 	
 	extern char smode_trap_vector[];
   write_csr(stvec, (uint64)smode_trap_vector);
@@ -247,7 +247,7 @@ static void unmap_segment(process *ps, int segnum) {
 int do_exec(void *path) {
   //, char **argv, u64 envp
   // 当前只支持进程中仅有一个线程时进行 exec
-  process *cur = current_percpu[read_tp()];
+  process *cur = CURRENT;
 
   for (int i = 0; i < cur->total_mapped_region; i++) {
     switch (cur->mapped_info[i].seg_type) {

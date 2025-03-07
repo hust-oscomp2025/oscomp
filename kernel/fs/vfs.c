@@ -224,7 +224,7 @@ struct file *vfs_open(const char *path, int flags) {
 // return: the number of bytes actually read
 //
 ssize_t vfs_read(struct file *file, char *buf, size_t count) {
-  if (!file->readable) {
+  if (!(file->f_mode & FMODE_READ)) {
     sprint("vfs_read: file is not readable!\n");
     return -1;
   }
@@ -233,7 +233,7 @@ ssize_t vfs_read(struct file *file, char *buf, size_t count) {
     return -1;
   }
   // actual reading.
-  return viop_read(file->f_dentry->dentry_inode, buf, count, &(file->offset));
+  return viop_read(file->f_dentry->dentry_inode, buf, count, &(file->f_pos));
 }
 
 //
@@ -241,7 +241,7 @@ ssize_t vfs_read(struct file *file, char *buf, size_t count) {
 // return: the number of bytes actually written
 //
 ssize_t vfs_write(struct file *file, const char *buf, size_t count) {
-  if (!file->writable) {
+  if (!(file->f_mode & FMODE_WRITE)) {
     sprint("vfs_write: file is not writable!\n");
     return -1;
   }
@@ -250,7 +250,7 @@ ssize_t vfs_write(struct file *file, const char *buf, size_t count) {
     return -1;
   }
   // actual writing.
-  return viop_write(file->f_dentry->dentry_inode, buf, count, &(file->offset));
+  return viop_write(file->f_dentry->dentry_inode, buf, count, &(file->f_pos));
 }
 
 //
@@ -264,12 +264,12 @@ ssize_t vfs_lseek(struct file *file, ssize_t offset, int whence) {
   }
 
   if (viop_lseek(file->f_dentry->dentry_inode, offset, whence,
-                 &(file->offset)) != 0) {
+                 &(file->f_pos)) != 0) {
     sprint("vfs_lseek: lseek failed!\n");
     return -1;
   }
 
-  return file->offset;
+  return file->f_pos;
 }
 
 //
@@ -478,7 +478,7 @@ int vfs_readdir(struct file *file, struct dir *dir) {
     sprint("vfs_readdir: cannot read a file!\n");
     return -1;
   }
-  return viop_readdir(file->f_dentry->dentry_inode, dir, &(file->offset));
+  return viop_readdir(file->f_dentry->dentry_inode, dir, &(file->f_pos));
 }
 
 //
@@ -533,7 +533,6 @@ int vfs_closedir(struct file *file) {
   // it will serve as a cache for later lookup operations on it or its
   // descendants
   file->f_dentry->d_ref--;
-  file->status = FD_NONE;
 
   // additional close direntry operations for a specific file system
   // rfs needs reclaim dir cache.
@@ -699,21 +698,7 @@ void get_base_name(const char *path, char *base_name) {
     strcpy(base_name, "/");
   }
 }
-//
-// alloc a (virtual) file
-//
-struct file *alloc_vfs_file(struct dentry *file_dentry, int readable,
-                            int writable, int offset) {
-  struct file *file = alloc_page();
-  file->f_dentry = file_dentry;
-  file_dentry->d_ref += 1;
 
-  file->readable = readable;
-  file->writable = writable;
-  file->offset = 0;
-  file->status = FD_OPENED;
-  return file;
-}
 
 //
 // alloc a (virtual) dir entry

@@ -2,6 +2,7 @@
 #define _VFS_H_
 
 #include <kernel/types.h>
+#include <kernel/file.h>
 
 #define MAX_VFS_DEV 10            // the maximum number of vfs_dev_list
 #define MAX_DENTRY_NAME_LEN 30    // the maximum length of dentry name
@@ -43,13 +44,13 @@ int vfs_closedir(struct file *file);
 extern struct dentry *vfs_root_dentry;
 
 // vfs abstract dentry
-struct dentry {
+typedef struct dentry {
   char name[MAX_DENTRY_NAME_LEN];
   int d_ref;
   struct vinode *dentry_inode;
   struct dentry *parent;
   struct super_block *sb;
-};
+}dentry_t;
 
 
 // dentry constructor and destructor
@@ -75,18 +76,7 @@ struct dentry *hash_get_dentry(struct dentry *parent, char *name);
 int hash_put_dentry(struct dentry *dentry);
 int hash_erase_dentry(struct dentry *dentry);
 
-// data structure of an openned file
-struct file {
-  int status;
-  int readable;
-  int writable;
-  int offset;
-  struct dentry *f_dentry;
-};
 
-// file constructor and destructor(use free_page to destruct)
-struct file *alloc_vfs_file(struct dentry *dentry, int readable, int writable,
-                        int offset);
 
 // abstract device entry in vfs_dev_list
 struct device {

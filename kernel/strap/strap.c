@@ -60,7 +60,7 @@ void handle_mtimer_trap() {
 // stval: the virtual address that causes pagefault when being accessed.
 //
 void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
-  process *ps = current_percpu[read_tp()];
+  process *ps = CURRENT;
   // int hartid = read_tp();
   sprint("sepc=%lx,handle_page_fault: %lx\n",sepc, stval);
   switch (mcause) {

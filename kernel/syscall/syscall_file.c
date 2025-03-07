@@ -7,5 +7,5 @@
 int sys_fstat(uint64 fd, uint64 stat)
 {
 
-	return do_stat(fd,user_va_to_pa(current->pagetable,(void*)stat));
+	return do_stat(fd,user_va_to_pa(CURRENT->pagetable,(void*)stat));
 }

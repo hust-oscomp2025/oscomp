@@ -157,7 +157,7 @@ int do_exec(void *path);
 ssize_t do_wait(int pid);
 // current_percpu points to the currently running user-mode application.
 extern process* current_percpu[NCPU];
-#define current (current_percpu[read_tp()])
+#define CURRENT (current_percpu[read_tp()])
 // current_percpu running process
 // extern process* current_percpu[NCPU];
 
