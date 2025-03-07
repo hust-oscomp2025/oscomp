@@ -3,15 +3,16 @@
  */
 
 #include <kernel/vmm.h>
+#include <kernel/user_mem.h>
+
+#include "spike_interface/spike_utils.h"
 
 #include <kernel/memlayout.h>
 #include <kernel/pmm.h>
 #include <kernel/process.h>
 #include <kernel/riscv.h>
-#include "spike_interface/spike_utils.h"
-#include "util/functions.h"
-#include <util/string.h>
 #include <kernel/types.h>
+#include <util/string.h>
 
 /* --- utility functions for virtual address mapping --- */
 //
@@ -163,7 +164,6 @@ void kern_vm_init(void) {
   sprint("physical address of _etext is: 0x%lx\n",
          lookup_pa(t_page_dir, (uint64)_etext));
 
-
   g_kernel_pagetable = t_page_dir;
 }
 
@@ -172,7 +172,7 @@ void kern_vm_init(void) {
 // convert and return the corresponding physical address of a virtual address
 // (va) of application.
 //
-void *user_va_to_pa(pagetable_t page_dir, void* va) {
+void *user_va_to_pa(pagetable_t page_dir, void *va) {
   // TODO (lab2_1): implement user_va_to_pa to convert a given user virtual
   // address "va" to its corresponding physical address, i.e., "pa". To do it,
   // we need to walk through the page table, starting from its directory
@@ -190,30 +190,12 @@ void *user_va_to_pa(pagetable_t page_dir, void* va) {
   return (void *)(PTE2PA(*pte) + offset);
 }
 
-//
-// maps virtual address [va, va+sz] to [pa, pa+sz] (for user application).
-//
-void user_vm_map(pagetable_t page_dir, uint64 va, uint64 size, uint64 pa,
-                 int perm) {
-  if (map_pages(page_dir, va, size, pa, perm) != 0) {
-    panic("fail to user_vm_map .\n");
-  }
-}
 
 //
 // unmap virtual address [va, va+size] from the user app.
 // reclaim the physical pages if free!=0
 //
 void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free) {
-  // TODO (lab2_2): implement user_vm_unmap to disable the mapping of the
-  // virtual pages in [va, va+size], and free the corresponding physical pages
-  // used by the virtual addresses when if 'free' (the last parameter) is not
-  // zero. basic idea here is to first locate the PTEs of the virtual pages, and
-  // then reclaim (use free_page() defined in pmm.c) the physical pages. lastly,
-  // invalidate the PTEs. as naive_free reclaims only one page at a time, you
-  // only need to consider one page to make user/app_naive_malloc to behave
-  // correctly. panic( "You have to implement user_vm_unmap to free pages using
-  // naive_free in lab2_2.\n" );
   pte_t *pte;
   uint64 firstPage = ROUNDDOWN(va, PGSIZE);
   uint64 lastPage = ROUNDDOWN(va + size - 1, PGSIZE);
@@ -234,13 +216,15 @@ void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free) {
 #define USER_MEM_SIZE(size) ((size) + sizeof(heap_block))
 
 void create_user_heap(process *ps) {
-  heap_block *first_block = (heap_block *)Alloc_page();
+	user_alloc_page(ps, ps->user_heap.heap_bottom, PROT_READ | PROT_WRITE);
+
+  heap_block *first_block = (heap_block *)ps->user_heap.heap_bottom;
   first_block->size = PGSIZE - sizeof(heap_block);
   first_block->prev = NULL;
   first_block->next = NULL;
   first_block->free = 1; // 初始块是空闲的
-  user_vm_map(ps->pagetable, ps->user_heap.heap_bottom, PGSIZE,
-              (uint64)first_block, prot_to_type(PROT_WRITE | PROT_READ, 1));
+	
+
   ps->user_heap.heap_top += PGSIZE;
   ps->mapped_info[HEAP_SEGMENT].npages++;
 }
@@ -250,14 +234,13 @@ void *vmalloc(size_t size) {
   if (size == 0)
     return NULL;
   int hartid = read_tp();
-  process *ps = current_percpu[hartid];
-  if (ps->user_heap.heap_top == ps->user_heap.heap_bottom) {
-    create_user_heap(ps);
+  if (CURRENT->user_heap.heap_top == CURRENT->user_heap.heap_bottom) {
+    create_user_heap(CURRENT);
   }
 
   int required_size = ALIGN(size + sizeof(heap_block), 8);
-  heap_block *current_block = (heap_block *)ps->user_heap.heap_bottom;
-  heap_block *pa_current_block = user_va_to_pa(ps->pagetable, current_block);
+  heap_block *current_block = (heap_block *)CURRENT->user_heap.heap_bottom;
+  heap_block *pa_current_block = user_va_to_pa(CURRENT->pagetable, current_block);
   if (required_size >= PGSIZE) {
     goto heap_alloc;
   }
@@ -271,17 +254,17 @@ void *vmalloc(size_t size) {
         pa_current_block->size = required_size;
         heap_block *new_block =
             (heap_block *)((uintptr_t)current_block + required_size);
-        heap_block *pa_newblock = user_va_to_pa(ps->pagetable, new_block);
+        heap_block *pa_newblock = user_va_to_pa(CURRENT->pagetable, new_block);
         pa_newblock->size =
             pa_current_block->size - required_size - sizeof(heap_block);
         pa_newblock->free = 1;
         pa_newblock->next = pa_current_block->next;
         pa_newblock->prev = current_block;
 
-        
         if (pa_current_block->next != NULL) {
           heap_block *next_block = (heap_block *)pa_current_block->next;
-          heap_block *pa_next_block = user_va_to_pa(ps->pagetable, (void*)next_block);
+          heap_block *pa_next_block =
+              user_va_to_pa(CURRENT->pagetable, (void *)next_block);
           pa_next_block->prev = new_block;
         }
         pa_current_block->next = new_block;
@@ -294,17 +277,15 @@ void *vmalloc(size_t size) {
       // 遍历到了最后一个节点，仍然没有找到可用的块
       // 新分配一个够大的块，然后再做切割
       int n_pages = (required_size >> 12) + 1;
-      uint64 va = ps->user_heap.heap_top;
+      uint64 va = CURRENT->user_heap.heap_top;
       // void *va = (void *)(((uint64)current_block >> 12) << 12) + PGSIZE;
       for (uint64 i = 0; i < n_pages; i++) {
-        user_vm_map(ps->pagetable, va + i * PGSIZE, PGSIZE,
-                    (uint64)Alloc_page(),
-                    prot_to_type(PROT_READ | PROT_WRITE, 1));
+				user_alloc_page(CURRENT, va + i * PGSIZE, PROT_READ | PROT_WRITE);
       }
-      ps->user_heap.heap_top += n_pages * PGSIZE;
-      ps->mapped_info[HEAP_SEGMENT].npages += n_pages;
+      CURRENT->user_heap.heap_top += n_pages * PGSIZE;
+      CURRENT->mapped_info[HEAP_SEGMENT].npages += n_pages;
 
-      heap_block *pa = user_va_to_pa(ps->pagetable, (void *)va);
+      heap_block *pa = user_va_to_pa(CURRENT->pagetable, (void *)va);
       pa->next = NULL;
       pa->size = PGSIZE * n_pages - sizeof(heap_block);
       pa->prev = current_block;
@@ -315,7 +296,7 @@ void *vmalloc(size_t size) {
       continue;
     }
     current_block = pa_current_block->next;
-    pa_current_block = user_va_to_pa(ps->pagetable, current_block);
+    pa_current_block = user_va_to_pa(CURRENT->pagetable, current_block);
   }
 
   // 如果没有找到合适的块，返回 NULL（表示堆内存不足）
@@ -331,7 +312,8 @@ void free(void *ptr) {
 
   // 获取指向 heap_block 的指针，跳过用户数据区域
   heap_block *block = (heap_block *)((uintptr_t)ptr - sizeof(heap_block));
-  heap_block *pa_block = user_va_to_pa(current_percpu[hartid]->pagetable, block);
+  heap_block *pa_block =
+      user_va_to_pa(CURRENT->pagetable, block);
   // 如果该块已经是空闲的，说明已经释放过了，直接返回
   if (pa_block->free) {
     return;
@@ -342,10 +324,10 @@ void free(void *ptr) {
 
   heap_block *block_prev = pa_block->prev;
   heap_block *pa_block_prev =
-      user_va_to_pa(current_percpu[hartid]->pagetable, block_prev);
+      user_va_to_pa(CURRENT->pagetable, block_prev);
   heap_block *block_next = pa_block->next;
   heap_block *pa_block_next =
-      user_va_to_pa(current_percpu[hartid]->pagetable, block_next);
+      user_va_to_pa(CURRENT->pagetable, block_next);
   // 合并前面的空闲块
   if (block_prev != NULL && pa_block_prev->free) {
     // 合并前一个空闲块
@@ -370,7 +352,7 @@ void free(void *ptr) {
 
   // 合并会自动设置好堆的头指针，所以不需要做更多工作。
   // if (block_prev == NULL) {
-  //  current_percpu[hartid]->heap = block; // 更新堆的头部
+  //  CURRENT->heap = block; // 更新堆的头部
   //}
 }
 

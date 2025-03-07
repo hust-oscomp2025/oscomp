@@ -13,7 +13,7 @@
 #include <kernel/sched.h>
 
 #include "spike_interface/spike_utils.h"
-#include "util/functions.h"
+
 #include <kernel/syscall.h>
 #include <kernel/types.h>
 #include <kernel/vmm.h>

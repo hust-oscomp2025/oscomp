@@ -304,68 +304,6 @@ void init_page(struct page *page, struct address_space *mapping, uint64 index) {
     page->flags = 0;
 }
 
-// 增加页引用计数
-void get_page(struct page *page) {
-    atomic_inc(&page->_refcount);
-}
-
-// 减少页引用计数，如果引用计数为0则释放页
-void put_page(struct page *page) {
-    if (atomic_dec_and_test(&page->_refcount)) {
-        // 从LRU链表中删除
-        spinlock_lock(&lru_lock);
-        if (page->lru.next) {  // 如果页在链表中
-            list_del(&page->lru);
-            lru_page_count--;
-        }
-        spinlock_unlock(&lru_lock);
-        
-        // 如果是脏页且有写回操作，先写回
-        if ((page->flags & PAGE_DIRTY) && page->mapping && page->mapping->a_ops && 
-            page->mapping->a_ops->writepage) {
-            page->mapping->a_ops->writepage(page, NULL);
-        }
-        
-        // 释放页内存
-        free_page_buffer(page->virtual_address);
-        kfree(page);
-    }
-}
-
-// 将页标记为脏页
-int set_page_dirty(struct page *page) {
-    if (!page)
-        return -1;
-    
-    if (page->mapping && page->mapping->a_ops && page->mapping->a_ops->set_page_dirty)
-        return page->mapping->a_ops->set_page_dirty(page);
-    
-    page->flags |= PAGE_DIRTY;
-    return 0;
-}
-
-// 将页内容标记为最新
-void set_page_uptodate(struct page *page) {
-    page->flags |= PAGE_UPTODATE;
-}
-
-// 检查页内容是否最新
-int page_uptodate(struct page *page) {
-    return (page->flags & PAGE_UPTODATE) != 0;
-}
-
-// 锁定页，防止其被回收
-void lock_page(struct page *page) {
-    spinlock_lock(&page->page_lock);
-    page->flags |= PAGE_LOCKED;
-}
-
-// 解锁页
-void unlock_page(struct page *page) {
-    page->flags &= ~PAGE_LOCKED;
-    spinlock_unlock(&page->page_lock);
-}
-
 // 将页写回存储设备
 int write_page(struct page *page) {
     if (!page || !page->mapping || !page->mapping->a_ops || !page->mapping->a_ops->writepage)

@@ -8,7 +8,7 @@
 #include <kernel/riscv.h>
 #include "spike_interface/spike_file.h"
 #include "spike_interface/spike_utils.h"
-#include "util/functions.h"
+
 #include <util/string.h>
 
 

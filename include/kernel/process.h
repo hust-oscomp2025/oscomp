@@ -97,27 +97,10 @@ typedef struct process_t {
 	// lab3_challenge2新增：内核上下文。用来从内核阻塞中恢复。
 	trapframe* ktrapframe;
 
-  // added @lab1_challenge2
-  char *debugline;
-  char **dir;
-  code_file *file;
-  addr_line *line;
-  int line_count;
-
-  // user stack bottom. added @lab2_challenge1
-  uint64 user_stack_bottom;
-
-  //heap_block* heap;
-  // size_t heap_size;
-
-
-  // points to a page that contains mapped_regions. below are added @lab3_1
-  mapped_region *mapped_info;
-  // next free mapped region in mapped_info
-  int total_mapped_region;
+  struct mm_struct *mm;
 
   // heap management
-  process_heap_manager user_heap;
+  // process_heap_manager user_heap;
 
   // process id
   uint64 pid;

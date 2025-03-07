@@ -13,7 +13,7 @@
 #include "spike_htif.h"
 #include "spike_interface/spike_utils.h"
 #include <util/string.h>
-#include "util/functions.h"
+#include <kernel/types.h>
 // #include "../kernel/config.h"
 
 #define atomic_cas(ptr, cmp, swp)                           \

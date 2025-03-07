@@ -15,7 +15,9 @@
 			"file.h": "c",
 			"vfs.h": "c",
 			"spinlock.h": "c",
-			"spike_htif.h": "c"
+			"spike_htif.h": "c",
+			"list.h": "c",
+			"config.h": "c"
 		},
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyFunction": true,
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyType": true,

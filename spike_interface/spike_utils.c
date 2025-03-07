@@ -7,7 +7,7 @@
 #include <kernel/atomic.h>
 #include <kernel/spinlock.h>
 #include "spike_htif.h"
-#include "util/functions.h"
+#include <kernel/types.h>
 #include <util/snprintf.h>
 #include "spike_utils.h"
 #include "spike_file.h"

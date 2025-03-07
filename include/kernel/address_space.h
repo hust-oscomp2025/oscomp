@@ -7,27 +7,10 @@
 #include <kernel/vmm.h>
 #include <kernel/riscv.h>
 #include <kernel/list.h>
+#include <kernel/page.h>
 
 // 前向声明，避免循环引用
 struct inode;
-
-/**
- * 页缓存结构体，表示文件系统缓存中的一个页
- */
-struct page {
-    uint64 index;                // 文件内的页索引
-    atomic_t _refcount;          // 引用计数
-    uint64 flags;                // 页标志，如是否脏页
-    void *virtual_address;               // 页的虚拟地址
-    struct address_space *mapping; // 所属的address_space
-    struct list_head lru;        // LRU链表节点
-    spinlock_t page_lock;        // 页锁，用于同步访问
-};
-
-// 页标志位
-#define PAGE_DIRTY     (1UL << 0)  // 脏页，需要回写
-#define PAGE_UPTODATE  (1UL << 1)  // 页内容是最新的
-#define PAGE_LOCKED    (1UL << 2)  // 页已锁定，不可回收
 
 /**
  * 地址空间对象，代表一个文件的页缓存集合
@@ -70,26 +53,11 @@ struct page *find_get_page(struct address_space *mapping, uint64 index);
 // 从缓存中查找页，如果不存在则分配一个新页
 struct page *find_or_create_page(struct address_space *mapping, uint64 index);
 
-// 将页标记为脏页
-int set_page_dirty(struct page *page);
-
-// 初始化页结构体
 void init_page(struct page *page, struct address_space *mapping, uint64 index);
-
-// 增加页引用计数
-void get_page(struct page *page);
-
-// 减少页引用计数，如果引用计数为0则释放页
-void put_page(struct page *page);
 
 // 将页写回存储设备
 int write_page(struct page *page);
 
-// 将页内容标记为最新
-void set_page_uptodate(struct page *page);
-
-// 检查页内容是否最新
-int page_uptodate(struct page *page);
 
 // 锁定页，防止其被回收
 void lock_page(struct page *page);

@@ -299,7 +299,7 @@ ssize_t do_wait(int pid) {
 
         process *p = &(procs[i]);
         // sprint("p = 0x%lx,\n",p);
-        if (p->parent != NULL && p->parent->pid == current_percpu[hartid]->pid &&
+        if (p->parent != NULL && p->parent->pid == CURRENT->pid &&
             p->status == ZOMBIE) {
           // sprint("DEBUG LINE\n");
 
@@ -308,7 +308,7 @@ ssize_t do_wait(int pid) {
         }
       }
       // sprint("current->sem_index = %d\n",current->sem_index);
-      sem_P(current_percpu[hartid]->sem_index);
+      sem_P(CURRENT->sem_index);
       // sprint("wait:return from blocking!\n");
     }
   }
@@ -316,7 +316,7 @@ ssize_t do_wait(int pid) {
     // sprint("DEBUG LINE\n");
 
     process *p = &procs[pid];
-    if (p->parent != current_percpu[hartid]) {
+    if (p->parent != CURRENT) {
       return -1;
     } else if (p->status == ZOMBIE) {
       free_process(p);

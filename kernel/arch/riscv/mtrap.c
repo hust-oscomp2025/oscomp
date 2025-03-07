@@ -6,62 +6,6 @@
 // #include <util/string.h>
 #include <util/string.h>
 
-void error_printer()
-{
-  int hartid = read_tp();
-  uint64 exception_addr = read_csr(mepc);
-
-  addr_line *line_list = current_percpu[hartid]->line;
-  code_file *file_list = current_percpu[hartid]->file;
-  char **dir_list = current_percpu[hartid]->dir;
-  int line_count = current_percpu[hartid]->line_count;
-
-  for (int i = 0; i < current_percpu[hartid]->line_count; i++)
-  {
-    if (exception_addr < line_list[i].addr)
-    { // illegal instruction is on line (i-1)
-      addr_line *excpline = line_list + i - 1;
-      char file_path[256];
-      char file_contents[8192];
-      struct stat file_stat;
-
-      int dir_len = strlen(dir_list[file_list[excpline->file].dir]);
-      //'**dir' stores dir string, process->line->file points out the index of code_file
-      strcpy(file_path, dir_list[file_list[excpline->file].dir]);
-      file_path[dir_len] = '/';
-      strcpy(file_path + dir_len + 1, file_list[excpline->file].file);
-      // filename places after dir/, code_file->file stores the filename
-      // sprint(file_path);
-      // sprint("%d",excpline->line);
-      // sprint("\n");
-
-      // read illegal instruction through spike_file functions
-      spike_file_t *_file_ = spike_file_open(file_path, O_RDONLY, 0);
-      spike_file_stat(_file_, &file_stat);
-      spike_file_read(_file_, file_contents, file_stat.st_size);
-      spike_file_close(_file_);
-      int offset = 0, count = 0;
-      while (offset < file_stat.st_size)
-      {
-        int temp = offset;
-        while (temp < file_stat.st_size && file_contents[temp] != '\n')
-          temp++; // find every line
-        if (count == excpline->line - 1)
-        {
-          file_contents[temp] = '\0';
-          sprint("Runtime error at %s:%d\n%s\n", file_path, excpline->line, file_contents + offset);
-          break;
-        }
-        else
-        {
-          count++;
-          offset = temp + 1;
-        }
-      }
-      break;
-    }
-  }
-}
 
 
 // added @lab1_3

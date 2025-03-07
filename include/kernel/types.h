@@ -16,6 +16,21 @@ typedef signed int int32;
 typedef signed long long int64;
 
 
+
+// 方便的宏定义
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define ROUNDUP(a, b) ((((a)-1) / (b) + 1) * (b))
+#define ROUNDDOWN(a, b) ((a) / (b) * (b))
+
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define likely(x) __builtin_expect((x), 1)
+#define unlikely(x) __builtin_expect((x), 0)
+
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
+
 // 用来标记用户的虚拟内存地址
 #define __user
 
@@ -25,14 +40,12 @@ typedef signed long long int64;
 
 #define MASK_FILEMODE 0x003
 
-#define FD_NONE 0
-#define FD_OPENED 1
-
-#define MAX_FILE_NAME_LEN 32
 
 
 // file system type
 
+
+#define MAX_FILE_NAME_LEN 256
 typedef uint64 loff_t;
 
 struct dir {
