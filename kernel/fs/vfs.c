@@ -164,7 +164,7 @@ struct file *vfs_open(const char *path, int flags) {
 
       // create the file
       file_dentry = alloc_vfs_dentry(basename, NULL, parent);
-      struct vinode *new_inode = viop_create(parent->dentry_inode, file_dentry);
+      struct inode *new_inode = viop_create(parent->dentry_inode, file_dentry);
       if (!new_inode)
         panic("vfs_open: cannot create file!\n");
 
@@ -368,7 +368,7 @@ int vfs_unlink(const char *path) {
   }
 
   // do the real unlink
-  struct vinode *unlinked_vinode = file_dentry->dentry_inode;
+  struct inode *unlinked_vinode = file_dentry->dentry_inode;
   int err = viop_unlink(parent->dentry_inode, file_dentry, unlinked_vinode);
   if (err)
     return -1;
@@ -401,7 +401,7 @@ int vfs_close(struct file *file) {
   }
 
   struct dentry *dentry = file->f_dentry;
-  struct vinode *inode = dentry->dentry_inode;
+  struct inode *inode = dentry->dentry_inode;
 
   // additional close operations for a specific file system
   // hostfs needs to conduct actual file close.
@@ -500,7 +500,7 @@ int vfs_mkdir(const char *path) {
 
   // do real mkdir
   struct dentry *new_dentry = alloc_vfs_dentry(basename, NULL, parent);
-  struct vinode *new_dir_inode = viop_mkdir(parent->dentry_inode, new_dentry);
+  struct inode *new_dir_inode = viop_mkdir(parent->dentry_inode, new_dentry);
   if (!new_dir_inode) {
     free_page(new_dentry);
     sprint("vfs_mkdir: cannot create directory!\n");
@@ -602,7 +602,7 @@ struct dentry *lookup_final_dentry(const char *path, struct dentry **parent,
       this = alloc_vfs_dentry(token, NULL, *parent);
       // lookup subfolder/file in its parent directory. note:
       // hostfs and rfs will take different procedures for lookup.
-      struct vinode *found_vinode = viop_lookup((*parent)->dentry_inode, this);
+      struct inode *found_vinode = viop_lookup((*parent)->dentry_inode, this);
       if (found_vinode == NULL) {
         // not found in both hash table and directory file on disk.
         free_page(this);
@@ -610,7 +610,7 @@ struct dentry *lookup_final_dentry(const char *path, struct dentry **parent,
         return NULL;
       }
 
-      struct vinode *same_inode =
+      struct inode *same_inode =
           hash_get_vinode(found_vinode->sb, found_vinode->inum);
       if (same_inode != NULL) {
         // the vinode is already in the hash table (i.e. we are opening another
@@ -696,7 +696,7 @@ void get_base_name(const char *path, char *base_name) {
 //
 // alloc a (virtual) dir entry
 //
-struct dentry *alloc_vfs_dentry(const char *name, struct vinode *inode,
+struct dentry *alloc_vfs_dentry(const char *name, struct inode *inode,
                                 struct dentry *parent) {
   struct dentry *dentry = (struct dentry *)alloc_page();
   strcpy(dentry->name, name);
@@ -786,15 +786,15 @@ size_t vinode_hash_func(void *key) {
 }
 
 // vinode hash table interface
-struct vinode *hash_get_vinode(struct super_block *sb, int inum) {
+struct inode *hash_get_vinode(struct super_block *sb, int inum) {
   if (inum < 0)
     return NULL;
   struct vinode_key key = {.sb = sb, .inum = inum};
-  return (struct vinode *)vinode_hash_table.virtual_hash_get(&vinode_hash_table,
+  return (struct inode *)vinode_hash_table.virtual_hash_get(&vinode_hash_table,
                                                              &key);
 }
 
-int hash_put_vinode(struct vinode *vinode) {
+int hash_put_vinode(struct inode *vinode) {
   if (vinode->inum < 0)
     return -1;
   struct vinode_key *key = alloc_page();
@@ -807,7 +807,7 @@ int hash_put_vinode(struct vinode *vinode) {
   return ret;
 }
 
-int hash_erase_vinode(struct vinode *vinode) {
+int hash_erase_vinode(struct inode *vinode) {
   if (vinode->inum < 0)
     return -1;
   struct vinode_key key = {.sb = vinode->sb, .inum = vinode->inum};
@@ -817,8 +817,8 @@ int hash_erase_vinode(struct vinode *vinode) {
 //
 // shared (default) actions on allocating a vfs inode.
 //
-struct vinode *default_alloc_vinode(struct super_block *sb) {
-  struct vinode *vinode = (struct vinode *)alloc_page();
+struct inode *default_alloc_vinode(struct super_block *sb) {
+  struct inode *vinode = (struct inode *)alloc_page();
   vinode->blocks = 0;
   vinode->inum = 0;
   vinode->nlinks = 0;

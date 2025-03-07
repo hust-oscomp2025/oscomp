@@ -15,6 +15,8 @@ typedef signed short int16;
 typedef signed int int32;
 typedef signed long long int64;
 
+#define __user
+
    
 
 #define MOUNT_DEFAULT 0

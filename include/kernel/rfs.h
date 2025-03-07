@@ -65,27 +65,27 @@ int rfs_write_dinode(struct rfs_device *rdev, const struct rfs_dinode *dinode,
                      int n_inode);
 int rfs_alloc_block(struct super_block *sb);
 int rfs_free_block(struct super_block *sb, int block_num);
-int rfs_add_direntry(struct vinode *dir, const char *name, int inum);
+int rfs_add_direntry(struct inode *dir, const char *name, int inum);
 
-struct vinode *rfs_alloc_vinode(struct super_block *sb);
-int rfs_write_back_vinode(struct vinode *vinode);
-int rfs_update_vinode(struct vinode *vinode);
+struct inode *rfs_alloc_vinode(struct super_block *sb);
+int rfs_write_back_vinode(struct inode *vinode);
+int rfs_update_vinode(struct inode *vinode);
 
 // rfs interface function declarations
-ssize_t rfs_read(struct vinode *f_inode, char *r_buf, ssize_t len, int *offset);
-ssize_t rfs_write(struct vinode *f_inode, const char *w_buf, ssize_t len,
+ssize_t rfs_read(struct inode *f_inode, char *r_buf, ssize_t len, int *offset);
+ssize_t rfs_write(struct inode *f_inode, const char *w_buf, ssize_t len,
                   int *offset);
-struct vinode *rfs_lookup(struct vinode *parent, struct dentry *sub_dentry);
-struct vinode *rfs_create(struct vinode *parent, struct dentry *sub_dentry);
-int rfs_lseek(struct vinode *f_inode, ssize_t new_offset, int whence, int *offset);
-int rfs_disk_stat(struct vinode *vinode, struct istat *istat);
-int rfs_link(struct vinode *parent, struct dentry *sub_dentry, struct vinode *link_node);
-int rfs_unlink(struct vinode *parent, struct dentry *sub_dentry, struct vinode *unlink_vinode);
+struct inode *rfs_lookup(struct inode *parent, struct dentry *sub_dentry);
+struct inode *rfs_create(struct inode *parent, struct dentry *sub_dentry);
+int rfs_lseek(struct inode *f_inode, ssize_t new_offset, int whence, int *offset);
+int rfs_disk_stat(struct inode *vinode, struct istat *istat);
+int rfs_link(struct inode *parent, struct dentry *sub_dentry, struct inode *link_node);
+int rfs_unlink(struct inode *parent, struct dentry *sub_dentry, struct inode *unlink_vinode);
 
-int rfs_hook_opendir(struct vinode *dir_vinode, struct dentry *dentry);
-int rfs_hook_closedir(struct vinode *dir_vinode, struct dentry *dentry);
-int rfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset);
-struct vinode *rfs_mkdir(struct vinode *parent, struct dentry *sub_dentry);
+int rfs_hook_opendir(struct inode *dir_vinode, struct dentry *dentry);
+int rfs_hook_closedir(struct inode *dir_vinode, struct dentry *dentry);
+int rfs_readdir(struct inode *dir_vinode, struct dir *dir, int *offset);
+struct inode *rfs_mkdir(struct inode *parent, struct dentry *sub_dentry);
 
 struct super_block *rfs_get_superblock(struct device *dev);
 

@@ -12,7 +12,8 @@
 			"sync_utils.h": "c",
 			"types.h": "c",
 			"snprintf.h": "c",
-			"file.h": "c"
+			"file.h": "c",
+			"vfs.h": "c"
 		},
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyFunction": true,
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyType": true,

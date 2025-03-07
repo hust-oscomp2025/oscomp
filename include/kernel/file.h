@@ -1,12 +1,13 @@
 #ifndef _FILE_H
 #define _FILE_H
-#include <kernel/vfs.h>
 #include <kernel/types.h>
-
+#include <kernel/vfs.h>
 #include <spike_interface/atomic.h>
 
 typedef struct dentry dentry_t;
-typedef unsigned int fmode_t;
+typedef struct inode inode_t;
+typedef uint32 fmode_t;
+typedef uint64 loff_t;
 
 struct file *alloc_vfs_file(dentry_t *file_dentry, int readable,
 	int writable, int offset);
@@ -15,7 +16,7 @@ struct file *alloc_vfs_file(dentry_t *file_dentry, int readable,
 // data structure of an openned file
 struct file {
   dentry_t *f_dentry;
-	//const struct file_operations	*f_op;
+	const struct file_operations	*f_op;
 	spinlock_t		f_lock;
 	fmode_t f_mode;
 	//struct mutex		f_pos_lock;
@@ -23,6 +24,65 @@ struct file {
 	// struct file_ra_state	f_ra;
 	// struct address_space	*f_mapping;
 };
+
+
+struct file_operations {
+	// struct module *owner;   /* 指向该操作所属模块，防止模块卸载 */
+	// 通过这个管理内核动态模块的引用计数，避免模块被卸载后操作函数失效。
+	// 但由于本设计是简化版，这里不考虑模块的加载和卸载，因此这个字段暂时不需要。
+
+	/* 基本的文件定位操作，用于实现 lseek 功能 */
+	loff_t (*llseek) (struct file *, loff_t, int);
+
+	/* 基本的文件读操作 */
+	ssize_t (*read) (struct file *, char __user *, size_t, loff_t *);
+
+	/* 基本的文件写操作 */
+	ssize_t (*write) (struct file *, const char __user *, size_t, loff_t *);
+
+	/*
+	 * 以下函数在完整的 Linux 内核中用于实现更多高级特性，
+	 * 例如异步 I/O、迭代读取、ioctl 控制、内存映射、文件锁定、
+	 * 事件轮询等。由于本设计是简化版，这里仅保留基本接口，
+	 * 其他接口均置为 NULL 或不支持。
+	 *
+	 * // ssize_t (*read_iter) (struct kiocb *, struct iov_iter *);
+	 * // ssize_t (*write_iter) (struct kiocb *, struct iov_iter *);
+	 * // int (*iopoll)(struct kiocb *, struct io_comp_batch *, unsigned int flags);
+	 * // int (*iterate) (struct file *, struct dir_context *);
+	 * // int (*iterate_shared) (struct file *, struct dir_context *);
+	 * // __poll_t (*poll) (struct file *, struct poll_table_struct *);
+	 * // long (*unlocked_ioctl) (struct file *, unsigned int, unsigned long);
+	 * // long (*compat_ioctl) (struct file *, unsigned int, unsigned long);
+	 * // int (*mmap) (struct file *, struct vm_area_struct *);
+	 * // unsigned long mmap_supported_flags;
+	 * // int (*flush) (struct file *, fl_owner_t id);
+	 * // ssize_t (*sendpage) (struct file *, struct page *, int, size_t, loff_t *, int);
+	 * // unsigned long (*get_unmapped_area)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
+	 * // int (*check_flags)(int);
+	 * // int (*flock) (struct file *, int, struct file_lock *);
+	 * // ssize_t (*splice_write)(struct pipe_inode_info *, struct file *, loff_t *, size_t, unsigned int);
+	 * // ssize_t (*splice_read)(struct file *, loff_t *, struct pipe_inode_info *, size_t, unsigned int);
+	 * // int (*setlease)(struct file *, long, struct file_lock **, void **);
+	 * // long (*fallocate)(struct file *, int, loff_t, loff_t);
+	 * // void (*show_fdinfo)(struct seq_file *, struct file *);
+	 * // #ifndef CONFIG_MMU
+	 * // unsigned (*mmap_capabilities)(struct file *);
+	 * // #endif
+	 * // ssize_t (*copy_file_range)(struct file *, loff_t, struct file *, loff_t, size_t, unsigned int);
+	 * // loff_t (*remap_file_range)(struct file *, loff_t, struct file *, loff_t, loff_t, unsigned int);
+	 * // int (*fadvise)(struct file *, loff_t, loff_t, int);
+	 * // int (*uring_cmd)(struct io_uring_cmd *, unsigned int);
+	 * // int (*uring_cmd_iopoll)(struct io_uring_cmd *, struct io_comp_batch *, unsigned int);
+	 */
+
+	/* 文件打开操作，在打开文件时调用 */
+	int (*open) (struct inode *, struct file *);
+
+	/* 文件释放操作，在关闭文件时调用 */
+	int (*release) (struct inode *, struct file *);
+};
+
 
 
 

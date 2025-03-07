@@ -211,7 +211,7 @@ int rfs_free_block(struct super_block *sb, int block_num) {
 //
 // add a new directory entry to a directory
 //
-int rfs_add_direntry(struct vinode *dir, const char *name, int inum) {
+int rfs_add_direntry(struct inode *dir, const char *name, int inum) {
   if (dir->type != S_IFDIR) {
     sprint("rfs_add_direntry: not a directory!\n");
     return -1;
@@ -254,8 +254,8 @@ int rfs_add_direntry(struct vinode *dir, const char *name, int inum) {
 //
 // alloc a new (and empty) vinode
 //
-struct vinode *rfs_alloc_vinode(struct super_block *sb) {
-  struct vinode *vinode = default_alloc_vinode(sb);
+struct inode *rfs_alloc_vinode(struct super_block *sb) {
+  struct inode *vinode = default_alloc_vinode(sb);
   vinode->i_ops = &rfs_i_ops;
   return vinode;
 }
@@ -263,7 +263,7 @@ struct vinode *rfs_alloc_vinode(struct super_block *sb) {
 //
 // convert vfs inode to disk inode, and write it back to disk
 //
-int rfs_write_back_vinode(struct vinode *vinode) {
+int rfs_write_back_vinode(struct inode *vinode) {
   // copy vinode info to disk inode
   struct rfs_dinode dinode;
   dinode.size = vinode->size;
@@ -286,7 +286,7 @@ int rfs_write_back_vinode(struct vinode *vinode) {
 //
 // update vinode info by reading disk inode
 //
-int rfs_update_vinode(struct vinode *vinode) {
+int rfs_update_vinode(struct inode *vinode) {
   struct rfs_device *rdev = rfs_device_list[vinode->sb->s_dev->dev_id];
   struct rfs_dinode *dinode = rfs_read_dinode(rdev, vinode->inum);
   if (dinode == NULL) {
@@ -310,7 +310,7 @@ int rfs_update_vinode(struct vinode *vinode) {
 // read the content (for "len") of a file ("f_inode"), and copy the content
 // to "r_buf".
 //
-ssize_t rfs_read(struct vinode *f_inode, char *r_buf, ssize_t len,
+ssize_t rfs_read(struct inode *f_inode, char *r_buf, ssize_t len,
                  int *offset) {
   // obtain disk inode from vfs inode
   if (f_inode->size < *offset)
@@ -368,7 +368,7 @@ ssize_t rfs_read(struct vinode *f_inode, char *r_buf, ssize_t len,
 //
 // write the content of "w_buf" (lengthed "len") to a file ("f_inode").
 //
-ssize_t rfs_write(struct vinode *f_inode, const char *w_buf, ssize_t len,
+ssize_t rfs_write(struct inode *f_inode, const char *w_buf, ssize_t len,
                   int *offset) {
   if (f_inode->size < *offset) {
     panic("rfs_write:offset should less than file size!");
@@ -441,9 +441,9 @@ ssize_t rfs_write(struct vinode *f_inode, const char *w_buf, ssize_t len,
 // function several times until the final file is found.
 // return: if found, return its vinode, otherwise return NULL
 //
-struct vinode *rfs_lookup(struct vinode *parent, struct dentry *sub_dentry) {
+struct inode *rfs_lookup(struct inode *parent, struct dentry *sub_dentry) {
   struct rfs_direntry *p_direntry = NULL;
-  struct vinode *child_vinode = NULL;
+  struct inode *child_vinode = NULL;
 
   int total_direntrys = parent->size / sizeof(struct rfs_direntry);
   int one_block_direntrys = RFS_BLKSIZE / sizeof(struct rfs_direntry);
@@ -472,7 +472,7 @@ struct vinode *rfs_lookup(struct vinode *parent, struct dentry *sub_dentry) {
 // create a file with "sub_dentry->name" at directory "parent" in rfs.
 // return the vfs inode of the file being created.
 //
-struct vinode *rfs_create(struct vinode *parent, struct dentry *sub_dentry) {
+struct inode *rfs_create(struct inode *parent, struct dentry *sub_dentry) {
   struct rfs_device *rdev = rfs_device_list[parent->sb->s_dev->dev_id];
 
   int free_inum = 0;
@@ -496,7 +496,7 @@ struct vinode *rfs_create(struct vinode *parent, struct dentry *sub_dentry) {
   free_page(free_dinode);
 
   // ** build vfs inode according to dinode
-  struct vinode *new_vinode = rfs_alloc_vinode(parent->sb);
+  struct inode *new_vinode = rfs_alloc_vinode(parent->sb);
   new_vinode->inum = free_inum;
   rfs_update_vinode(new_vinode);
 
@@ -516,7 +516,7 @@ struct vinode *rfs_create(struct vinode *parent, struct dentry *sub_dentry) {
 // SEEK_CUR: set the file pointer to the current_percpu offset plus the offset
 // return 0 if success, otherwise return -1
 //
-int rfs_lseek(struct vinode *f_inode, ssize_t new_offset, int whence, int *offset) {
+int rfs_lseek(struct inode *f_inode, ssize_t new_offset, int whence, int *offset) {
   int file_size = f_inode->size;
 
   switch (whence) {
@@ -545,7 +545,7 @@ int rfs_lseek(struct vinode *f_inode, ssize_t new_offset, int whence, int *offse
 //
 //  read disk inode information from disk
 //
-int rfs_disk_stat(struct vinode *vinode, struct istat *istat) {
+int rfs_disk_stat(struct inode *vinode, struct istat *istat) {
 	sprint("rfs_disk_stat\n");
   struct rfs_device *rdev = rfs_device_list[vinode->sb->s_dev->dev_id];
   struct rfs_dinode *dinode = rfs_read_dinode(rdev, vinode->inum);
@@ -568,7 +568,7 @@ int rfs_disk_stat(struct vinode *vinode, struct istat *istat) {
 //
 // create a hard link under a direntry "parent" for an existing file of "link_node"
 //
-int rfs_link(struct vinode *parent, struct dentry *sub_dentry, struct vinode *link_node) {
+int rfs_link(struct inode *parent, struct dentry *sub_dentry, struct inode *link_node) {
   // TODO (lab4_3): we now need to establish a hard link to an existing file whose vfs
   // inode is "link_node". To do that, we need first to know the name of the new (link)
   // file, and then, we need to increase the link count of the existing file. Lastly, 
@@ -604,7 +604,7 @@ int rfs_link(struct vinode *parent, struct dentry *sub_dentry, struct vinode *li
 //
 // remove a hard link with "name" under a direntry "parent"
 //
-int rfs_unlink(struct vinode *parent, struct dentry *sub_dentry, struct vinode *unlink_vinode) {
+int rfs_unlink(struct inode *parent, struct dentry *sub_dentry, struct inode *unlink_vinode) {
   struct rfs_device *rdev = rfs_device_list[parent->sb->s_dev->dev_id];
 
   // ** find the direntry in the directory file
@@ -723,7 +723,7 @@ int rfs_unlink(struct vinode *parent, struct dentry *sub_dentry, struct vinode *
 // when a directory is opened, the contents of the directory file are read
 // into the memory for directory read operations
 //
-int rfs_hook_opendir(struct vinode *dir_vinode, struct dentry *dentry) {
+int rfs_hook_opendir(struct inode *dir_vinode, struct dentry *dentry) {
   // allocate space and read the contents of the dir block into memory
   void *pdire = NULL;
   void *previous = NULL;
@@ -755,7 +755,7 @@ int rfs_hook_opendir(struct vinode *dir_vinode, struct dentry *dentry) {
 // when a directory is closed, the memory space allocated for the directory
 // block is freed
 //
-int rfs_hook_closedir(struct vinode *dir_vinode, struct dentry *dentry) {
+int rfs_hook_closedir(struct inode *dir_vinode, struct dentry *dentry) {
   struct rfs_dir_cache *dir_cache =
       (struct rfs_dir_cache *)dir_vinode->i_fs_info;
 
@@ -772,7 +772,7 @@ int rfs_hook_closedir(struct vinode *dir_vinode, struct dentry *dentry) {
 // if offset is 1, the second entry is read, and so on.
 // return: 0 on success, -1 when there are no more entry (end of the list).
 //
-int rfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset) {
+int rfs_readdir(struct inode *dir_vinode, struct dir *dir, int *offset) {
   int total_direntrys = dir_vinode->size / sizeof(struct rfs_direntry);
   int one_block_direntrys = RFS_BLKSIZE / sizeof(struct rfs_direntry);
 
@@ -809,7 +809,7 @@ int rfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset) {
 // make a new direntry named "sub_dentry->name" under the directory "parent",
 // return the vfs inode of subdir being created.
 //
-struct vinode *rfs_mkdir(struct vinode *parent, struct dentry *sub_dentry) {
+struct inode *rfs_mkdir(struct inode *parent, struct dentry *sub_dentry) {
   struct rfs_device *rdev = rfs_device_list[parent->sb->s_dev->dev_id];
 
   // ** find a free disk inode to store the file that is going to be created
@@ -837,7 +837,7 @@ struct vinode *rfs_mkdir(struct vinode *parent, struct dentry *sub_dentry) {
   }
 
   // ** allocate a new vinode
-  struct vinode *sub_vinode = rfs_alloc_vinode(parent->sb);
+  struct inode *sub_vinode = rfs_alloc_vinode(parent->sb);
   sub_vinode->inum = free_inum;
   rfs_update_vinode(sub_vinode);
 
@@ -867,7 +867,7 @@ struct super_block *rfs_get_superblock(struct device *dev) {
     panic("rfs_get_superblock: wrong ramdisk device!\n");
 
   // build root dentry and root inode
-  struct vinode *root_inode = rfs_alloc_vinode(sb);
+  struct inode *root_inode = rfs_alloc_vinode(sb);
   root_inode->inum = 0;
   rfs_update_vinode(root_inode);
 

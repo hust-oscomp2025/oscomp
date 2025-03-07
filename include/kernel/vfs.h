@@ -47,14 +47,14 @@ extern struct dentry *vfs_root_dentry;
 typedef struct dentry {
   char name[MAX_DENTRY_NAME_LEN];
   int d_ref;
-  struct vinode *dentry_inode;
+  struct inode *dentry_inode;
   struct dentry *parent;
   struct super_block *sb;
 }dentry_t;
 
 
 // dentry constructor and destructor
-struct dentry *alloc_vfs_dentry(const char *name, struct vinode *inode,
+struct dentry *alloc_vfs_dentry(const char *name, struct inode *inode,
                             struct dentry *parent);
 int free_vfs_dentry(struct dentry *dentry);
 
@@ -110,7 +110,7 @@ struct super_block {
 };
 
 // abstract vfs inode
-struct vinode {
+struct inode {
   int inum;                  // inode number of the disk inode
   int ref;                   // reference count
   int size;                  // size of the file (in bytes)
@@ -125,26 +125,26 @@ struct vinode {
 
 struct vinode_ops {
   // file operations
-  ssize_t (*viop_read)(struct vinode *node, char *buf, ssize_t len,
+  ssize_t (*viop_read)(struct inode *node, char *buf, ssize_t len,
                        int *offset);
-  ssize_t (*viop_write)(struct vinode *node, const char *buf, ssize_t len,
+  ssize_t (*viop_write)(struct inode *node, const char *buf, ssize_t len,
                         int *offset);
-  struct vinode *(*viop_create)(struct vinode *parent, struct dentry *sub_dentry);
-  int (*viop_lseek)(struct vinode *node, ssize_t new_off, int whence, int *off);
-  int (*viop_disk_stat)(struct vinode *node, struct istat *istat);
-  int (*viop_link)(struct vinode *parent, struct dentry *sub_dentry,
-                   struct vinode *link_node);
-  int (*viop_unlink)(struct vinode *parent, struct dentry *sub_dentry,
-                     struct vinode *unlink_node);
-  struct vinode *(*viop_lookup)(struct vinode *parent,
+  struct inode *(*viop_create)(struct inode *parent, struct dentry *sub_dentry);
+  int (*viop_lseek)(struct inode *node, ssize_t new_off, int whence, int *off);
+  int (*viop_disk_stat)(struct inode *node, struct istat *istat);
+  int (*viop_link)(struct inode *parent, struct dentry *sub_dentry,
+                   struct inode *link_node);
+  int (*viop_unlink)(struct inode *parent, struct dentry *sub_dentry,
+                     struct inode *unlink_node);
+  struct inode *(*viop_lookup)(struct inode *parent,
                                 struct dentry *sub_dentry);
 
   // directory operations
-  int (*viop_readdir)(struct vinode *dir_vinode, struct dir *dir, int *offset);
-  struct vinode *(*viop_mkdir)(struct vinode *parent, struct dentry *sub_dentry);
+  int (*viop_readdir)(struct inode *dir_vinode, struct dir *dir, int *offset);
+  struct inode *(*viop_mkdir)(struct inode *parent, struct dentry *sub_dentry);
 
   // write back inode to disk
-  int (*viop_write_back_vinode)(struct vinode *node);
+  int (*viop_write_back_vinode)(struct inode *node);
 
   // hook functions
   // In the vfs layer, we do not assume that hook functions will do anything,
@@ -152,10 +152,10 @@ struct vinode_ops {
   // Hook functions exist because the fs layer may need to do some additional
   // operations (such as allocating additional data structures) at some critical
   // times.
-  int (*viop_hook_open)(struct vinode *node, struct dentry *dentry);
-  int (*viop_hook_close)(struct vinode *node, struct dentry *dentry);
-  int (*viop_hook_opendir)(struct vinode *node, struct dentry *dentry);
-  int (*viop_hook_closedir)(struct vinode *node, struct dentry *dentry);
+  int (*viop_hook_open)(struct inode *node, struct dentry *dentry);
+  int (*viop_hook_close)(struct inode *node, struct dentry *dentry);
+  int (*viop_hook_opendir)(struct inode *node, struct dentry *dentry);
+  int (*viop_hook_closedir)(struct inode *node, struct dentry *dentry);
 };
 
 // vinode operation interface
@@ -188,12 +188,12 @@ int vinode_hash_equal(void *key1, void *key2);
 size_t vinode_hash_func(void *key);
 
 // vinode hash table interface
-struct vinode *hash_get_vinode(struct super_block *sb, int inum);
-int hash_put_vinode(struct vinode *vinode);
-int hash_erase_vinode(struct vinode *vinode);
+struct inode *hash_get_vinode(struct super_block *sb, int inum);
+int hash_put_vinode(struct inode *vinode);
+int hash_erase_vinode(struct inode *vinode);
 
 // other utility functions
-struct vinode *default_alloc_vinode(struct super_block *sb);
+struct inode *default_alloc_vinode(struct super_block *sb);
 struct dentry *lookup_final_dentry(const char *path, struct dentry **parent,
                                    char *miss_name);
 void get_base_name(const char *path, char *base_name);
