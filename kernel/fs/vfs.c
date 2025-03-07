@@ -10,6 +10,7 @@
 #include <kernel/pmm.h>
 #include <kernel/rfs.h>
 #include <kernel/types.h>
+#include <kernel/inode.h>
 #include <util/string.h>
 
 struct dentry *vfs_root_dentry;              // system root direntry
@@ -169,7 +170,7 @@ struct file *vfs_open(const char *path, int flags) {
         panic("vfs_open: cannot create file!\n");
 
       file_dentry->dentry_inode = new_inode;
-      new_inode->ref++;
+			atomic_inc(&(new_inode->i_count));
       hash_put_dentry(file_dentry);
       hash_put_inode(new_inode);
     } else {
@@ -207,8 +208,8 @@ struct file *vfs_open(const char *path, int flags) {
 
   // additional open operations for a specific file system
   // hostfs needs to conduct actual file open.
-  if (file_dentry->dentry_inode->i_ops->viop_hook_open) {
-    if (file_dentry->dentry_inode->i_ops->viop_hook_open(
+  if (file_dentry->dentry_inode->i_op->viop_hook_open) {
+    if (file_dentry->dentry_inode->i_op->viop_hook_open(
             file_dentry->dentry_inode, file_dentry) < 0) {
       sprint("vfs_open: hook_open failed!\n");
     }
@@ -274,7 +275,7 @@ ssize_t vfs_lseek(struct file *file, ssize_t offset, int whence) {
 // read the vinode information
 //
 int vfs_stat(struct file *file, struct istat *istat) {
-  istat->st_inum = file->f_dentry->dentry_inode->inum;
+  istat->st_inum = file->f_dentry->dentry_inode->i_ino;
   istat->st_size = file->f_dentry->dentry_inode->size;
   istat->st_type = file->f_dentry->dentry_inode->type;
   istat->st_nlinks = file->f_dentry->dentry_inode->nlinks;
@@ -376,12 +377,12 @@ int vfs_unlink(const char *path) {
   // remove the dentry from the hash table
   hash_erase_dentry(file_dentry);
   free_vfs_dentry(file_dentry);
-  unlinked_vinode->ref--;
+	atomic_dec(&unlinked_vinode->i_count);
 
   // if this inode has been removed from disk
   if (unlinked_vinode->nlinks == 0) {
     // no one will remember a dead inode
-    assert(unlinked_vinode->ref == 0);
+    assert(atomic_read(&unlinked_vinode->i_count) == 0);
 
     // we don't write back the inode, because it has disappeared from the disk
     hash_erase_inode(unlinked_vinode);
@@ -405,8 +406,8 @@ int vfs_close(struct file *file) {
 
   // additional close operations for a specific file system
   // hostfs needs to conduct actual file close.
-  if (inode->i_ops->viop_hook_close) {
-    if (inode->i_ops->viop_hook_close(inode, dentry) != 0) {
+  if (inode->i_op->viop_hook_close) {
+    if (inode->i_op->viop_hook_close(inode, dentry) != 0) {
       sprint("vfs_close: hook_close failed!\n");
     }
   }
@@ -417,9 +418,9 @@ int vfs_close(struct file *file) {
     // free the dentry
     hash_erase_dentry(dentry);
     free_vfs_dentry(dentry);
-    inode->ref--;
+		atomic_dec(&inode->i_count);
     // no other opened hard link
-    if (inode->ref == 0) {
+    if (atomic_read(&inode->i_count) == 0) {
       // write back the inode and free it
       if (viop_write_back_vinode(inode) != 0)
         panic("vfs_close: free inode failed!\n");
@@ -453,8 +454,8 @@ struct file *vfs_opendir(const char *path) {
 
   // additional open direntry operations for a specific file system
   // rfs needs duild dir cache.
-  if (file_dentry->dentry_inode->i_ops->viop_hook_opendir) {
-    if (file_dentry->dentry_inode->i_ops->viop_hook_opendir(
+  if (file_dentry->dentry_inode->i_op->viop_hook_opendir) {
+    if (file_dentry->dentry_inode->i_op->viop_hook_opendir(
             file_dentry->dentry_inode, file_dentry) != 0) {
       sprint("vfs_opendir: hook opendir failed!\n");
     }
@@ -508,7 +509,7 @@ int vfs_mkdir(const char *path) {
   }
 
   new_dentry->dentry_inode = new_dir_inode;
-  new_dir_inode->ref++;
+	atomic_inc(&new_dir_inode->i_count);
   hash_put_dentry(new_dentry);
   hash_put_inode(new_dir_inode);
   return 0;
@@ -530,8 +531,8 @@ int vfs_closedir(struct file *file) {
 
   // additional close direntry operations for a specific file system
   // rfs needs reclaim dir cache.
-  if (file->f_dentry->dentry_inode->i_ops->viop_hook_closedir) {
-    if (file->f_dentry->dentry_inode->i_ops->viop_hook_closedir(
+  if (file->f_dentry->dentry_inode->i_op->viop_hook_closedir) {
+    if (file->f_dentry->dentry_inode->i_op->viop_hook_closedir(
             file->f_dentry->dentry_inode, file->f_dentry) != 0) {
       sprint("vfs_closedir: hook closedir failed!\n");
     }
@@ -611,17 +612,18 @@ struct dentry *lookup_final_dentry(const char *path, struct dentry **parent,
       }
 
       struct inode *same_inode =
-          hash_get_inode(found_vinode->sb, found_vinode->inum);
+          hash_get_inode(found_vinode->sb, found_vinode->i_ino);
       if (same_inode != NULL) {
         // the vinode is already in the hash table (i.e. we are opening another
         // hard link)
         this->dentry_inode = same_inode;
-        same_inode->ref++;
+				atomic_inc(&same_inode->i_count);
+
         free_page(found_vinode);
       } else {
         // the vinode is not in the hash table
         this->dentry_inode = found_vinode;
-        found_vinode->ref++;
+				atomic_inc(&found_vinode->i_count);
         hash_put_inode(found_vinode);
       }
 
@@ -701,8 +703,9 @@ struct dentry *alloc_vfs_dentry(const char *name, struct inode *inode,
   struct dentry *dentry = (struct dentry *)alloc_page();
   strcpy(dentry->name, name);
   dentry->dentry_inode = inode;
-  if (inode)
-    inode->ref++;
+  if (inode){
+		atomic_inc(&inode->i_count);
+	}
 
   dentry->parent = parent;
   dentry->d_ref = 0;
@@ -795,11 +798,11 @@ struct inode *hash_get_inode(struct super_block *sb, int inum) {
 }
 
 int hash_put_inode(struct inode *vinode) {
-  if (vinode->inum < 0)
+  if (vinode->i_ino < 0)
     return -1;
   struct inode_key *key = alloc_page();
   key->sb = vinode->sb;
-  key->inum = vinode->inum;
+  key->inum = vinode->i_ino;
 
   int ret = vinode_hash_table.virtual_hash_put(&vinode_hash_table, key, vinode);
   if (ret != 0)
@@ -808,9 +811,9 @@ int hash_put_inode(struct inode *vinode) {
 }
 
 int hash_erase_inode(struct inode *vinode) {
-  if (vinode->inum < 0)
+  if (vinode->i_ino < 0)
     return -1;
-  struct inode_key key = {.sb = vinode->sb, .inum = vinode->inum};
+  struct inode_key key = {.sb = vinode->sb, .inum = vinode->i_ino};
   return vinode_hash_table.virtual_hash_erase(&vinode_hash_table, &key);
 }
 
@@ -820,9 +823,9 @@ int hash_erase_inode(struct inode *vinode) {
 struct inode *default_alloc_vinode(struct super_block *sb) {
   struct inode *vinode = (struct inode *)alloc_page();
   vinode->blocks = 0;
-  vinode->inum = 0;
+  vinode->i_ino = 0;
   vinode->nlinks = 0;
-  vinode->ref = 0;
+	atomic_set(&vinode->i_count, 0);
   vinode->sb = sb;
   vinode->size = 0;
   return vinode;

@@ -30,6 +30,11 @@ typedef signed long long int64;
 
 #define MAX_FILE_NAME_LEN 32
 
+
+// file system type
+
+typedef uint64 loff_t;
+
 struct dir {
   char name[MAX_FILE_NAME_LEN];
   int inum;

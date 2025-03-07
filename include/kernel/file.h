@@ -7,7 +7,7 @@
 typedef struct dentry dentry_t;
 typedef struct inode inode_t;
 typedef uint32 fmode_t;
-typedef uint64 loff_t;
+
 
 struct file *alloc_vfs_file(dentry_t *file_dentry, int readable,
 	int writable, int offset);

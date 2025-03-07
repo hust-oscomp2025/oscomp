@@ -11,7 +11,7 @@
 #include <kernel/vfs.h>
 
 /**** host-fs vinode interface ****/
-const struct inode_ops hostfs_i_ops = {
+const struct inode_operations hostfs_i_ops = {
     .viop_read = hostfs_read,
     .viop_write = hostfs_write,
     .viop_create = hostfs_create,
@@ -107,9 +107,9 @@ void get_path_string(char *path, struct dentry *dentry) {
 //
 struct inode *hostfs_alloc_vinode(struct super_block *sb) {
   struct inode *vinode = default_alloc_vinode(sb);
-  vinode->inum = -1; 
-  vinode->i_fs_info = NULL;
-  vinode->i_ops = &hostfs_i_ops;
+  vinode->i_ino = -1; 
+  vinode->i_private = NULL;
+  vinode->i_op = &hostfs_i_ops;
   return vinode;
 }
 
@@ -119,7 +119,7 @@ int hostfs_write_back_vinode(struct inode *vinode) { return 0; }
 // populate the vfs inode of an hostfs file, according to its stats.
 //
 int hostfs_update_vinode(struct inode *vinode) {
-  spike_file_t *f = vinode->i_fs_info;
+  spike_file_t *f = vinode->i_private;
   if ((int64)f < 0) {  // is a direntry
     vinode->type = H_DIR;
     return -1;
@@ -128,7 +128,7 @@ int hostfs_update_vinode(struct inode *vinode) {
   struct stat stat;
   spike_file_stat(f, &stat);
 
-  vinode->inum = stat.st_ino;
+  vinode->i_ino = stat.st_ino;
   vinode->size = stat.st_size;
   vinode->nlinks = stat.st_nlink;
   vinode->blocks = stat.st_blocks;
@@ -151,7 +151,7 @@ int hostfs_update_vinode(struct inode *vinode) {
 //
 ssize_t hostfs_read(struct inode *f_inode, char *r_buf, ssize_t len,
                     int *offset) {
-  spike_file_t *pf = (spike_file_t *)f_inode->i_fs_info;
+  spike_file_t *pf = (spike_file_t *)f_inode->i_private;
   if (pf < 0) {
     sprint("hostfs_read: invalid file handle!\n");
     return -1;
@@ -167,7 +167,7 @@ ssize_t hostfs_read(struct inode *f_inode, char *r_buf, ssize_t len,
 //
 ssize_t hostfs_write(struct inode *f_inode, const char *w_buf, ssize_t len,
                      int *offset) {
-  spike_file_t *pf = (spike_file_t *)f_inode->i_fs_info;
+  spike_file_t *pf = (spike_file_t *)f_inode->i_private;
   if (pf < 0) {
     sprint("hostfs_write: invalid file handle!\n");
     return -1;
@@ -189,10 +189,9 @@ struct inode *hostfs_lookup(struct inode *parent, struct dentry *sub_dentry) {
   spike_file_t *f = spike_file_open(path, O_RDWR, 0);
 
   struct inode *child_inode = hostfs_alloc_vinode(parent->sb);
-  child_inode->i_fs_info = f;
+  child_inode->i_private = f;
   hostfs_update_vinode(child_inode);
-
-  child_inode->ref = 0;
+	atomic_set(&(child_inode->i_count), 0);
   return child_inode;
 }
 
@@ -210,11 +209,10 @@ struct inode *hostfs_create(struct inode *parent, struct dentry *sub_dentry) {
   }
 
   struct inode *new_inode = hostfs_alloc_vinode(parent->sb);
-  new_inode->i_fs_info = f;
+  new_inode->i_private = f;
 
   if (hostfs_update_vinode(new_inode) != 0) return NULL;
-
-  new_inode->ref = 0;
+	atomic_set(&(new_inode->i_count), 0);
   return new_inode;
 }
 
@@ -223,7 +221,7 @@ struct inode *hostfs_create(struct inode *parent, struct dentry *sub_dentry) {
 //
 int hostfs_lseek(struct inode *f_inode, ssize_t new_offset, int whence,
                   int *offset) {
-  spike_file_t *f = (spike_file_t *)f_inode->i_fs_info;
+  spike_file_t *f = (spike_file_t *)f_inode->i_private;
   if (f < 0) {
     sprint("hostfs_lseek: invalid file handle!\n");
     return -1;
@@ -261,7 +259,7 @@ struct inode *hostfs_mkdir(struct inode *parent, struct dentry *sub_dentry) {
 // open a hostfs file (after having its vfs inode).
 //
 int hostfs_hook_open(struct inode *f_inode, struct dentry *f_dentry) {
-  if (f_inode->i_fs_info != NULL) return 0;
+  if (f_inode->i_private != NULL) return 0;
 
   char path[MAX_PATH_LEN];
   get_path_string(path, f_dentry);
@@ -271,7 +269,7 @@ int hostfs_hook_open(struct inode *f_inode, struct dentry *f_dentry) {
     return -1;
   }
 
-  f_inode->i_fs_info = f;
+  f_inode->i_private = f;
   return 0;
 }
 
@@ -279,7 +277,7 @@ int hostfs_hook_open(struct inode *f_inode, struct dentry *f_dentry) {
 // close a hostfs file.
 //
 int hostfs_hook_close(struct inode *f_inode, struct dentry *dentry) {
-  spike_file_t *f = (spike_file_t *)f_inode->i_fs_info;
+  spike_file_t *f = (spike_file_t *)f_inode->i_private;
   spike_file_close(f);
   return 0;
 }

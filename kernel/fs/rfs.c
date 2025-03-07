@@ -19,7 +19,7 @@
 #include <kernel/vfs.h>
 #include <util/string.h>
 /**** vinode inteface ****/
-const struct inode_ops rfs_i_ops = {
+const struct inode_operations rfs_i_ops = {
     .viop_read = rfs_read,
     .viop_write = rfs_write,
     .viop_create = rfs_create,
@@ -256,7 +256,7 @@ int rfs_add_direntry(struct inode *dir, const char *name, int inum) {
 //
 struct inode *rfs_alloc_vinode(struct super_block *sb) {
   struct inode *vinode = default_alloc_vinode(sb);
-  vinode->i_ops = &rfs_i_ops;
+  vinode->i_op = &rfs_i_ops;
   return vinode;
 }
 
@@ -275,7 +275,7 @@ int rfs_write_back_vinode(struct inode *vinode) {
   }
 
   struct rfs_device *rdev = rfs_device_list[vinode->sb->s_dev->dev_id];
-  if (rfs_write_dinode(rdev, &dinode, vinode->inum) != 0) {
+  if (rfs_write_dinode(rdev, &dinode, vinode->i_ino) != 0) {
     sprint("rfs_free_write_back_inode: failed to write back disk inode!\n");
     return -1;
   }
@@ -288,7 +288,7 @@ int rfs_write_back_vinode(struct inode *vinode) {
 //
 int rfs_update_vinode(struct inode *vinode) {
   struct rfs_device *rdev = rfs_device_list[vinode->sb->s_dev->dev_id];
-  struct rfs_dinode *dinode = rfs_read_dinode(rdev, vinode->inum);
+  struct rfs_dinode *dinode = rfs_read_dinode(rdev, vinode->i_ino);
   if (dinode == NULL) {
     sprint("rfs_update_vinode: failed to read disk inode!\n");
     return -1;
@@ -458,7 +458,7 @@ struct inode *rfs_lookup(struct inode *parent, struct dentry *sub_dentry) {
     }
     if (strcmp(p_direntry->name, sub_dentry->name) == 0) {  // found
       child_vinode = rfs_alloc_vinode(parent->sb);
-      child_vinode->inum = p_direntry->inum;
+      child_vinode->i_ino = p_direntry->inum;
       if (rfs_update_vinode(child_vinode) != 0)
         panic("rfs_lookup: read inode failed!");
       break;
@@ -497,7 +497,7 @@ struct inode *rfs_create(struct inode *parent, struct dentry *sub_dentry) {
 
   // ** build vfs inode according to dinode
   struct inode *new_vinode = rfs_alloc_vinode(parent->sb);
-  new_vinode->inum = free_inum;
+  new_vinode->i_ino = free_inum;
   rfs_update_vinode(new_vinode);
 
   // ** append the new file as a direntry to its parent dir
@@ -548,14 +548,14 @@ int rfs_lseek(struct inode *f_inode, ssize_t new_offset, int whence, int *offset
 int rfs_disk_stat(struct inode *vinode, struct istat *istat) {
 	sprint("rfs_disk_stat\n");
   struct rfs_device *rdev = rfs_device_list[vinode->sb->s_dev->dev_id];
-  struct rfs_dinode *dinode = rfs_read_dinode(rdev, vinode->inum);
+  struct rfs_dinode *dinode = rfs_read_dinode(rdev, vinode->i_ino);
   if (dinode == NULL) {
     sprint("rfs_disk_stat: read dinode failed!\n");
     return -1;
   }
 
   istat->st_inum = 1;
-  istat->st_inum = vinode->inum;  // get inode number from vinode
+  istat->st_inum = vinode->i_ino;  // get inode number from vinode
 
   istat->st_size = dinode->size;
   istat->st_type = dinode->type;
@@ -591,7 +591,7 @@ int rfs_link(struct inode *parent, struct dentry *sub_dentry, struct inode *link
 	sub_dentry->dentry_inode->nlinks++;
 	rfs_write_back_vinode(sub_dentry->dentry_inode);
 	
-	if((result = rfs_add_direntry(parent,sub_dentry->name,sub_dentry->dentry_inode->inum ) ) != 0){
+	if((result = rfs_add_direntry(parent,sub_dentry->name,sub_dentry->dentry_inode->i_ino ) ) != 0){
 		sprint("rfs_link: rfs_add_direntry failed");
 		return -1;
 	}
@@ -746,7 +746,7 @@ int rfs_hook_opendir(struct inode *dir_vinode, struct dentry *dentry) {
   dir_cache->block_count = dir_vinode->blocks;
   dir_cache->dir_base_addr = (struct rfs_direntry *)pdire;
 
-  dir_vinode->i_fs_info = dir_cache;
+  dir_vinode->i_private = dir_cache;
 
   return 0;
 }
@@ -757,7 +757,7 @@ int rfs_hook_opendir(struct inode *dir_vinode, struct dentry *dentry) {
 //
 int rfs_hook_closedir(struct inode *dir_vinode, struct dentry *dentry) {
   struct rfs_dir_cache *dir_cache =
-      (struct rfs_dir_cache *)dir_vinode->i_fs_info;
+      (struct rfs_dir_cache *)dir_vinode->i_private;
 
   // reclaim the dir cache
   for (int i = 0; i < dir_cache->block_count; ++i) {
@@ -784,7 +784,7 @@ int rfs_readdir(struct inode *dir_vinode, struct dir *dir, int *offset) {
 
   // reads a directory entry from the directory cache stored in vfs inode.
   struct rfs_dir_cache *dir_cache =
-      (struct rfs_dir_cache *)dir_vinode->i_fs_info;
+      (struct rfs_dir_cache *)dir_vinode->i_private;
   struct rfs_direntry *p_direntry = dir_cache->dir_base_addr + direntry_index;
 	// 这里没有考虑rfs_direntry不整齐，以及dir_cache大于一个页的情况。
 
@@ -838,7 +838,7 @@ struct inode *rfs_mkdir(struct inode *parent, struct dentry *sub_dentry) {
 
   // ** allocate a new vinode
   struct inode *sub_vinode = rfs_alloc_vinode(parent->sb);
-  sub_vinode->inum = free_inum;
+  sub_vinode->i_ino = free_inum;
   rfs_update_vinode(sub_vinode);
 
   return sub_vinode;
@@ -868,7 +868,7 @@ struct super_block *rfs_get_superblock(struct device *dev) {
 
   // build root dentry and root inode
   struct inode *root_inode = rfs_alloc_vinode(sb);
-  root_inode->inum = 0;
+  root_inode->i_ino = 0;
   rfs_update_vinode(root_inode);
 
   struct dentry *root_dentry = alloc_vfs_dentry("/", root_inode, NULL);
