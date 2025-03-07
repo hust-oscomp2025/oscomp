@@ -9,6 +9,7 @@
  #define _ASM_RISCV_ATOMIC_H
  
  #include <stdint.h>
+ #include <stdatomic.h>
  
  /* 
 	* Memory barrier definitions 
@@ -503,5 +504,31 @@
  /* Atomic operations to memory barriers */
  #define smp_mb__before_atomic()         mb()
  #define smp_mb__after_atomic()          mb()
+
+
+ // 读取 `sstatus`
+static inline uint64_t read_sstatus() {
+	uint64_t value;
+	asm volatile("csrr %0, sstatus" : "=r"(value));
+	return value;
+}
+
+// 写入 `sstatus`
+static inline void write_sstatus(uint64_t value) {
+	asm volatile("csrw sstatus, %0" :: "r"(value));
+}
+
+// 禁用 S-mode 中断（清除 SIE 位）
+static inline uint64_t disable_irqsave() {
+	uint64_t sstatus = read_sstatus();
+	write_sstatus(sstatus & ~0x2); // 清除 SIE (bit 1)
+	return sstatus;
+}
+
+// 恢复 S-mode 中断
+static inline void enable_irqrestore(uint64_t flags) {
+	write_sstatus(flags);
+}
+
  
  #endif /* _ASM_RISCV_ATOMIC_H */

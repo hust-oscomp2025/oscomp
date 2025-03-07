@@ -2,7 +2,8 @@
 #define _FILE_H
 #include <kernel/types.h>
 #include <kernel/vfs.h>
-#include <spike_interface/atomic.h>
+#include <kernel/atomic.h>
+#include <kernel/spinlock.h>
 
 typedef struct dentry dentry_t;
 typedef struct inode inode_t;

@@ -28,8 +28,8 @@ struct inode {
   uint64 i_ino;                  // inode number of the disk inode
   atomic_t i_count;                   // reference count
   loff_t i_size;                  // size of the file (in bytes)
-  int i_nlink;                // number of hard links to this file
-	//struct address_space	*i_mapping;
+  uint32 i_nlink;                // number of hard links to this file
+	struct address_space	*i_mapping;
 
   int blocks;                // number of blocks
   int addrs[DIRECT_BLKNUM];  // direct blocks
@@ -109,17 +109,6 @@ struct inode_operations {
 #define viop_readdir(dir_vinode, dir, offset)  (dir_vinode->i_op->viop_readdir(dir_vinode, dir, offset))
 #define viop_mkdir(dir, sub_dentry)            (dir->i_op->viop_mkdir(dir, sub_dentry))
 #define viop_write_back_vinode(node)           (node->i_op->viop_write_back_vinode(node))
-
-
-
-
-
-
-
-
-
-
-
 
 
 #endif

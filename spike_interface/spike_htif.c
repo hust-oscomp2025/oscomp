@@ -11,8 +11,8 @@
  */
 
 #include <sys/types.h>
+#include <kernel/spinlock.h>
 #include "spike_htif.h"
-#include "atomic.h"
 #include "spike_interface/spike_utils.h"
 #include "dts_parse.h"
 #include <util/string.h>

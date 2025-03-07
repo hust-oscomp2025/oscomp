@@ -148,7 +148,7 @@ void kern_vm_init(void) {
   // map virtual address [KERN_BASE, _etext] to physical address [DRAM_BASE,
   // DRAM_BASE+(_etext - KERN_BASE)], to maintin (direct) text section kernel
   // address mapping.
-  kern_vm_map(t_page_dir, KERN_BASE, DRAM_BASE, (uint64)_etext - KERN_BASE,
+  kern_vm_map(t_page_dir, KERN_BASE, KERN_BASE, (uint64)_etext - KERN_BASE,
               prot_to_type(PROT_READ | PROT_EXEC, 0));
 
   sprint("KERN_BASE 0x%lx\n", lookup_pa(t_page_dir, KERN_BASE));

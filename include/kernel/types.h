@@ -15,9 +15,9 @@ typedef signed short int16;
 typedef signed int int32;
 typedef signed long long int64;
 
-#define __user
 
-   
+// 用来标记用户的虚拟内存地址
+#define __user
 
 #define MOUNT_DEFAULT 0
 #define MOUNT_AS_ROOT 1

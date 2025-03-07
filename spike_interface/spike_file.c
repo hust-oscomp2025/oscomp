@@ -8,7 +8,8 @@
  */
 
 #include "spike_file.h"
-#include "atomic.h"
+#include <kernel/atomic.h>
+#include <kernel/spinlock.h>
 #include "spike_htif.h"
 #include "spike_interface/spike_utils.h"
 #include <util/string.h>
