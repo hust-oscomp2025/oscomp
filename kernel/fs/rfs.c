@@ -19,7 +19,7 @@
 #include <kernel/vfs.h>
 #include <util/string.h>
 /**** vinode inteface ****/
-const struct vinode_ops rfs_i_ops = {
+const struct inode_ops rfs_i_ops = {
     .viop_read = rfs_read,
     .viop_write = rfs_write,
     .viop_create = rfs_create,

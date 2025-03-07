@@ -36,6 +36,6 @@ int hostfs_readdir(struct inode *dir_vinode, struct dir *dir, int *offset);
 struct inode *hostfs_mkdir(struct inode *parent, struct dentry *sub_dentry);
 struct super_block *hostfs_get_superblock(struct device *dev);
 
-extern const struct vinode_ops hostfs_node_ops;
+extern const struct inode_ops hostfs_node_ops;
 
 #endif

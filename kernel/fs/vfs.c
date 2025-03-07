@@ -51,8 +51,8 @@ int vfs_init() {
                              dentry_hash_func, NULL, NULL, NULL)) != 0)
     return ret;
 
-  if ((ret = hash_table_init(&vinode_hash_table, vinode_hash_equal,
-                             vinode_hash_func, NULL, NULL, NULL)) != 0)
+  if ((ret = hash_table_init(&vinode_hash_table, inode_hash_equal,
+                             inode_hash_func, NULL, NULL, NULL)) != 0)
     return ret;
 
   return 0;
@@ -91,7 +91,7 @@ struct super_block *vfs_mount(const char *dev_name, int mnt_type) {
   struct super_block *sb = fs_type->get_superblock(p_device);
 
   // add the root vinode into vinode_hash_table
-  hash_put_vinode(sb->s_root->dentry_inode);
+  hash_put_inode(sb->s_root->dentry_inode);
 
   int err = 1;
   for (int i = 0; i < MAX_MOUNTS; ++i) {
@@ -171,7 +171,7 @@ struct file *vfs_open(const char *path, int flags) {
       file_dentry->dentry_inode = new_inode;
       new_inode->ref++;
       hash_put_dentry(file_dentry);
-      hash_put_vinode(new_inode);
+      hash_put_inode(new_inode);
     } else {
       sprint("vfs_open: cannot find the file!\n");
       return NULL;
@@ -384,7 +384,7 @@ int vfs_unlink(const char *path) {
     assert(unlinked_vinode->ref == 0);
 
     // we don't write back the inode, because it has disappeared from the disk
-    hash_erase_vinode(unlinked_vinode);
+    hash_erase_inode(unlinked_vinode);
     free_page(unlinked_vinode); // free the vinode
   }
 
@@ -423,7 +423,7 @@ int vfs_close(struct file *file) {
       // write back the inode and free it
       if (viop_write_back_vinode(inode) != 0)
         panic("vfs_close: free inode failed!\n");
-      hash_erase_vinode(inode);
+      hash_erase_inode(inode);
       free_page(inode);
     }
   }
@@ -510,7 +510,7 @@ int vfs_mkdir(const char *path) {
   new_dentry->dentry_inode = new_dir_inode;
   new_dir_inode->ref++;
   hash_put_dentry(new_dentry);
-  hash_put_vinode(new_dir_inode);
+  hash_put_inode(new_dir_inode);
   return 0;
 }
 
@@ -611,7 +611,7 @@ struct dentry *lookup_final_dentry(const char *path, struct dentry **parent,
       }
 
       struct inode *same_inode =
-          hash_get_vinode(found_vinode->sb, found_vinode->inum);
+          hash_get_inode(found_vinode->sb, found_vinode->inum);
       if (same_inode != NULL) {
         // the vinode is already in the hash table (i.e. we are opening another
         // hard link)
@@ -622,7 +622,7 @@ struct dentry *lookup_final_dentry(const char *path, struct dentry **parent,
         // the vinode is not in the hash table
         this->dentry_inode = found_vinode;
         found_vinode->ref++;
-        hash_put_vinode(found_vinode);
+        hash_put_inode(found_vinode);
       }
 
       hash_put_dentry(this);
@@ -770,9 +770,9 @@ int hash_erase_dentry(struct dentry *dentry) {
 }
 
 // vinode generic hash table method implementation
-int vinode_hash_equal(void *key1, void *key2) {
-  struct vinode_key *vinode_key1 = key1;
-  struct vinode_key *vinode_key2 = key2;
+int inode_hash_equal(void *key1, void *key2) {
+  struct inode_key *vinode_key1 = key1;
+  struct inode_key *vinode_key2 = key2;
   if (vinode_key1->inum == vinode_key2->inum &&
       vinode_key1->sb == vinode_key2->sb) {
     return 1;
@@ -780,24 +780,24 @@ int vinode_hash_equal(void *key1, void *key2) {
   return 0;
 }
 
-size_t vinode_hash_func(void *key) {
-  struct vinode_key *vinode_key = key;
+size_t inode_hash_func(void *key) {
+  struct inode_key *vinode_key = key;
   return vinode_key->inum % HASH_TABLE_SIZE;
 }
 
 // vinode hash table interface
-struct inode *hash_get_vinode(struct super_block *sb, int inum) {
+struct inode *hash_get_inode(struct super_block *sb, int inum) {
   if (inum < 0)
     return NULL;
-  struct vinode_key key = {.sb = sb, .inum = inum};
+  struct inode_key key = {.sb = sb, .inum = inum};
   return (struct inode *)vinode_hash_table.virtual_hash_get(&vinode_hash_table,
                                                              &key);
 }
 
-int hash_put_vinode(struct inode *vinode) {
+int hash_put_inode(struct inode *vinode) {
   if (vinode->inum < 0)
     return -1;
-  struct vinode_key *key = alloc_page();
+  struct inode_key *key = alloc_page();
   key->sb = vinode->sb;
   key->inum = vinode->inum;
 
@@ -807,10 +807,10 @@ int hash_put_vinode(struct inode *vinode) {
   return ret;
 }
 
-int hash_erase_vinode(struct inode *vinode) {
+int hash_erase_inode(struct inode *vinode) {
   if (vinode->inum < 0)
     return -1;
-  struct vinode_key key = {.sb = vinode->sb, .inum = vinode->inum};
+  struct inode_key key = {.sb = vinode->sb, .inum = vinode->inum};
   return vinode_hash_table.virtual_hash_erase(&vinode_hash_table, &key);
 }
 

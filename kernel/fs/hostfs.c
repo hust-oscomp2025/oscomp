@@ -11,7 +11,7 @@
 #include <kernel/vfs.h>
 
 /**** host-fs vinode interface ****/
-const struct vinode_ops hostfs_i_ops = {
+const struct inode_ops hostfs_i_ops = {
     .viop_read = hostfs_read,
     .viop_write = hostfs_write,
     .viop_create = hostfs_create,

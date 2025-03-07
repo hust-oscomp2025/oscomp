@@ -89,6 +89,6 @@ struct inode *rfs_mkdir(struct inode *parent, struct dentry *sub_dentry);
 
 struct super_block *rfs_get_superblock(struct device *dev);
 
-extern const struct vinode_ops rfs_i_ops;
+extern const struct inode_ops rfs_i_ops;
 
 #endif
