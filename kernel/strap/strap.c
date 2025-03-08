@@ -3,12 +3,12 @@
  */
 
 #include <kernel/strap.h>
-#include <kernel/mmap.h>
+#include <kernel/mm/mmap.h>
 
-#include <kernel/memlayout.h>
+#include <kernel/mm/memlayout.h>
 
-#include <kernel/page.h>
-#include <kernel/mm_struct.h>
+#include <kernel/mm/page.h>
+#include <kernel/mm/mm_struct.h>
 #include <kernel/process.h>
 #include <kernel/riscv.h>
 #include <kernel/sched.h>

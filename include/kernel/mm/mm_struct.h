@@ -2,12 +2,12 @@
 #define _USER_MEM_H
 
 #include <kernel/types.h>
-#include <kernel/page.h>
-#include <kernel/pagetable.h>
+#include <kernel/mm/page.h>
+#include <kernel/mm/pagetable.h>
 #include <kernel/process.h>
 #include <kernel/riscv.h>
-#include <kernel/list.h>
-#include <kernel/spinlock.h>
+#include <util/list.h>
+#include <util/spinlock.h>
 
 /**
  * 虚拟内存区域类型

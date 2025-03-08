@@ -1,10 +1,10 @@
 #ifndef INODE_H
 #define INODE_H
 
-#include <kernel/vfs.h>
+#include <kernel/fs/vfs.h>
 #include <kernel/types.h>
-#include <kernel/super_block.h>
-#include <kernel/atomic.h>
+#include <kernel/fs/super_block.h>
+#include <util/atomic.h>
 
 #define DIRECT_BLKNUM 10          // the number of direct blocks
 

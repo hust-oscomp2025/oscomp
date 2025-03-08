@@ -10,14 +10,14 @@
  *
  * The disk layout of rfs is similar to the fs in xv6.
  */
-#include <kernel/kmalloc.h>
-#include <kernel/page.h>
-#include <kernel/rfs.h>
+#include <kernel/mm/kmalloc.h>
+#include <kernel/mm/page.h>
+#include <kernel/fs/rfs.h>
 
-#include <kernel/ramdev.h>
+#include <kernel/fs/ramdev.h>
 #include <spike_interface/spike_utils.h>
 // #include <util/string.h>
-#include <kernel/vfs.h>
+#include <kernel/fs/vfs.h>
 #include <util/string.h>
 /**** vinode inteface ****/
 const struct inode_operations rfs_i_ops = {

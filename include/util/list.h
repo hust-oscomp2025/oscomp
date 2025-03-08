@@ -8,7 +8,7 @@
 #ifndef _KERNEL_LIST_H
 #define _KERNEL_LIST_H
 
-#include <kernel/atomic.h> // for memory barriers
+#include <util/atomic.h> // for memory barriers
 #include <kernel/types.h>
 
 /*

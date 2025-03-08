@@ -4,9 +4,8 @@
 
 #ifndef _RISCV_SPINLOCK_H_
 #define _RISCV_SPINLOCK_H_
-#include <stdatomic.h>
 #include <stdint.h>
-#include <kernel/atomic.h>
+#include <util/atomic.h>
 
 
 
@@ -19,10 +18,6 @@ typedef struct {
 static inline void spinlock_init(spinlock_t* lock) {
 	atomic_flag_clear(&lock->lock);
 }
-
-
-
-
 
 static inline int spinlock_trylock(spinlock_t* lock) {
     return atomic_flag_test_and_set(&lock->lock) == 0;  // 成功返回 1

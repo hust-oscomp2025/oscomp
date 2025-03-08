@@ -1,5 +1,5 @@
-#include <kernel/file.h>
-#include <kernel/kmalloc.h>
+#include <kernel/fs/file.h>
+#include <kernel/mm/kmalloc.h>
 
 
 //

@@ -3,7 +3,7 @@
 
 #include "spike_interface/spike_file.h"
 #include <kernel/types.h>
-#include <kernel/vfs.h>
+#include <kernel/fs/vfs.h>
 
 //
 // file operations

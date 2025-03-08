@@ -10,9 +10,9 @@
  #define _SLAB_H
  
  #include <kernel/types.h>
- #include <kernel/page.h>
- #include <kernel/spinlock.h>
- #include <kernel/list.h>
+ #include <kernel/mm/page.h>
+ #include <util/spinlock.h>
+ #include <util/list.h>
  
  // Slab cache sizes available
  #define SLAB_SIZES_COUNT 10

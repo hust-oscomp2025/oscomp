@@ -1,14 +1,14 @@
 /*
  * Interface functions between VFS and host-fs. added @lab4_1.
  */
-#include <kernel/hostfs.h>
-#include <kernel/kmalloc.h>
+#include <kernel/fs/hostfs.h>
+#include <kernel/mm/kmalloc.h>
 
 #include "spike_interface/spike_file.h"
 #include <spike_interface/spike_utils.h>
 #include <util/string.h>
 #include <kernel/types.h>
-#include <kernel/vfs.h>
+#include <kernel/fs/vfs.h>
 
 /**** host-fs vinode interface ****/
 const struct inode_operations hostfs_i_ops = {

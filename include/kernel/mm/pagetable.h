@@ -9,11 +9,11 @@
 #ifndef _PAGETABLE_H
 #define _PAGETABLE_H
 
-#include <kernel/atomic.h>
+#include <util/atomic.h>
 #include <kernel/riscv.h>
-#include <kernel/spinlock.h>
+#include <util/spinlock.h>
 #include <kernel/types.h>
-#include <kernel/page.h>
+#include <kernel/mm/page.h>
 
 /**
  * @brief 页表管理数据结构

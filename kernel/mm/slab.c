@@ -6,11 +6,11 @@
  * Used by kmalloc for allocations up to 4KB in size.
  */
 
- #include <kernel/slab.h>
- #include <kernel/page.h>
- #include <kernel/atomic.h>
- #include <kernel/spinlock.h>
- #include <kernel/list.h>
+ #include <kernel/mm/slab.h>
+ #include <kernel/mm/page.h>
+ #include <util/atomic.h>
+ #include <util/spinlock.h>
+ #include <util/list.h>
  #include <util/string.h>
  #include <spike_interface/spike_utils.h>
  

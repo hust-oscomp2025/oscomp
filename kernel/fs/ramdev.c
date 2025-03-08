@@ -2,14 +2,14 @@
  * Utility functions operating the devices. support only RAM disk device. added @lab4_1.
  */
 
-#include <kernel/ramdev.h>
-#include <kernel/vfs.h>
-#include <kernel/kmalloc.h>
+#include <kernel/fs/ramdev.h>
+#include <kernel/fs/vfs.h>
+#include <kernel/mm/kmalloc.h>
 #include <kernel/riscv.h>
 #include <kernel/types.h>
 #include <util/string.h>
 #include <spike_interface/spike_utils.h>
-#include <kernel/rfs.h>
+#include <kernel/fs/rfs.h>
 
 struct rfs_device *rfs_device_list[MAX_RAMDISK_COUNT];
 

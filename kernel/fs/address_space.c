@@ -1,9 +1,9 @@
-#include <kernel/address_space.h>
-#include <kernel/kmalloc.h>
-#include <kernel/memlayout.h>
+#include <kernel/fs/address_space.h>
+#include <kernel/mm/kmalloc.h>
+#include <kernel/mm/memlayout.h>
 
-#include <kernel/spinlock.h>
-#include <kernel/atomic.h>
+#include <util/spinlock.h>
+#include <util/atomic.h>
 #include <kernel/types.h>
 #include <string.h>
 

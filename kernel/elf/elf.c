@@ -9,10 +9,10 @@
 #include <kernel/proc_file.h>
 #include <kernel/process.h>
 #include <kernel/riscv.h>
-#include <kernel/mm_struct.h>
-#include <kernel/vfs.h>
-#include <kernel/kmalloc.h>
-#include <kernel/mmap.h>
+#include <kernel/mm/mm_struct.h>
+#include <kernel/fs/vfs.h>
+#include <kernel/mm/kmalloc.h>
+#include <kernel/mm/mmap.h>
 
 
 #include <util/string.h>

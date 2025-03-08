@@ -3,10 +3,10 @@
  * @brief RISC-V SV39 页表管理模块的实现
  */
 
-#include <kernel/page.h>
-#include <kernel/pagetable.h>
+#include <kernel/mm/page.h>
+#include <kernel/mm/pagetable.h>
 
-#include <kernel/spinlock.h>
+#include <util/spinlock.h>
 
 #include <util/string.h>
 

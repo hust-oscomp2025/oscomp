@@ -1,11 +1,11 @@
 #ifndef _LINUX_MM_H
 #define _LINUX_MM_H
 
-#include <kernel/pagetable.h>
+#include <kernel/mm/pagetable.h>
 #include <kernel/riscv.h>
 #include <kernel/types.h>
 #include <kernel/process.h>
-#include <kernel/page.h>
+#include <kernel/mm/page.h>
 
 /* 页标志位定义 */
 #define VM_READ       (1UL << 0)  /* 可读 */

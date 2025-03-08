@@ -4,8 +4,8 @@
  * codes are borrowed from riscv-pk (https://github.com/riscv/riscv-pk)
  */
 
-#include <kernel/atomic.h>
-#include <kernel/spinlock.h>
+#include <util/atomic.h>
+#include <util/spinlock.h>
 #include <spike_interface/spike_htif.h>
 #include <kernel/types.h>
 #include <util/snprintf.h>

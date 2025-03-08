@@ -1,9 +1,12 @@
-#include <kernel/mmap.h>
-#include <kernel/mm_struct.h>
-#include <kernel/pagetable.h>
+
+
+#include <kernel/mm/page.h>
+#include <kernel/mm/kmalloc.h>
+#include <kernel/mm/mmap.h>
+#include <kernel/mm/mm_struct.h>
+#include <kernel/mm/pagetable.h>
+
 #include <kernel/process.h>
-#include <kernel/page.h>
-#include <kernel/kmalloc.h>
 #include <util/string.h>
 
 /**

@@ -16,12 +16,12 @@
 
 #include <kernel/syscall.h>
 #include <kernel/types.h>
-#include <kernel/mm_struct.h>
+#include <kernel/mm/mm_struct.h>
 
 #include <util/string.h>
 
 #include <kernel/semaphore.h>
-#include <kernel/sync_utils.h>
+#include <util/sync_utils.h>
 
 // //
 // // implement the SYS_user_print syscall

@@ -3,7 +3,7 @@
  */
 
 #include <kernel/proc_file.h>
-#include <kernel/kmalloc.h>
+#include <kernel/mm/kmalloc.h>
 #include <kernel/process.h>
 #include <kernel/riscv.h>
 #include "spike_interface/spike_file.h"

@@ -7,12 +7,12 @@
  * allocations.
  */
 
- #include <kernel/kmalloc.h>
- #include <kernel/list.h>
- #include <kernel/slab.h>
- #include <kernel/page.h>
- #include <kernel/atomic.h>
- #include <kernel/spinlock.h>
+ #include <kernel/mm/kmalloc.h>
+ #include <util/list.h>
+ #include <kernel/mm/slab.h>
+ #include <kernel/mm/page.h>
+ #include <util/atomic.h>
+ #include <util/spinlock.h>
  #include <util/string.h>
  #include <spike_interface/spike_utils.h>
  

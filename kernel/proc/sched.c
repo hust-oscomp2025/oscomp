@@ -3,7 +3,7 @@
  */
 
 #include <kernel/sched.h>
-#include <kernel/kmalloc.h>
+#include <kernel/mm/kmalloc.h>
 #include <spike_interface/spike_utils.h>
 
 

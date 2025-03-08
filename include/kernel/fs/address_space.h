@@ -2,12 +2,12 @@
 #define _ADDRESS_SPACE_H
 
 #include <kernel/types.h>
-#include <kernel/atomic.h>
-#include <kernel/spinlock.h>
+#include <util/atomic.h>
+#include <util/spinlock.h>
 
 #include <kernel/riscv.h>
-#include <kernel/list.h>
-#include <kernel/page.h>
+#include <util/list.h>
+#include <kernel/mm/page.h>
 
 // 前向声明，避免循环引用
 struct inode;

@@ -1,10 +1,10 @@
-#include <kernel/page.h>
-#include <kernel/atomic.h>
-#include <kernel/spinlock.h>
-#include <kernel/list.h>
+#include <kernel/mm/page.h>
+#include <util/atomic.h>
+#include <util/spinlock.h>
+#include <util/list.h>
 #include <util/string.h>
 #include <spike_interface/spike_utils.h>
-#include <kernel/sync_utils.h>
+#include <util/sync_utils.h>
 
 // 页结构数组，用于跟踪所有物理页
 static struct page *page_map = NULL;

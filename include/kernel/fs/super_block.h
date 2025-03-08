@@ -1,6 +1,6 @@
 #ifndef SUPER_BLOCK_H
 #define SUPER_BLOCK_H
-#include <kernel/vfs.h>
+#include <kernel/fs/vfs.h>
 #include <kernel/types.h>
 
 // general-purpose super_block structure

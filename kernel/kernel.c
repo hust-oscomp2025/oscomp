@@ -7,13 +7,13 @@
 #include <kernel/process.h>
 
 #include <kernel/sched.h>
-#include <kernel/memlayout.h>
+#include <kernel/mm/memlayout.h>
 #include <kernel/types.h>
-#include <kernel/vfs.h>
-#include <kernel/rfs.h>
-#include <kernel/ramdev.h>
-#include <kernel/pagetable.h>
-#include <kernel/kmalloc.h>
+#include <kernel/fs/vfs.h>
+#include <kernel/fs/rfs.h>
+#include <kernel/fs/ramdev.h>
+#include <kernel/mm/pagetable.h>
+#include <kernel/mm/kmalloc.h>
 
 #include <util/string.h>
 

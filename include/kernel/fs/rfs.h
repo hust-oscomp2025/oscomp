@@ -1,10 +1,10 @@
 #ifndef _RFS_H_
 #define _RFS_H_
 
-#include <kernel/ramdev.h>
+#include <kernel/fs/ramdev.h>
 #include <kernel/riscv.h>
 #include <kernel/types.h>
-#include <kernel/vfs.h>
+#include <kernel/fs/vfs.h>
 
 #define RFS_TYPE 0
 #define RFS_MAGIC 0xBEAF

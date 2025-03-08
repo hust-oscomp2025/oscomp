@@ -2,13 +2,13 @@
  * VFS (Virtual File System) interface utilities. added @lab4_1.
  */
 
-#include <kernel/vfs.h>
-#include <kernel/kmalloc.h>
-#include <kernel/page.h>
-#include <kernel/hostfs.h>
-#include <kernel/rfs.h>
+#include <kernel/fs/vfs.h>
+#include <kernel/mm/kmalloc.h>
+#include <kernel/mm/page.h>
+#include <kernel/fs/hostfs.h>
+#include <kernel/fs/rfs.h>
 #include <kernel/types.h>
-#include <kernel/inode.h>
+#include <kernel/fs/inode.h>
 
 #include <util/hash_table.h>
 #include <util/string.h>

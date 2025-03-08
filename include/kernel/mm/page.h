@@ -2,9 +2,9 @@
 #define _PAGE_H
 
 #include <kernel/types.h>
-#include <kernel/list.h>
-#include <kernel/atomic.h>
-#include <kernel/spinlock.h>
+#include <util/list.h>
+#include <util/atomic.h>
+#include <util/spinlock.h>
 #include <kernel/riscv.h>
 
 // Forward declarations
