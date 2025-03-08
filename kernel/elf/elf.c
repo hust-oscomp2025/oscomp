@@ -14,6 +14,7 @@
 #include <kernel/vmm.h>
 #include <util/string.h>
 #include <spike_interface/spike_utils.h>
+#include <kernel/mmap.h>
 
 /**
  * ELF加载器的上下文信息
@@ -168,7 +169,7 @@ static int load_segment(elf_context *ctx, elf_prog_header *ph) {
   // 为段分配物理内存并映射
   for (uint64 i = 0; i < num_pages; i++) {
     uint64 vaddr = ph->vaddr + i * PGSIZE;
-    void *page = user_alloc_page(proc, vaddr, prot);
+    void *page = mm_alloc_page(proc, vaddr, prot);
     if (!page) {
       sprint("Failed to allocate page for segment\n");
       return -1;

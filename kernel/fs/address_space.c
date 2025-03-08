@@ -190,7 +190,7 @@ struct address_space *address_space_create(struct inode *host,
     mapping->host = host;
     mapping->a_ops = a_ops;
     atomic_set(&mapping->i_mmap_writable, 0);
-		atomic_flag_clear(&mapping->tree_lock);
+		spinlock_init(&mapping->tree_lock);
     mapping->page_tree = NULL;
     mapping->nrpages = 0;
     

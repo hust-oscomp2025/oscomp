@@ -76,7 +76,7 @@ void kern_vm_init(void) {
   // map virtual address [KERN_BASE, _etext] to physical address [DRAM_BASE,
   // DRAM_BASE+(_etext - KERN_BASE)], to maintin (direct) text section kernel
   // address mapping.
-  pagetable_map(t_page_dir, KERN_BASE, KERN_BASE, (uint64)_etext - KERN_BASE,
+  pgt_map(t_page_dir, KERN_BASE, KERN_BASE, (uint64)_etext - KERN_BASE,
               prot_to_type(PROT_READ | PROT_EXEC, 0));
 
   //sprint("KERN_BASE 0x%lx\n", lookup_pa(t_page_dir, KERN_BASE));
@@ -84,7 +84,7 @@ void kern_vm_init(void) {
   // also (direct) map remaining address space, to make them accessable from
   // kernel. this is important when kernel needs to access the memory content of
   // user's app without copying pages between kernel and user spaces.
-  pagetable_map(t_page_dir, (uint64)_etext, (uint64)_etext,
+  pgt_map(t_page_dir, (uint64)_etext, (uint64)_etext,
               PHYS_TOP - (uint64)_etext,
               prot_to_type(PROT_READ | PROT_WRITE, 0));
 

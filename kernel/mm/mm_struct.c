@@ -2,6 +2,7 @@
 #include <kernel/memlayout.h>
 #include <kernel/mm_struct.h>
 #include <kernel/page.h>
+#include <kernel/mmap.h>
 #include <kernel/pmm.h>
 #include <kernel/process.h>
 #include <kernel/vmm.h>
@@ -16,24 +17,6 @@ void user_mem_init(void) {
   sprint("User memory management subsystem initialized\n");
 }
 
-/**
- * 将用户虚拟地址转换为物理地址
- *
- * @param mm 内存管理结构体
- * @param user_va 用户空间虚拟地址
- * @return 物理地址，失败返回NULL
- */
-void *user_va_to_pa(struct mm_struct *mm, uaddr user_va) {
-  if (!mm || !mm->pagetable){
-    return NULL;
-	}
-
-
-  pte_t *pte = page_walk(mm->pagetable, user_va, 0);
-  if (pte == 0)
-    return NULL;
-  return (void *)(PTE2PA(*pte) + (user_va & (PGSIZE - 1)));
-}
 
 /**
  * 创建用户内存布局
@@ -47,7 +30,7 @@ struct mm_struct *user_mm_create(void) {
   memset(mm, 0, sizeof(struct mm_struct));
   INIT_LIST_HEAD(&mm->mmap);
   mm->map_count = 0;
-  atomic_flag_clear(&mm->mm_lock.lock);
+  spinlock_init(&mm->mm_lock);
   atomic_set(&mm->mm_users, 1);
   atomic_set(&mm->mm_count, 1);
 
@@ -127,7 +110,7 @@ int setup_user_memory(process *proc) {
 
   // 分配并映射初始栈页
   void *page_addr =
-      user_alloc_page(proc, mm->start_stack, PROT_READ | PROT_WRITE);
+      mm_alloc_page(proc, mm->start_stack, PROT_READ | PROT_WRITE);
   if (!page_addr) {
     user_mm_free(mm);
     proc->mm = NULL;
@@ -165,7 +148,7 @@ struct vm_area_struct *create_vma(struct mm_struct *mm, uint64 start,
   vma->vm_flags = flags;
   vma->vm_mm = mm;
 
-  atomic_flag_clear(&vma->vma_lock.lock);
+  spinlock_init(&vma->vma_lock);
 
   // 计算需要的页数
   vma->page_count = (end - start + PGSIZE - 1) / PGSIZE;
@@ -294,7 +277,7 @@ int do_munmap(process *proc, uint64 addr, size_t length) {
         if (vma->pages[i]) {
           // 取消对应虚拟地址的映射
           uint64 page_va = vma->vm_start + (i * PGSIZE);
-          pagetable_unmap(mm->pagetable, page_va, PGSIZE, 1);
+          pgt_unmap(mm->pagetable, page_va, PGSIZE, 1);
 
           // 释放页
           page_free(vma->pages[i]);
@@ -362,7 +345,7 @@ int do_munmap(process *proc, uint64 addr, size_t length) {
 /**
  * 分配一个页并映射到指定地址
  */
-void *user_alloc_page(process *proc, uaddr addr, int prot) {
+void *mm_alloc_page(process *proc, uaddr addr, int prot) {
   if (!proc || !proc->mm || !proc->mm->pagetable)
     return NULL;
 
@@ -375,7 +358,7 @@ void *user_alloc_page(process *proc, uaddr addr, int prot) {
   void *pa = page_to_virt(page);
 
   // 映射到用户虚拟地址空间
-  int result = map_pages(proc->mm->pagetable, addr, PGSIZE, (uint64)pa,
+  int result = pgt_map(proc->mm->pagetable, addr, PGSIZE, (uint64)pa,
                          prot_to_type(prot, 1));
 
   if (result != 0) {
@@ -472,7 +455,7 @@ uint64 do_brk(process *proc, int64 increment) {
       for (int i = start_idx; i < end_idx; i++) {
         if (vma->pages[i]) {
           uint64 page_va = vma->vm_start + (i * PGSIZE);
-          pagetable_unmap(mm->pagetable, page_va, PGSIZE, 1);
+          pgt_unmap(mm->pagetable, page_va, PGSIZE, 1);
           page_free(vma->pages[i]);
           vma->pages[i] = NULL;
         }
@@ -506,7 +489,7 @@ void *user_alloc_pages(process *proc, int nr_pages, uint64 addr, int prot) {
 
   // 预分配所有页并立即映射（不使用按需分页）
   for (int i = 0; i < nr_pages; i++) {
-    void *page_addr = user_alloc_page(proc, mmap_addr + (i * PGSIZE), prot);
+    void *page_addr = mm_alloc_page(proc, mmap_addr + (i * PGSIZE), prot);
     if (!page_addr) {
       // 分配失败，释放已分配的页
       do_munmap(proc, mmap_addr, i * PGSIZE);
@@ -566,7 +549,7 @@ ssize_t copy_to_user(process *proc, void *dst, const void *src, size_t len) {
 
     // 确保页已分配
     if (!vma->pages[page_idx]) {
-      void *page_addr = user_alloc_page(proc, page_va, vma->vm_prot);
+      void *page_addr = mm_alloc_page(proc, page_va, vma->vm_prot);
       if (!page_addr)
         return bytes_copied > 0 ? bytes_copied : -1;
     }
@@ -656,7 +639,7 @@ int init_user_memory(process *proc) {
 
   // 为用户栈分配初始页
   void *stack_addr =
-      user_alloc_page(proc, proc->mm->start_stack, PROT_READ | PROT_WRITE);
+      mm_alloc_page(proc, proc->mm->start_stack, PROT_READ | PROT_WRITE);
   if (!stack_addr)
     return -1;
 

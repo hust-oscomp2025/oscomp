@@ -13,8 +13,13 @@
 #include <kernel/riscv.h>
 #include <kernel/spinlock.h>
 #include <kernel/types.h>
+#include <kernel/page.h>
 
-
+/**
+ * @brief 页表管理数据结构
+ */
+typedef uint64 pte_t;       // 页表项类型
+typedef pte_t *pagetable_t; // 页表类型(指向512个PTE的数组)
 
 /**
  * @brief SV39页表常量定义
@@ -25,8 +30,6 @@
   ((SATP_MODE_SV39 << 60) | (((uint64)pagetable) >> 12))
 #define VA_BITS 39
 #define PAGE_LEVELS 3
-#define PAGE_SIZE PGSIZE // 从riscv.h导入的4096
-#define PAGE_SHIFT 12    // 从riscv.h导入的12
 
 #define PTE_V (1L << 0) // valid
 #define PTE_R (1L << 1) // readable
@@ -55,11 +58,17 @@
 #define PXSHIFT(level) (PAGE_SHIFT + (PT_INDEX_BITS * (level)))
 #define PX(level, va) ((((uint64)(va)) >> PXSHIFT(level)) & PT_INDEX_MASK)
 
-/**
- * @brief 页表管理数据结构
- */
-typedef uint64 pte_t;       // 页表项类型
-typedef pte_t *pagetable_t; // 页表类型(指向512个PTE的数组)
+/* 页表项标志位定义 */
+#define _PAGE_PRESENT   (1UL << 0)  /* 页面存在 */
+#define _PAGE_READ      (1UL << 1)  /* 可读 */
+#define _PAGE_WRITE     (1UL << 2)  /* 可写 */
+#define _PAGE_EXEC      (1UL << 3)  /* 可执行 */
+#define _PAGE_USER      (1UL << 4)  /* 用户态可访问 */
+#define _PAGE_GLOBAL    (1UL << 5)  /* 全局页 */
+#define _PAGE_ACCESSED  (1UL << 6)  /* 已访问 */
+#define _PAGE_DIRTY     (1UL << 7)  /* 已修改 */
+
+
 
 /**
  * @brief 页表统计信息结构
@@ -69,7 +78,7 @@ typedef struct {
   atomic_t page_tables;  // 页表数量
 } pagetable_stats_t;
 
-extern pagetable_stats_t pt_stats; // 全局页表统计信息
+
 
 /**
  * @brief 初始化页表子系统
@@ -100,7 +109,7 @@ void pagetable_free(pagetable_t pagetable);
  * @param perm 权限标志(PTE_R, PTE_W, PTE_X, PTE_U等)
  * @return int 成功返回0，失败返回负值
  */
-int pagetable_map(pagetable_t pagetable, uaddr va, uint64 pa, uint64 size,
+int pgt_map(pagetable_t pagetable, uaddr va, uint64 pa, uint64 size,
                   int perm);
 
 /**
@@ -112,7 +121,7 @@ int pagetable_map(pagetable_t pagetable, uaddr va, uint64 pa, uint64 size,
  * @param free_phys 是否同时释放物理页内存
  * @return int 成功返回0，失败返回负值
  */
-int pagetable_unmap(pagetable_t pagetable, uaddr va, uint64 size,
+int pgt_unmap(pagetable_t pagetable, uaddr va, uint64 size,
                     int free_phys);
 
 /**
@@ -123,7 +132,7 @@ int pagetable_unmap(pagetable_t pagetable, uaddr va, uint64 size,
  * @param alloc 如果为1，则在页表不存在时分配一个新页表页
  * @return pte_t* 返回PTE的地址，如果不存在且alloc=0，则返回NULL
  */
-pte_t *pagetable_walk(pagetable_t pagetable, uaddr va, int alloc);
+pte_t *pgt_walk(pagetable_t pagetable, uaddr va, int alloc);
 
 /**
  * @brief 查找虚拟地址对应的物理地址
@@ -132,7 +141,7 @@ pte_t *pagetable_walk(pagetable_t pagetable, uaddr va, int alloc);
  * @param va 虚拟地址
  * @return uint64 物理地址，如果映射不存在则返回0
  */
-uint64 pagetable_translate(pagetable_t pagetable, uaddr va);
+void* pgt_lookuppa(pagetable_t pagetable, uaddr va);
 
 /**
  * @brief 复制页表结构(可选择是否复制映射)
@@ -175,7 +184,7 @@ static inline pagetable_t pagetable_current(void) {
   return (pagetable_t)((satp & ((1L << 44) - 1)) << PAGE_SHIFT);
 }
 
-
+extern pagetable_stats_t pt_stats; // 全局页表统计信息
 // pointer to kernel page directory
 extern pagetable_t g_kernel_pagetable;
 

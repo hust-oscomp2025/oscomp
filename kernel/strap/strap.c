@@ -137,7 +137,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 					// }
 					
 					// 分配新页并映射
-					void *page_addr = user_alloc_page(proc, page_va, vma->vm_prot);
+					void *page_addr = mm_alloc_page(proc, page_va, vma->vm_prot);
 					if (page_addr) return;
 			}
 	}

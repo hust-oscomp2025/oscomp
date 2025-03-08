@@ -23,6 +23,12 @@ struct page {
     spinlock_t page_lock;        // 页锁，用于同步访问
 };
 
+/* 页大小相关定义 */
+#define PAGE_SHIFT      12
+#define PAGE_SIZE       (1UL << PAGE_SHIFT)
+#define PAGE_MASK       (~(PAGE_SIZE-1))
+
+
 // 页标志位定义
 #define PAGE_DIRTY     (1UL << 0)  // 脏页，需要回写
 #define PAGE_UPTODATE  (1UL << 1)  // 页内容是最新的

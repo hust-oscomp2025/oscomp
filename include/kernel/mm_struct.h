@@ -3,6 +3,7 @@
 
 #include <kernel/types.h>
 #include <kernel/page.h>
+#include <kernel/pagetable.h>
 #include <kernel/process.h>
 #include <kernel/riscv.h>
 #include <kernel/list.h>
@@ -54,21 +55,6 @@ struct vm_area_struct {
     spinlock_t vma_lock;     // VMA锁
 };
 
-/**
- * VMA标志位 - 可按位组合使用
- */
-#define VM_READ         0x00000001  // 可读
-#define VM_WRITE        0x00000002  // 可写
-#define VM_EXEC         0x00000004  // 可执行
-#define VM_SHARED       0x00000008  // 共享映射
-#define VM_PRIVATE      0x00000010  // 私有映射（写时复制）
-#define VM_GROWSDOWN    0x00000100  // 向下增长（用于栈）
-#define VM_GROWSUP      0x00000200  // 向上增长（用于堆）
-#define VM_DONTCOPY     0x00000400  // fork时不复制
-#define VM_DONTEXPAND   0x00000800  // 不允许扩展
-#define VM_LOCKED       0x00001000  // 页面锁定，不允许换出
-#define VM_IO           0x00002000  // 映射到I/O地址空间
-
 
 typedef uint64 pte_t;
 typedef uint64* pagetable_t;  // 512 PTEs
@@ -106,7 +92,20 @@ struct mm_struct {
 
 };
 
-void *user_va_to_pa(struct mm_struct *mm, uaddr user_va);
+/**
+ * 将用户虚拟地址转换为物理地址
+ *
+ * @param mm 内存管理结构体
+ * @param user_va 用户空间虚拟地址
+ * @return 物理地址，失败返回NULL
+ */
+inline void *mm_lookuppa(struct mm_struct *mm, uaddr user_va) {
+  if (!mm || !mm->pagetable){
+    return NULL;
+	}
+  return pgt_lookuppa(mm->pagetable, user_va);
+}
+
 
 
 /**
@@ -181,7 +180,7 @@ int do_munmap(process *proc, uint64 addr, size_t length);
  * @param prot 保护标志
  * @return 成功返回映射的地址，失败返回NULL
  */
-void *user_alloc_page(process *proc, uaddr addr, int prot);
+void *mm_alloc_page(process *proc, uaddr addr, int prot);
 
 
 /**

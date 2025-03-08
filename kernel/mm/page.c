@@ -43,7 +43,7 @@ void init_page_struct(struct page* page) {
   page->virtual_address = NULL;
   page->mapping = NULL;
   INIT_LIST_HEAD(&page->lru);
-  atomic_flag_clear(&page->page_lock.lock);
+  spinlock_init(&page->page_lock.lock);
 }
 
 // 初始化页管理子系统

@@ -16,6 +16,11 @@ typedef struct {
 
 #define SPINLOCK_INIT  ATOMIC_FLAG_INIT 
 
+static inline void spinlock_init(spinlock_t* lock) {
+	atomic_flag_clear(&lock->lock);
+}
+
+
 
 
 
