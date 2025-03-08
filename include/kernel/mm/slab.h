@@ -14,21 +14,17 @@
  #include <util/spinlock.h>
  #include <util/list.h>
  
- // Slab cache sizes available
- #define SLAB_SIZES_COUNT 10
- extern const size_t slab_sizes[SLAB_SIZES_COUNT];
- 
  /**
 	* @brief Slab header structure - manages a single slab
 	*/
-struct slab_header {
-	struct list_head list;      // List node
-	struct page *page;          // Physical page
-	unsigned int free_count;    // Number of free objects
-	unsigned int total_count;   // Total number of objects
-	unsigned int obj_size;      // Object size
-	unsigned char bitmap[0];    // Bitmap marking object usage
-};
+ struct slab_header {
+		 struct list_head list;      // List node
+		 struct page *page;          // Physical page
+		 unsigned int free_count;    // Number of free objects
+		 unsigned int total_count;   // Total number of objects
+		 unsigned int obj_size;      // Object size
+		 unsigned char bitmap[0];    // Bitmap marking object usage
+ };
  
  /**
 	* @brief Slab cache structure - manages objects of a specific size

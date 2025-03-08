@@ -14,12 +14,19 @@
  #include <util/string.h>
  #include <spike_interface/spike_utils.h>
  
- // Slab sizes in bytes
+ // Slab sizes including allocation headers (8 bytes)
+ // These sizes are the total allocation size
+ #define SLAB_SIZES_COUNT 8
  const size_t slab_sizes[SLAB_SIZES_COUNT] = {
-		 16, 32, 64, 128, 256, 512, 1024, 2048, 3072, 4096
+		 16,    // 8 bytes user data + 8 byte header
+		 32,    // 24 bytes user data + 8 byte header
+		 64,    // 56 bytes user data + 8 byte header
+		 128,   // 120 bytes user data + 8 byte header
+		 256,   // 248 bytes user data + 8 byte header
+		 512,   // 504 bytes user data + 8 byte header
+		 1024,  // 1016 bytes user data + 8 byte header
+		 2048   // 2040 bytes user data + 8 byte header
  };
- 
-
  
  // Global array of slab caches
  static struct kmem_cache slab_caches[SLAB_SIZES_COUNT];
@@ -87,6 +94,9 @@
 		 struct slab_header *slab = page_to_virt(page);
 		 
 		 // Calculate bitmap size and number of objects
+		 // Make sure objects are aligned to 8 bytes
+		 obj_size = (obj_size + 7) & ~7;
+		 
 		 unsigned int bitmap_size = sizeof(unsigned char) * ((PGSIZE / obj_size + 7) / 8);
 		 unsigned int usable_size = PGSIZE - sizeof(struct slab_header) - bitmap_size;
 		 unsigned int total_objs = usable_size / obj_size;
@@ -147,7 +157,13 @@
 				 list_add(&slab->list, &cache->slabs_full);
 		 }
 		 
-		 return index_to_obj(slab, idx);
+		 // Get pointer to the allocated object
+		 void *obj = index_to_obj(slab, idx);
+		 
+		 // Clear the object memory
+		 memset(obj, 0, slab->obj_size);
+		 
+		 return obj;
  }
  
  /**
@@ -222,22 +238,33 @@
 	* @brief Get cache for a specific size
 	*/
  struct kmem_cache *slab_cache_for_size(size_t size) {
+		 // Round up size to next multiple of 8 bytes for alignment
+		 size = (size + 7) & ~7;
+		 
 		 for (int i = 0; i < SLAB_SIZES_COUNT; i++) {
 				 if (size <= slab_sizes[i]) {
 						 return &slab_caches[i];
 				 }
 		 }
-		 return NULL;  // Size too large for any cache
+		 
+		 // If we get here, the size is too large for any slab
+		 // This shouldn't happen as callers should check the size
+		 return NULL;
  }
  
  /**
 	* @brief Allocate object from slab allocator
 	*/
  void *slab_alloc(size_t size) {
+		 // Verify size is within our slab allocator range
+		 if (size > 2048) {
+				 return NULL;  // Too large for slab allocator
+		 }
+		 
 		 struct kmem_cache *cache = slab_cache_for_size(size);
 		 if (!cache) {
-				 // Size too large for slab allocator
-				 return NULL;
+				 // Should not happen if size <= 2048
+				 panic("slab_alloc: failed to find cache for size %d\n", size);
 		 }
 		 
 		 spinlock_lock(&cache->lock);
@@ -248,48 +275,39 @@
  }
  
  /**
+	* @brief Find the slab containing an object
+	*/
+ static struct slab_header *find_slab(void *ptr) {
+		 // Convert to page-aligned address to find slab header
+		 uintptr_t addr = (uintptr_t)ptr & ~(PGSIZE - 1);
+		 return (struct slab_header *)addr;
+ }
+ 
+ /**
 	* @brief Find and free slab object
 	*/
  int slab_free(void *ptr) {
 		 if (!ptr) return 0;
 		 
-		 // Search through all caches
+		 // Find slab containing this object
+		 struct slab_header *slab = find_slab(ptr);
+		 
+		 // Verify this is a valid slab object
+		 unsigned int idx = obj_index(slab, ptr);
+		 if (idx >= slab->total_count) {
+				 return 0;  // Not a valid slab object
+		 }
+		 
+		 // Find matching cache
 		 for (int i = 0; i < SLAB_SIZES_COUNT; i++) {
 				 struct kmem_cache *cache = &slab_caches[i];
 				 
-				 spinlock_lock(&cache->lock);
-				 
-				 // Check full slabs
-				 struct list_head *pos;
-				 list_for_each(pos, &cache->slabs_full) {
-						 struct slab_header *slab = list_entry(pos, struct slab_header, list);
-						 void *slab_start = (void*)(slab + 1);
-						 void *slab_end = (char*)slab_start + 
-								 (slab->total_count * slab->obj_size);
-						 
-						 if (ptr >= slab_start && ptr < slab_end) {
-								 // Found the object
-								 slab_free_obj(cache, slab, ptr);
-								 spinlock_unlock(&cache->lock);
-								 return 1;  // Successfully freed
-						 }
+				 if (cache->obj_size == slab->obj_size) {
+						 spinlock_lock(&cache->lock);
+						 slab_free_obj(cache, slab, ptr);
+						 spinlock_unlock(&cache->lock);
+						 return 1;  // Successfully freed
 				 }
-				 
-				 // Check partial slabs
-				 list_for_each(pos, &cache->slabs_partial) {
-						 struct slab_header *slab = list_entry(pos, struct slab_header, list);
-						 void *slab_start = (void*)(slab + 1);
-						 void *slab_end = (char*)slab_start + 
-								 (slab->total_count * slab->obj_size);
-						 
-						 if (ptr >= slab_start && ptr < slab_end) {
-								 slab_free_obj(cache, slab, ptr);
-								 spinlock_unlock(&cache->lock);
-								 return 1;
-						 }
-				 }
-				 
-				 spinlock_unlock(&cache->lock);
 		 }
 		 
 		 return 0;  // Not a slab object
@@ -321,7 +339,7 @@
 				 }
 				 
 				 sprint("  Size %4d bytes: %2d full, %2d partial, %2d free, %4d free objects\n",
-							 cache->obj_size, full_count, partial_count, free_count, cache->free_objects);
+								 cache->obj_size, full_count, partial_count, free_count, cache->free_objects);
 				 
 				 spinlock_unlock(&cache->lock);
 		 }
