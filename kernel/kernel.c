@@ -13,29 +13,12 @@
 #include <kernel/vfs.h>
 #include <kernel/rfs.h>
 #include <kernel/ramdev.h>
+#include <kernel/pagetable.h>
 
 #include <util/string.h>
 
 #include <spike_interface/spike_utils.h>
 
-
-//
-// trap_sec_start points to the beginning of S-mode trap segment (i.e., the entry point of
-// S-mode trap vector). added @lab2_1
-//
-// extern char trap_sec_start[];
-
-//
-// turn on paging. added @lab2_1
-//
-void enable_paging() {
-  // write the pointer to kernel page (table) directory into the CSR of "satp".
-  write_csr(satp, MAKE_SATP(g_kernel_pagetable));
-
-  // refresh tlb to invalidate its content.
-  flush_tlb();
-  sprint("kernel page table is on \n");
-}
 
 
 typedef union {
@@ -109,7 +92,7 @@ int s_start(void) {
 
   //  写入satp寄存器并刷新tlb缓存
   //    从这里开始，所有内存访问都通过MMU进行虚实转换
-  enable_paging();
+	pagetable_activate(g_kernel_pagetable);
   // added @lab3_1
   init_proc_pool();
 

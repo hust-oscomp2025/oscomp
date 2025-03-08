@@ -42,7 +42,7 @@ void kheap_alloc() {
 }
 
 void* kmalloc(size_t size) {
-  int required_size = ALIGN(size + sizeof(heap_block), 8);
+  int required_size = ROUNDUP(size + sizeof(heap_block), 8);
   // 目前只服务大小小于一个页的内核堆分配请求。因为内核堆难以稳定获取连续的物理内存。
   if (size <= 0 || required_size > PGSIZE) {
     return NULL;
@@ -148,31 +148,19 @@ void pmm_init() {
   // 空闲内存起始地址必须页对齐
   free_mem_start_addr = ROUNDUP(g_kernel_end, PGSIZE);
 
+
   // 重新计算g_mem_size以限制物理内存空间
-  g_mem_size = MIN(PKE_MAX_ALLOWABLE_RAM, g_mem_size);
-  if (g_mem_size < pke_kernel_size)
-    panic("Error when recomputing physical memory size (g_mem_size).\n");
-
-  free_mem_end_addr = DRAM_BASE + g_mem_size;
-  
+  g_mem_size = ROUNDDOWN((PKE_MAX_ALLOWABLE_RAM, g_mem_size),PGSIZE);
+	assert(g_mem_size > pke_kernel_size);
   sprint("free physical memory address: [0x%lx, 0x%lx] \n", free_mem_start_addr,
-    free_mem_end_addr - 1);
-
-  sprint("kernel memory manager is initializing ...\n");
+    DRAM_BASE + g_mem_size - 1);
   
+
+
   // 初始化页管理子系统
   page_init(DRAM_BASE, g_mem_size, free_mem_start_addr);
   
-  // 更新空闲内存起始地址（考虑页结构数组的空间）
-  // 这个值由page_init内部更新，需要page_init实现返回更新后的值
-  // 目前简单处理，不改变原值
-  uint64 page_map_size = (g_mem_size / PGSIZE) * sizeof(struct page);
-  uint64 page_map_pages = (page_map_size + PGSIZE - 1) / PGSIZE;
-  free_mem_start_addr += page_map_pages * PGSIZE;
-  
-  // 创建空闲页链表
-  for (uint64 p = ROUNDUP(free_mem_start_addr, PGSIZE); p + PGSIZE < free_mem_end_addr; p += PGSIZE)
-    put_free_page((void *)p);
+
 
   // 初始化内核堆
   kernel_heap_head.next = NULL;

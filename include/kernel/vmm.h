@@ -4,8 +4,6 @@
 #include <kernel/riscv.h>
 #include <kernel/process.h>
 
-/* --- utility functions for virtual address mapping --- */
-int map_pages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm);
 // permission codes.
 enum VMPermision {
   PROT_NONE = 0,
@@ -24,26 +22,12 @@ typedef struct heap_block_t {
 } heap_block;
 
 uint64 prot_to_type(int prot, int user);
-pte_t *page_walk(pagetable_t pagetable, uaddr va, int alloc);
-uint64 lookup_pa(pagetable_t pagetable, uint64 va);
 
 /* --- kernel page table --- */
-// pointer to kernel page directory
-extern pagetable_t g_kernel_pagetable;
 
-void kern_vm_map(pagetable_t page_dir, uint64 va, uint64 pa, uint64 sz, int perm);
 
 // Initialize the kernel pagetable
 void kern_vm_init(void);
 
-void user_vm_map(pagetable_t page_dir, uint64 va, uint64 size, uint64 pa, int perm);
-void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free);
-void print_proc_vmspace(process* proc);
-
-void* vmalloc(size_t size);
-void free( void* ptr);
-
-// 定义一个对齐宏，确保按 8 字节对齐
-#define ALIGN(addr, alignment) (((uintptr_t)(addr) + (alignment) - 1) & ~((alignment) - 1))
 
 #endif

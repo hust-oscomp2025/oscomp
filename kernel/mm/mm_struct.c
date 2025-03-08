@@ -294,7 +294,7 @@ int do_munmap(process *proc, uint64 addr, size_t length) {
         if (vma->pages[i]) {
           // 取消对应虚拟地址的映射
           uint64 page_va = vma->vm_start + (i * PGSIZE);
-          user_vm_unmap(mm->pagetable, page_va, PGSIZE, 1);
+          pagetable_unmap(mm->pagetable, page_va, PGSIZE, 1);
 
           // 释放页
           page_free(vma->pages[i]);
@@ -472,7 +472,7 @@ uint64 do_brk(process *proc, int64 increment) {
       for (int i = start_idx; i < end_idx; i++) {
         if (vma->pages[i]) {
           uint64 page_va = vma->vm_start + (i * PGSIZE);
-          user_vm_unmap(mm->pagetable, page_va, PGSIZE, 1);
+          pagetable_unmap(mm->pagetable, page_va, PGSIZE, 1);
           page_free(vma->pages[i]);
           vma->pages[i] = NULL;
         }

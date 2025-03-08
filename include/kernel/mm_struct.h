@@ -72,6 +72,8 @@ struct vm_area_struct {
 
 typedef uint64 pte_t;
 typedef uint64* pagetable_t;  // 512 PTEs
+
+
 /**
  * 用户内存布局
  * 仿照 mm_struct，管理进程的整个地址空间

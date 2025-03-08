@@ -25,7 +25,7 @@ typedef struct node {
 } list_node;
 
 static list_node free_page_list = { NULL };
-volatile static int counter = 1;
+volatile static int free_page_counter;
 
 // 获取页框号 (PFN)
 static unsigned long get_pfn(void *addr) {
@@ -51,13 +51,12 @@ void page_init(uint64 mem_base, uint64 mem_size_bytes, uint64 start_addr) {
   // 保存物理内存布局信息
   mem_base_addr = mem_base;
   mem_size = mem_size_bytes;
-  
-  // 计算总页数
-  total_pages = mem_size_bytes / PGSIZE;
-  page_map_size = total_pages * sizeof(struct page);
-  
+
+	free_page_counter = 0;
+
+  uint64 total_pages = (mem_size_bytes / PGSIZE);
   // 为页结构数组分配空间
-  uint64 page_map_pages = (page_map_size + PGSIZE - 1) / PGSIZE;
+  uint64 page_map_size = ROUNDUP( total_pages * sizeof(struct page), PGSIZE );
   
   // 保留空间给页结构数组
   page_map = (struct page *)start_addr;
@@ -71,8 +70,16 @@ void page_init(uint64 mem_base, uint64 mem_size_bytes, uint64 start_addr) {
          total_pages, page_map_size, (uint64)page_map);
   
   // 返回空闲内存开始地址（页结构后的地址）
-  uint64 free_start = start_addr + (page_map_pages * PGSIZE);
+  uint64 free_start = start_addr + page_map_size;
   sprint("Free memory starts at: 0x%lx\n", free_start);
+
+  // 初始化空闲页链表
+  free_page_list.next = NULL;  // 确保链表为空
+	for(uint64 i = free_start;i < mem_base_addr + mem_size_bytes; i += PGSIZE){
+		put_free_page((void *)i);
+	}
+	sprint("Free page list initialized with %d pages\n", free_page_counter);
+
 }
 
 // 获取一个空闲物理页，不设置page结构
@@ -81,6 +88,7 @@ void* get_free_page(void) {
   if (n) {
     free_page_list.next = n->next;
   }
+	free_page_counter--;
   return (void *)n;
 }
 
@@ -205,6 +213,7 @@ int put_page(struct page* page) {
     // 引用计数降为0，页可以被释放
     return 1;
   }
+	free_page_counter++;
   return 0;
 }
 
@@ -279,4 +288,9 @@ void copy_page(struct page* dest, struct page* src) {
   if (dest_addr && src_addr) {
     memcpy(dest_addr, src_addr, PGSIZE);
   }
+}
+
+// 获取当前空闲页数量
+int get_free_page_count(void) {
+  return free_page_counter;
 }

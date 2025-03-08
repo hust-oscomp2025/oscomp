@@ -74,6 +74,8 @@ static inline void set_page_uptodate(struct page *page) {
 	page->flags |= PAGE_UPTODATE;
 }
 
+int get_free_page_count(void);
+
 
 // 内部使用函数，但需要在头文件中声明以便PMM调用
 void init_page_struct(struct page* page);
