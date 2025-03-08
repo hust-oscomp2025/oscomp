@@ -7,7 +7,7 @@
 #include <kernel/process.h>
 
 #include <kernel/sched.h>
-#include <kernel/mm/memlayout.h>
+
 #include <kernel/types.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/fs/rfs.h>

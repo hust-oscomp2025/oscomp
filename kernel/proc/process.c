@@ -9,7 +9,7 @@
 
 #include <kernel/config.h>
 #include <kernel/elf.h>
-#include <kernel/mm/memlayout.h>
+
 #include <kernel/mm/mm_struct.h>
 #include <kernel/mm/mmap.h>
 

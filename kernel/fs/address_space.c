@@ -1,6 +1,5 @@
 #include <kernel/fs/address_space.h>
 #include <kernel/mm/kmalloc.h>
-#include <kernel/mm/memlayout.h>
 
 #include <util/spinlock.h>
 #include <util/atomic.h>

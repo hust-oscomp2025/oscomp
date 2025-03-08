@@ -5,7 +5,7 @@
 #include <kernel/strap.h>
 #include <kernel/mm/mmap.h>
 
-#include <kernel/mm/memlayout.h>
+
 
 #include <kernel/mm/page.h>
 #include <kernel/mm/mm_struct.h>

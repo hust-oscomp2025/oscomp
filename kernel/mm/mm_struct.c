@@ -1,6 +1,6 @@
 
 #include <kernel/mm/kmalloc.h>
-#include <kernel/mm/memlayout.h>
+
 #include <kernel/mm/mm_struct.h>
 #include <kernel/mm/page.h>
 #include <kernel/mm/mmap.h>
@@ -646,9 +646,6 @@ int init_user_memory(process *proc) {
   if (!stack_addr)
     return -1;
 
-  // 初始化堆
-  proc->mm->start_brk = USER_FREE_ADDRESS_START;
-  proc->mm->brk = USER_FREE_ADDRESS_START;
 
   return 0;
 }
