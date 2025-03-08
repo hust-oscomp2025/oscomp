@@ -168,58 +168,41 @@
 		 return ptr;
  }
  
- /**
-	* @brief Resize allocated memory
-	*/
- void *krealloc(void *ptr, size_t new_size) {
-		 if (!ptr) return kmalloc(new_size);
-		 if (new_size == 0) {
-				 kfree(ptr);
-				 return NULL;
-		 }
-		 
-		 // Try to find original allocation size
-		 size_t old_size = 0;
-		 
-		 // Check if it's a large allocation
-		 spinlock_lock(&large_alloc_lock);
-		 struct large_allocation *curr = large_allocations;
-		 while (curr != NULL) {
-				 if (curr->addr == ptr) {
-						 old_size = curr->size;
-						 break;
-				 }
-				 curr = curr->next;
-		 }
-		 spinlock_unlock(&large_alloc_lock);
-		 
-		 // If not a large allocation, estimate size from slab caches
-		 if (old_size == 0) {
-				 // For slab objects, we don't know exact size, but can estimate upper bound
-				 for (int i = 0; i < SLAB_SIZES_COUNT; i++) {
-						 // Assume it belongs to the first possible cache we find
-						 old_size = slab_sizes[i];
-						 break;
-				 }
-		 }
-		 
-		 // If new size is smaller or equal, return the same pointer
-		 if (new_size <= old_size) {
-				 return ptr;
-		 }
-		 
-		 // Allocate new block
-		 void *new_ptr = kmalloc(new_size);
-		 if (!new_ptr) return NULL;
-		 
-		 // Copy data
-		 memcpy(new_ptr, ptr, old_size);
-		 
-		 // Free old block
-		 kfree(ptr);
-		 
-		 return new_ptr;
- }
+/**
+ * @brief Resize an allocated memory block
+ * 
+ * @param ptr Pointer to memory previously allocated by kmalloc, or NULL
+ * @param new_size New size in bytes
+ * @return void* Pointer to the resized memory block, or NULL if failed
+ */
+void *krealloc(void *ptr, size_t new_size) {
+	// 处理特殊情况
+	if (!ptr) return kmalloc(new_size);
+	if (new_size == 0) {
+			kfree(ptr);
+			return NULL;
+	}
+	
+	// 获取当前分配的大小
+	size_t old_size = ksize(ptr);
+	
+	// 如果新大小小于等于旧大小，直接返回原指针
+	if (new_size <= old_size) {
+			return ptr;
+	}
+	
+	// 分配新内存块
+	void *new_ptr = kmalloc(new_size);
+	if (!new_ptr) return NULL;
+	
+	// 复制数据
+	memcpy(new_ptr, ptr, old_size);
+	
+	// 释放旧内存块
+	kfree(ptr);
+	
+	return new_ptr;
+}
  
  /**
 	* @brief Get size of allocated memory block
