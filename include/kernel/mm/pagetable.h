@@ -27,7 +27,7 @@ typedef pte_t *pagetable_t; // 页表类型(指向512个PTE的数组)
 // SV39虚拟地址布局: 39位虚拟地址, 分为3级页表
 #define SATP_MODE_SV39 8L
 #define MAKE_SATP(pagetable)                                                   \
-  ((SATP_MODE_SV39 << 60) | (((uint64)pagetable) >> 12))
+  (((uint64)SATP_MODE_SV39 << 60) | (((uint64)pagetable) >> 12))
 #define VA_BITS 39
 #define PAGE_LEVELS 3
 
@@ -166,23 +166,14 @@ void pagetable_dump(pagetable_t pagetable);
  *
  * @param pagetable 要激活的页表
  */
-static inline void pagetable_activate(pagetable_t pagetable) {
-  write_csr(satp, MAKE_SATP(pagetable));
-  flush_tlb(); // 刷新TLB
-}
+void pagetable_activate(pagetable_t pagetable);
 
 /**
  * @brief 获取当前活动的页表
  *
  * @return pagetable_t 当前页表
  */
-static inline pagetable_t pagetable_current(void) {
-  uint64 satp = read_csr(satp);
-  if ((satp >> 60) != SATP_MODE_SV39) {
-    return NULL; // 不是SV39模式
-  }
-  return (pagetable_t)((satp & ((1L << 44) - 1)) << PAGE_SHIFT);
-}
+pagetable_t pagetable_current(void);
 
 extern pagetable_stats_t pt_stats; // 全局页表统计信息
 // pointer to kernel page directory

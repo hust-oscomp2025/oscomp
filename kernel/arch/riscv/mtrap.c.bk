@@ -1,0 +1,307 @@
+//理想化的mtrap处理函数
+
+
+#include <kernel/riscv.h>
+#include <kernel/process.h>
+#include <spike_interface/spike_utils.h>
+#include <spike_interface/spike_file.h>
+#include <util/string.h>
+
+// 中断原因码
+#define IRQ_U_SOFT    0  // 用户模式软件中断
+#define IRQ_S_SOFT    1  // 监管模式软件中断
+#define IRQ_M_SOFT    3  // 机器模式软件中断
+#define IRQ_U_TIMER   4  // 用户模式定时器中断
+#define IRQ_S_TIMER   5  // 监管模式定时器中断
+#define IRQ_M_TIMER   7  // 机器模式定时器中断
+#define IRQ_U_EXT     8  // 用户模式外部中断
+#define IRQ_S_EXT     9  // 监管模式外部中断
+#define IRQ_M_EXT     11 // 机器模式外部中断
+
+// 异常原因码
+#define CAUSE_MISALIGNED_FETCH     0  // 指令地址不对齐
+#define CAUSE_FETCH_ACCESS         1  // 指令访问错误
+#define CAUSE_ILLEGAL_INSTRUCTION  2  // 非法指令
+#define CAUSE_BREAKPOINT           3  // 断点
+#define CAUSE_MISALIGNED_LOAD      4  // 加载地址不对齐
+#define CAUSE_LOAD_ACCESS          5  // 加载访问错误
+#define CAUSE_MISALIGNED_STORE     6  // 存储地址不对齐
+#define CAUSE_STORE_ACCESS         7  // 存储访问错误
+#define CAUSE_USER_ECALL           8  // 用户模式环境调用
+#define CAUSE_SUPERVISOR_ECALL     9  // 监管模式环境调用
+#define CAUSE_HYPERVISOR_ECALL    10  // 虚拟监管模式环境调用
+#define CAUSE_MACHINE_ECALL       11  // 机器模式环境调用
+#define CAUSE_FETCH_PAGE_FAULT    12  // 指令页错误
+#define CAUSE_LOAD_PAGE_FAULT     13  // 加载页错误
+#define CAUSE_RESERVED_14         14  // 保留
+#define CAUSE_STORE_PAGE_FAULT    15  // 存储页错误
+
+// 中断处理函数类型定义
+typedef void (*interrupt_handler_t)(void);
+typedef void (*exception_handler_t)(uint64 mepc, uint64 mtval);
+
+// 处理机器模式定时器中断
+static void handle_m_timer() {
+  int cpuid = read_csr(mhartid);
+  // 设置下一次定时器中断时间
+  *(uint64 *)CLINT_MTIMECMP(cpuid) = *(uint64 *)CLINT_MTIMECMP(cpuid) + TIMER_INTERVAL;
+
+  // 设置S模式软件中断，将处理传递给S模式
+  write_csr(sip, SIP_SSIP);
+}
+
+// 处理机器模式软件中断
+static void handle_m_soft() {
+  sprint("Machine software interrupt handled\n");
+  
+  // 清除机器模式软件中断挂起位
+  clear_csr(mip, MIP_MSIP);
+  
+  // 这里可以添加额外的处理逻辑
+}
+
+// 处理机器模式外部中断
+static void handle_m_external() {
+  sprint("Machine external interrupt handled\n");
+  
+  // 与PLIC（平台级中断控制器）交互，识别并处理外部中断源
+  // 这里需要根据实际的硬件平台实现详细的PLIC交互代码
+  
+  // 假设我们已经处理完成，清除相关的中断挂起状态
+}
+
+// 处理非法指令异常
+static void handle_illegal_instruction(uint64 mepc, uint64 mtval) {
+  sprint("Illegal instruction at 0x%lx, instruction: 0x%lx\n", mepc, mtval);
+  
+  // 检查是否是浮点指令（可能是在没有浮点硬件支持的情况下使用）
+  if ((mtval & 0x7F) == 0x53) {  // RISC-V浮点指令的部分特征
+    sprint("Attempted to execute floating-point instruction without FPU support\n");
+  }
+  
+  // 在实际系统中，可能会尝试模拟某些指令或向进程发送信号
+  // 但在M模式下通常直接终止
+  panic("Illegal instruction exception in M-mode");
+}
+
+// 处理地址不对齐异常
+static void handle_misaligned_access(uint64 mepc, uint64 mtval, int is_store) {
+  const char* op_type = is_store ? "store" : "load";
+  sprint("Misaligned %s at 0x%lx, address: 0x%lx\n", op_type, mepc, mtval);
+  
+  // 在某些情况下可以模拟不对齐访问，但在M模式下通常直接终止
+  panic("Misaligned access exception in M-mode");
+}
+
+// 处理页错误
+static void handle_page_fault(uint64 mepc, uint64 mtval, int fault_type) {
+  const char* fault_name;
+  switch (fault_type) {
+    case CAUSE_FETCH_PAGE_FAULT:  fault_name = "instruction"; break;
+    case CAUSE_LOAD_PAGE_FAULT:   fault_name = "load"; break;
+    case CAUSE_STORE_PAGE_FAULT:  fault_name = "store"; break;
+    default:                      fault_name = "unknown"; break;
+  }
+  
+  sprint("%s page fault at 0x%lx, address: 0x%lx\n", fault_name, mepc, mtval);
+  
+  // 在M模式下通常直接终止
+  // 在完整系统中，页错误通常在S模式处理（由页表管理）
+  panic("Page fault in M-mode");
+}
+
+// 处理机器模式环境调用
+static void handle_m_ecall(uint64 mepc, uint64 mtval) {
+  sprint("Machine mode ecall at 0x%lx\n", mepc);
+  
+  // 获取a7寄存器中的系统调用号（根据RISC-V ABI）
+  uint64 syscall_num = read_csr_a7();
+  // 获取a0-a6寄存器中的参数
+  uint64 arg0 = read_csr_a0();
+  
+  sprint("M-mode syscall %ld, arg0: 0x%lx\n", syscall_num, arg0);
+  
+  // 执行特定于M模式的系统调用处理
+  // ...
+  
+  // 增加mepc以跳过ecall指令（4字节长度）
+  write_csr(mepc, mepc + 4);
+}
+
+// 中断处理函数表
+static interrupt_handler_t interrupt_handlers[] = {
+  [IRQ_U_SOFT]   = NULL,             // 用户模式软件中断（M模式不处理）
+  [IRQ_S_SOFT]   = NULL,             // 监管模式软件中断（M模式不处理）
+  [IRQ_M_SOFT]   = handle_m_soft,    // 机器模式软件中断
+  [IRQ_U_TIMER]  = NULL,             // 用户模式定时器中断（M模式不处理）
+  [IRQ_S_TIMER]  = NULL,             // 监管模式定时器中断（M模式不处理）
+  [IRQ_M_TIMER]  = handle_m_timer,   // 机器模式定时器中断
+  [IRQ_U_EXT]    = NULL,             // 用户模式外部中断（M模式不处理）
+  [IRQ_S_EXT]    = NULL,             // 监管模式外部中断（M模式不处理）
+  [IRQ_M_EXT]    = handle_m_external // 机器模式外部中断
+};
+
+// 异常处理函数表
+static void handle_exception(uint64 cause, uint64 mepc, uint64 mtval) {
+  switch (cause) {
+    case CAUSE_MISALIGNED_FETCH:
+      sprint("Instruction address misaligned at 0x%lx, address: 0x%lx\n", mepc, mtval);
+      panic("Instruction address misaligned in M-mode");
+      break;
+      
+    case CAUSE_FETCH_ACCESS:
+      sprint("Instruction access fault at 0x%lx, address: 0x%lx\n", mepc, mtval);
+      panic("Instruction access fault in M-mode");
+      break;
+      
+    case CAUSE_ILLEGAL_INSTRUCTION:
+      handle_illegal_instruction(mepc, mtval);
+      break;
+      
+    case CAUSE_BREAKPOINT:
+      sprint("Breakpoint at 0x%lx\n", mepc);
+      // 调试断点，可以添加特殊处理或继续执行
+      write_csr(mepc, mepc + 2);  // ebreak通常是2字节长度
+      break;
+      
+    case CAUSE_MISALIGNED_LOAD:
+      handle_misaligned_access(mepc, mtval, 0);
+      break;
+      
+    case CAUSE_LOAD_ACCESS:
+      sprint("Load access fault at 0x%lx, address: 0x%lx\n", mepc, mtval);
+      panic("Load access fault in M-mode");
+      break;
+      
+    case CAUSE_MISALIGNED_STORE:
+      handle_misaligned_access(mepc, mtval, 1);
+      break;
+      
+    case CAUSE_STORE_ACCESS:
+      sprint("Store access fault at 0x%lx, address: 0x%lx\n", mepc, mtval);
+      panic("Store access fault in M-mode");
+      break;
+      
+    case CAUSE_USER_ECALL:
+    case CAUSE_SUPERVISOR_ECALL:
+      // 用户和监管模式的环境调用应该在M模式下重定向到S模式处理
+      sprint("Redirecting ecall from lower privilege mode\n");
+      // 设置S模式的异常程序计数器和原因
+      write_csr(scause, cause);
+      write_csr(sepc, mepc);
+      write_csr(stval, mtval);
+      // 将执行权交给S模式的异常处理程序
+      return_to_s_mode();
+      break;
+      
+    case CAUSE_MACHINE_ECALL:
+      handle_m_ecall(mepc, mtval);
+      break;
+      
+    case CAUSE_FETCH_PAGE_FAULT:
+    case CAUSE_LOAD_PAGE_FAULT:
+    case CAUSE_STORE_PAGE_FAULT:
+      handle_page_fault(mepc, mtval, cause);
+      break;
+      
+    default:
+      sprint("Unknown exception: cause %ld, mepc 0x%lx, mtval 0x%lx\n", 
+             cause, mepc, mtval);
+      panic("Unhandled exception in M-mode");
+  }
+}
+
+// M模式陷阱入口点函数
+void handle_mtrap() {
+  uint64 mcause = read_csr(mcause);
+  uint64 mepc = read_csr(mepc);
+  uint64 mtval = read_csr(mtval);
+  
+  sprint("M-mode trap: mcause=%lx mepc=%lx mtval=%lx\n", mcause, mepc, mtval);
+  
+  // 检查最高位以确定是中断还是异常
+  if (mcause & (1ULL << 63)) {
+    // 这是一个中断
+    uint64 cause = mcause & 0xff;
+    
+    if (cause < sizeof(interrupt_handlers) / sizeof(interrupt_handlers[0]) && 
+        interrupt_handlers[cause] != NULL) {
+      // 调用对应的中断处理函数
+      interrupt_handlers[cause]();
+    } else {
+      sprint("Unknown interrupt: cause %ld\n", cause);
+      panic("Unhandled interrupt in M-mode");
+    }
+  } else {
+    // 这是一个异常
+    uint64 cause = mcause & 0xff;
+    handle_exception(cause, mepc, mtval);
+  }
+}
+
+// 设置并启用中断
+void init_machine_trap() {
+  // 设置M模式陷阱处理程序地址
+  write_csr(mtvec, (uint64)machine_trap_entry);
+  
+  // 启用M模式中断
+  // 使能机器模式的定时器中断、软件中断和外部中断
+  set_csr(mie, MIE_MTIE | MIE_MSIE | MIE_MEIE);
+  
+  // 设置初始定时器中断
+  int cpuid = read_csr(mhartid);
+  uint64 mtimecmp = *(uint64*)CLINT_MTIME + TIMER_INTERVAL;
+  *(uint64*)CLINT_MTIMECMP(cpuid) = mtimecmp;
+  
+  // 全局启用M模式中断
+  set_csr(mstatus, MSTATUS_MIE);
+  
+  sprint("Machine trap handler initialized\n");
+}
+
+// 将特定中断委托给S模式
+void delegate_traps() {
+  uint64 interrupts = (1U << IRQ_S_SOFT) | (1U << IRQ_S_TIMER) | (1U << IRQ_S_EXT);
+  uint64 exceptions = (1U << CAUSE_MISALIGNED_FETCH) | (1U << CAUSE_FETCH_ACCESS) | 
+                      (1U << CAUSE_LOAD_ACCESS) | (1U << CAUSE_STORE_ACCESS) |
+                      (1U << CAUSE_USER_ECALL) | (1U << CAUSE_FETCH_PAGE_FAULT) |
+                      (1U << CAUSE_LOAD_PAGE_FAULT) | (1U << CAUSE_STORE_PAGE_FAULT);
+  
+  write_csr(mideleg, interrupts);  // 中断委托
+  write_csr(medeleg, exceptions);  // 异常委托
+  
+  sprint("Delegated specific traps to S-mode\n");
+}
+
+// 辅助函数：返回到S模式
+void return_to_s_mode() {
+  // 保存当前的M模式状态
+  uint64 mstatus = read_csr(mstatus);
+  
+  // 设置之前的特权模式为S模式
+  mstatus = (mstatus & ~MSTATUS_MPP) | (1UL << 11);  // MPP = 01 (S-mode)
+  
+  // 重新开启中断
+  mstatus |= MSTATUS_MPIE;
+  
+  write_csr(mstatus, mstatus);
+  
+  // 设置返回地址为S模式陷阱处理程序
+  write_csr(mepc, read_csr(stvec));
+  
+  // 返回到S模式
+  asm volatile("mret");
+}
+
+// 读取a0-a7寄存器值的辅助函数（在实际实现中，这需要在汇编中处理）
+uint64 read_csr_a0() {
+  uint64 value;
+  asm volatile("mv %0, a0" : "=r"(value));
+  return value;
+}
+
+uint64 read_csr_a7() {
+  uint64 value;
+  asm volatile("mv %0, a7" : "=r"(value));
+  return value;
+}

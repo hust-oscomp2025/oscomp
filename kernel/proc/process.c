@@ -12,6 +12,7 @@
 
 #include <kernel/mm/mm_struct.h>
 #include <kernel/mm/mmap.h>
+#include <kernel/mm/kmalloc.h>
 
 #include <kernel/process.h>
 #include <kernel/riscv.h>
@@ -29,7 +30,7 @@ process *current_percpu[NCPU];
 // switch to a user-mode process
 //
 
-extern void return_to_user(trapframe *, uint64 satp);
+extern void return_to_user(struct trapframe *, uint64 satp);
 
 void switch_to(process *proc) {
 
@@ -90,9 +91,9 @@ process *alloc_process() {
   process *ps = find_empty_process();
   ps->mm = user_mm_create();
   // 分配内核栈
-  ps->kstack = (uint64)alloc_page()->virtual_address + PGSIZE;
+  ps->kstack = (uint64)alloc_page()->virtual_address + PAGE_SIZE;
 
-  ps->trapframe = (trapframe *)alloc_page()->virtual_address;
+  ps->trapframe = (struct trapframe*)kmalloc(sizeof(struct trapframe));
 
   // 创建信号量和初始化文件管理
   ps->sem_index = sem_new(0);

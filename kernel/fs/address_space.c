@@ -313,12 +313,12 @@ int write_page(struct page *page) {
 
 // 将数据从用户空间复制到页
 ssize_t copy_to_page(struct page *page, const char *buf, size_t count, loff_t offset) {
-    if (!page || !page->virtual_address || offset >= PGSIZE)
+    if (!page || !page->virtual_address || offset >= PAGE_SIZE)
         return -1;
     
     // 确保不超出页大小
-    if (offset + count > PGSIZE)
-        count = PGSIZE - offset;
+    if (offset + count > PAGE_SIZE)
+        count = PAGE_SIZE - offset;
     
     // 复制数据
     memcpy((char *)page->virtual_address + offset, buf, count);
@@ -331,12 +331,12 @@ ssize_t copy_to_page(struct page *page, const char *buf, size_t count, loff_t of
 
 // 将数据从页复制到用户空间
 ssize_t copy_from_page(struct page *page, char *buf, size_t count, loff_t offset) {
-    if (!page || !page->virtual_address || offset >= PGSIZE)
+    if (!page || !page->virtual_address || offset >= PAGE_SIZE)
         return -1;
     
     // 确保不超出页大小
-    if (offset + count > PGSIZE)
-        count = PGSIZE - offset;
+    if (offset + count > PAGE_SIZE)
+        count = PAGE_SIZE - offset;
     
     // 复制数据
     memcpy(buf, (char *)page->virtual_address + offset, count);

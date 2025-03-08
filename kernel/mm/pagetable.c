@@ -5,6 +5,7 @@
 
 #include <kernel/mm/page.h>
 #include <kernel/mm/pagetable.h>
+#include <spike_interface/spike_utils.h>
 
 #include <util/spinlock.h>
 
@@ -100,42 +101,36 @@ pte_t *pgt_walk(pagetable_t pagetable, uaddr va, int alloc) {
     return NULL;
   }
 
-  // 遍历三级页表
-  for (int level = 0; level < PAGE_LEVELS - 1; level++) {
-    // 计算当前级别的页表索引
-    int index =
-        (va >> (PAGE_SHIFT + PT_INDEX_BITS * (PAGE_LEVELS - 1 - level))) &
-        PT_INDEX_MASK;
-    pte_t *pte = &pagetable[index];
+  // starting from the page directory
+  pagetable_t pt = pagetable;
 
-    // 如果页表项有效，则继续到下一级
-    if (*pte & PTE_V) {
-      pagetable = (pagetable_t)PTE2PA(*pte);
-    } else {
-      // 页表不存在
-      if (!alloc) {
-        return NULL; // 不分配
-      }
+  // traverse from page directory to page table.
+  // as we use risc-v sv39 paging scheme, there will be 3 layers: page dir,
+  // page medium dir, and page table.
+  for (int level = 2; level > 0; level--) {
+    // macro "PX" gets the PTE index in page table of current level
+    // "pte" points to the entry of current level
+    pte_t *pte = pt + PX(level, va);
 
-      // 分配新的页表页
-      pagetable_t new_pt = (pagetable_t)alloc_page()->virtual_address;
-      if (new_pt == NULL) {
-        return NULL; // 内存不足
-      }
-
-      // 初始化新页表
-      memset(new_pt, 0, PAGE_SIZE);
-      atomic_inc(&pt_stats.page_tables);
-
-      // 更新当前页表项指向新页表
-      *pte = PA2PPN(new_pt) | PTE_V;
-      pagetable = new_pt;
+    // now, we need to know if above pte is valid (established mapping to a
+    // phyiscal page) or not.
+    if (*pte & PTE_V) { // PTE valid
+      // phisical address of pagetable of next level
+      pt = (pagetable_t)PTE2PA(*pte);
+    } else { // PTE invalid (not exist).
+      // allocate a page (to be the new pagetable), if alloc == 1
+      if (alloc && ((pt = (pte_t *)alloc_page()->virtual_address) != 0)) {
+        memset(pt, 0, PAGE_SIZE);
+        // writes the physical address of newly allocated page to pte, to
+        // establish the page table tree.
+        *pte = PA2PPN(pt) | PTE_V;
+      } else // returns NULL, if alloc == 0, or no more physical page remains
+        return 0;
     }
   }
 
-  // 计算最后一级页表的索引
-  int index = (va >> PAGE_SHIFT) & PT_INDEX_MASK;
-  return &pagetable[index];
+  // return a PTE which contains phisical address of a page
+  return pt + PX(0, va);
 }
 
 /**
@@ -150,7 +145,7 @@ int pgt_map_page(pagetable_t pagetable, uaddr va, uint64 pa, int perm) {
   if (pagetable == NULL) {
     return -1;
   }
-
+	//sprint("debug\n");
   // 将地址对齐到页边界
   uaddr aligned_va = ROUNDDOWN(va, PAGE_SIZE);
   uint64 aligned_pa = ROUNDDOWN(pa, PAGE_SIZE);
@@ -256,6 +251,21 @@ uint64 pgt_lookuppa(pagetable_t pagetable, uaddr va) {
 
   // 返回物理地址
   return PTE2PA(*pte) | offset;
+}
+
+void pagetable_activate(pagetable_t pagetable) {
+  // 确保所有映射都已完成
+  write_csr(satp, MAKE_SATP(pagetable));
+  flush_tlb(); // 刷新TLB
+
+}
+
+pagetable_t pagetable_current(void) {
+  uint64 satp = read_csr(satp);
+  if ((satp >> 60) != SATP_MODE_SV39) {
+    return NULL; // 不是SV39模式
+  }
+  return (pagetable_t)((satp & ((1L << 44) - 1)) << PAGE_SHIFT);
 }
 
 /**
@@ -368,81 +378,70 @@ pagetable_t pagetable_copy(pagetable_t src, uaddr start, uaddr end, int share) {
  * @param va_prefix 虚拟地址前缀
  */
 static void _pagetable_dump_level(pagetable_t pagetable, int level,
-                                   uaddr va_prefix) {
-  // // 打印缩进
-  // for (int i = 0; i < level; i++) {
-  //   putstring("  ");
-  // }
-  // putstring("Page table @0x");
+                                  uaddr va_prefix) {
+  // 打印缩进
+  for (int i = 0; i < level; i++) {
+    sprint("  ");
+  }
+  sprint("Page table @0x%lx\n", (uint64)pagetable);
 
-  // // 打印页表物理地址(十六进制)
-  // char addr_buf[20];
-  // sprint(addr_buf, "%lx", (uint64)pagetable);
-  // putstring(addr_buf);
-  // putstring("\n");
+  // 遍历当前页表的所有条目
+  for (int i = 0; i < PT_ENTRIES; i++) {
+    pte_t pte = pagetable[i];
+    if (pte & PTE_V) {
+      // 计算此项对应的虚拟地址
+      uaddr va =
+          va_prefix | ((uaddr)i << (PAGE_SHIFT +
+                                    PT_INDEX_BITS * (PAGE_LEVELS - 1 - level)));
 
-  // // 遍历当前页表的有效条目
-  // for (int i = 0; i < PT_ENTRIES; i++) {
-  //   pte_t pte = pagetable[i];
-  //   if (pte & PTE_V) {
-  //     // 计算此项对应的虚拟地址
-  //     uaddr va =
-  //         va_prefix | ((uaddr)i << (PAGE_SHIFT +
-  //                                   PT_INDEX_BITS * (PAGE_LEVELS - 1 - level)));
+      // 打印缩进
+      for (int j = 0; j < level + 1; j++) {
+        sprint("  ");
+      }
 
-  //     // 打印缩进
-  //     for (int j = 0; j < level + 1; j++) {
-  //       putstring("  ");
-  //     }
+      // 打印索引和虚拟地址
+      sprint("[%d] VA 0x%lx -> PA 0x%lx, flags: ", i, va, PTE2PA(pte));
 
-  //     // 打印索引和虚拟地址
-  //     char entry_buf[100];
-  //     sprint(entry_buf, "[%d] VA 0x%lx -> PA 0x%lx, flags: ", i, va,
-  //            PTE2PA(pte));
-  //     putstring(entry_buf);
+      // 打印权限标志
+      if (pte & PTE_R)
+        sprint("R");
+      if (pte & PTE_W)
+        sprint("W");
+      if (pte & PTE_X)
+        sprint("X");
+      if (pte & PTE_U)
+        sprint("U");
+      if (pte & PTE_G)
+        sprint("G");
+      if (pte & PTE_A)
+        sprint("A");
+      if (pte & PTE_D)
+        sprint("D");
+      sprint("\n");
 
-  //     // 打印权限标志
-  //     if (pte & PTE_R)
-  //       putstring("R");
-  //     if (pte & PTE_W)
-  //       putstring("W");
-  //     if (pte & PTE_X)
-  //       putstring("X");
-  //     if (pte & PTE_U)
-  //       putstring("U");
-  //     if (pte & PTE_G)
-  //       putstring("G");
-  //     if (pte & PTE_A)
-  //       putstring("A");
-  //     if (pte & PTE_D)
-  //       putstring("D");
-  //     putstring("\n");
-
-  //     // 如果不是叶子级别，则递归打印下一级
-  //     if (level < PAGE_LEVELS - 1) {
-  //       _pagetable_dump_level((pagetable_t)PTE2PA(pte), level + 1, va);
-  //     }
-  //   }
-  // }
+      // 如果不是叶子级别，则递归打印下一级
+      if (level < PAGE_LEVELS - 1 && !(pte & (PTE_R | PTE_W | PTE_X))) {
+        _pagetable_dump_level((pagetable_t)PTE2PA(pte), level + 1, va);
+      }
+    }
+  }
 }
 
 /**
  * 打印页表内容(用于调试)
  */
 void pagetable_dump(pagetable_t pagetable) {
-  // if (pagetable == NULL) {
-  //   putstring("NULL page table\n");
-  //   return;
-  // }
+  if (pagetable == NULL) {
+    sprint("NULL page table\n");
+    return;
+  }
 
-  // putstring("=== Page Table Dump ===\n");
-  // _pagetable_dump_level(pagetable, 0, 0);
+  sprint("=== Page Table Dump ===\n");
+  _pagetable_dump_level(pagetable, 0, 0);
 
-  // // 打印统计信息
-  // char stats_buf[100];
-  // sprint(stats_buf, "Stats: %d page tables, %d mapped pages\n",
-  //        atomic_read(&pt_stats.page_tables),
-  //        atomic_read(&pt_stats.mapped_pages));
-  // putstring(stats_buf);
-  // putstring("=======================\n");
+  // 打印统计信息
+  sprint("Stats: %d page tables, %d mapped pages\n",
+         atomic_read(&pt_stats.page_tables),
+         atomic_read(&pt_stats.mapped_pages));
+  sprint("=======================\n");
 }

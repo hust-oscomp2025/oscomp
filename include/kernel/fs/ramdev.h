@@ -5,7 +5,7 @@
 #include <kernel/types.h>
 
 #define RAMDISK_BLOCK_COUNT 128
-#define RAMDISK_BLOCK_SIZE  PGSIZE
+#define RAMDISK_BLOCK_SIZE  PAGE_SIZE
 
 #define MAX_RAMDISK_COUNT 10
 

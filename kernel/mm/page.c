@@ -28,8 +28,8 @@ static list_node free_page_list = { NULL };
 volatile static int free_page_counter;
 
 // 获取页框号 (PFN)
-static unsigned long get_pfn(void *addr) {
-  return ((uint64)addr - mem_base_addr) / PGSIZE;
+static uint64 get_pfn(void *addr) {
+  return ((uint64)addr - mem_base_addr) / PAGE_SIZE;
 }
 
 // 初始化页结构
@@ -50,13 +50,14 @@ void init_page_struct(struct page* page) {
 void page_init(uint64 mem_base, uint64 mem_size_bytes, uint64 start_addr) {
   // 保存物理内存布局信息
   mem_base_addr = mem_base;
+	sprint("mem_size_bytes=%lx\n",mem_size_bytes);
   mem_size = mem_size_bytes;
 
 	free_page_counter = 0;
 
-  uint64 total_pages = (mem_size_bytes / PGSIZE);
+  total_pages = (mem_size_bytes / PAGE_SIZE);
   // 为页结构数组分配空间
-  uint64 page_map_size = ROUNDUP( total_pages * sizeof(struct page), PGSIZE );
+  uint64 page_map_size = ROUNDUP( total_pages * sizeof(struct page), PAGE_SIZE );
   
   // 保留空间给页结构数组
   page_map = (struct page *)start_addr;
@@ -71,12 +72,15 @@ void page_init(uint64 mem_base, uint64 mem_size_bytes, uint64 start_addr) {
   
   // 返回空闲内存开始地址（页结构后的地址）
   uint64 free_start = start_addr + page_map_size;
-  sprint("Free memory starts at: 0x%lx\n", free_start);
+  sprint("Free memory starts at: 0x%lxaa\n", free_start);
 
   // 初始化空闲页链表
   free_page_list.next = NULL;  // 确保链表为空
-	for(uint64 i = free_start;i < mem_base_addr + mem_size_bytes; i += PGSIZE){
+
+	for(uint64 i = free_start;i < mem_base_addr + mem_size_bytes; i += PAGE_SIZE){
 		put_free_page((void *)i);
+		//sprint("Free page list initialized with %lx pages\n", i);
+		free_page_counter++;
 	}
 	sprint("Free page list initialized with %d pages\n", free_page_counter);
 
@@ -95,7 +99,7 @@ void* get_free_page(void) {
 // 释放一个物理页到空闲列表，不涉及page结构
 void put_free_page(void* addr) {
   // 检查地址是否在有效范围内
-  if (((uint64)addr % PGSIZE) != 0 || 
+  if (((uint64)addr % PAGE_SIZE) != 0 || 
       (uint64)addr < mem_base_addr || 
       (uint64)addr >= mem_base_addr + mem_size) {
     panic("put_free_page: invalid address 0x%lx\n", addr);
@@ -108,20 +112,22 @@ void put_free_page(void* addr) {
 }
 
 // 根据页框号获取页结构
-struct page* pfn_to_page(unsigned long pfn) {
+struct page* pfn_to_page(uint64 pfn) {
   if (pfn >= total_pages)
     return NULL;
+	//sprint("pfn_to_page: pfn = %lx\n",pfn);
   return &page_map[pfn];
 }
 
 // 根据物理地址获取页结构
 struct page* virt_to_page(void *addr) {
-  unsigned long pfn = get_pfn(addr);
+  uint64 pfn = get_pfn(addr);
+	//sprint("virt_to_page: pfn=%lx\n",pfn);
   return pfn_to_page(pfn);
 }
 
 // 根据页结构获取页框号
-unsigned long page_to_pfn(struct page* page) {
+uint64 page_to_pfn(struct page* page) {
   if (!page)
     return 0;
   return page - page_map;
@@ -131,18 +137,21 @@ unsigned long page_to_pfn(struct page* page) {
 void* page_to_virt(struct page* page) {
   if (!page)
     return NULL;
-  unsigned long pfn = page_to_pfn(page);
-  return (void*)(mem_base_addr + pfn * PGSIZE);
+  uint64 pfn = page_to_pfn(page);
+  return (void*)(mem_base_addr + pfn * PAGE_SIZE);
 }
 
 // 分配单个页结构及对应物理页
 struct page* alloc_page(void) {
   void* pa = get_free_page();
+	//sprint("alloc_page: pa=%lx\n",pa);
+	
   if (!pa)
     return NULL;
   
-  memset(pa, 0, PGSIZE);
+  memset(pa, 0, PAGE_SIZE);
   struct page* page = virt_to_page(pa);
+	//sprint("alloc_page: page=%lx\n",page);
   if (page) {
     init_page_struct(page);
     atomic_set(&page->_refcount, 1);  // 初始引用计数为1
@@ -273,7 +282,7 @@ void zero_page(struct page* page) {
     
   void* addr = page_to_virt(page);
   if (addr) {
-    memset(addr, 0, PGSIZE);
+    memset(addr, 0, PAGE_SIZE);
   }
 }
 
@@ -286,7 +295,7 @@ void copy_page(struct page* dest, struct page* src) {
   void* src_addr = page_to_virt(src);
   
   if (dest_addr && src_addr) {
-    memcpy(dest_addr, src_addr, PGSIZE);
+    memcpy(dest_addr, src_addr, PAGE_SIZE);
   }
 }
 

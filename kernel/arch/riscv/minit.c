@@ -41,7 +41,7 @@ riscv_regs g_itrframe;
 // in Intel series CPUs. it records the details of devices and memory of the
 // platform simulated using Spike.
 //
-void init_dtb(uint64 dtb) {
+static void init_dtb(uint64 dtb) {
   // defined in spike_interface/spike_htif.c, enabling Host-Target InterFace
   // (HTIF)
   query_htif(dtb);
@@ -139,7 +139,7 @@ void m_start(uintptr_t hartid, uintptr_t dtb) {
 
   // init timing. added @lab1_3
   // lab1_challenge1 为了调试便利，禁用了外部时钟中断：
-  timerinit(hartid);
+  //timerinit(hartid);
 
   // switch to supervisor mode (S mode) and jump to s_start(), i.e., set pc to
   // mepc

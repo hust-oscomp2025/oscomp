@@ -11,7 +11,7 @@
 #define NPROC 32
 
 
-typedef struct trapframe_t {
+struct trapframe {
   // space to store context (all common registers)
   /* offset:0   */ riscv_regs regs;
 
@@ -26,7 +26,7 @@ typedef struct trapframe_t {
   /* offset:272 */ uint64 kernel_satp;
 	// kernel scheduler, added @lab3_challenge2
 	/* offset:280 */ uint64 kernel_schedule;
-}trapframe;
+};
 
 
 
@@ -49,9 +49,9 @@ enum fork_choice {
 
 // the extremely simple definition of process, used for begining labs of PKE
 typedef struct process_t {
-  uint64 kstack;		// 分配一个页面当内核栈，注意内核栈的范围是[kstack-PGSIZE, kstack)
-  trapframe* trapframe;
-	trapframe* ktrapframe;
+  uint64 kstack;		// 分配一个页面当内核栈，注意内核栈的范围是[kstack-PAGE_SIZE, kstack)
+  struct trapframe* trapframe;
+	struct trapframe* ktrapframe;
 
   struct mm_struct *mm;
 

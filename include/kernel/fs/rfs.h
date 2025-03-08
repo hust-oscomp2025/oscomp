@@ -8,7 +8,7 @@
 
 #define RFS_TYPE 0
 #define RFS_MAGIC 0xBEAF
-#define RFS_BLKSIZE PGSIZE
+#define RFS_BLKSIZE PAGE_SIZE
 #define RFS_INODESIZE 128  // block size must be divisible by this value
 #define RFS_MAX_INODE_BLKNUM 10
 #define RFS_MAX_FILE_NAME_LEN 28

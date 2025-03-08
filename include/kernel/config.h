@@ -14,13 +14,13 @@
 #define DRAM_BASE 0x80000000
 
 // the beginning virtual address of PKE kernel
-#define KERN_BASE 0x80200000
+#define KERN_BASE 0x80000000
 
 // virtual address of stack top of user process
 #define USER_STACK_TOP 0x80000000
 
 // start virtual address (4MB) of our simple heap. added @lab2_2
-#define USER_FREE_ADDRESS_START 0x00000000 + PGSIZE * 1024
+#define USER_FREE_ADDRESS_START 0x00000000 + PAGE_SIZE * 1024
 
 
 

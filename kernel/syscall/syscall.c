@@ -65,7 +65,7 @@
 // // reclaim a page, indicated by "va". added @lab2_2
 // //
 // uint64 sys_user_free(uint64 va) {
-//   // user_vm_unmap((pagetable_t)current->pagetable, va, PGSIZE, 1);
+//   // user_vm_unmap((pagetable_t)current->pagetable, va, PAGE_SIZE, 1);
 //   free((void *)va);
 //   return 0;
 // }
@@ -152,8 +152,8 @@
 //   while (i < count) { // count can be greater than page size
 //     uint64 addr = (uint64)bufva + i;
 //     uint64 pa = lookup_pa((pagetable_t)CURRENT->pagetable, addr);
-//     uint64 off = addr - ROUNDDOWN(addr, PGSIZE);
-//     uint64 len = count - i < PGSIZE - off ? count - i : PGSIZE - off;
+//     uint64 off = addr - ROUNDDOWN(addr, PAGE_SIZE);
+//     uint64 len = count - i < PAGE_SIZE - off ? count - i : PAGE_SIZE - off;
 //     uint64 r = do_read(fd, (char *)pa + off, len);
 //     i += r;
 //     if (r < len)
@@ -170,8 +170,8 @@
 //   while (i < count) { // count can be greater than page size
 //     uint64 addr = (uint64)bufva + i;
 //     uint64 pa = lookup_pa((pagetable_t)CURRENT->pagetable, addr);
-//     uint64 off = addr - ROUNDDOWN(addr, PGSIZE);
-//     uint64 len = count - i < PGSIZE - off ? count - i : PGSIZE - off;
+//     uint64 off = addr - ROUNDDOWN(addr, PAGE_SIZE);
+//     uint64 len = count - i < PAGE_SIZE - off ? count - i : PAGE_SIZE - off;
 //     uint64 r = do_write(fd, (char *)pa + off, len);
 //     i += r;
 //     if (r < len)

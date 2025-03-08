@@ -97,8 +97,8 @@
 		 // Make sure objects are aligned to 8 bytes
 		 obj_size = (obj_size + 7) & ~7;
 		 
-		 unsigned int bitmap_size = sizeof(unsigned char) * ((PGSIZE / obj_size + 7) / 8);
-		 unsigned int usable_size = PGSIZE - sizeof(struct slab_header) - bitmap_size;
+		 unsigned int bitmap_size = sizeof(unsigned char) * ((PAGE_SIZE / obj_size + 7) / 8);
+		 unsigned int usable_size = PAGE_SIZE - sizeof(struct slab_header) - bitmap_size;
 		 unsigned int total_objs = usable_size / obj_size;
 		 
 		 // Initialize slab header
@@ -279,7 +279,7 @@
 	*/
  static struct slab_header *find_slab(void *ptr) {
 		 // Convert to page-aligned address to find slab header
-		 uintptr_t addr = (uintptr_t)ptr & ~(PGSIZE - 1);
+		 uintptr_t addr = (uintptr_t)ptr & ~(PAGE_SIZE - 1);
 		 return (struct slab_header *)addr;
  }
  

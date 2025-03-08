@@ -123,7 +123,7 @@ static int load_segment(elf_context *ctx, elf_prog_header *ph) {
          ph->memsz, ph->flags);
 
   // 计算所需页数（向上取整）
-  uint64 num_pages = (ph->memsz + PGSIZE - 1) / PGSIZE;
+  uint64 num_pages = (ph->memsz + PAGE_SIZE - 1) / PAGE_SIZE;
 
   // 确定VMA类型和权限
   enum vma_type vma_type;
@@ -171,21 +171,21 @@ static int load_segment(elf_context *ctx, elf_prog_header *ph) {
 
   // 为段分配物理内存并映射
   for (uint64 i = 0; i < num_pages; i++) {
-    uint64 vaddr = ph->vaddr + i * PGSIZE;
-    void *page = mm_alloc_page(proc, vaddr, prot);
+    uint64 vaddr = ph->vaddr + i * PAGE_SIZE;
+    void *page = mm_user_alloc_page(proc, vaddr, prot);
     if (!page) {
       sprint("Failed to allocate page for segment\n");
       return -1;
     }
 
     // 计算这一页需要从文件中加载的字节数
-    uint64 page_offset = i * PGSIZE;
+    uint64 page_offset = i * PAGE_SIZE;
     uint64 file_offset = ph->off + page_offset;
     uint64 bytes_to_copy = 0;
 
     // 确定需要复制多少数据
     if (page_offset < ph->filesz) {
-      bytes_to_copy = MIN(PGSIZE, ph->filesz - page_offset);
+      bytes_to_copy = MIN(PAGE_SIZE, ph->filesz - page_offset);
 
       // 从文件读取数据到分配的物理页
       if (elf_read_at(ctx, page, bytes_to_copy, file_offset) != bytes_to_copy) {
@@ -194,12 +194,12 @@ static int load_segment(elf_context *ctx, elf_prog_header *ph) {
       }
 
       // 如果此页有剩余部分，需要清零（.bss段的一部分）
-      if (bytes_to_copy < PGSIZE) {
-        memset((char *)page + bytes_to_copy, 0, PGSIZE - bytes_to_copy);
+      if (bytes_to_copy < PAGE_SIZE) {
+        memset((char *)page + bytes_to_copy, 0, PAGE_SIZE - bytes_to_copy);
       }
     } else {
       // 这一页完全是bss段，清零整个页
-      memset(page, 0, PGSIZE);
+      memset(page, 0, PAGE_SIZE);
     }
   }
 

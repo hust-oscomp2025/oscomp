@@ -92,7 +92,7 @@ void *kmalloc(size_t size) {
   } else {
     // For large allocations, use page allocator
 		// 目前只支持最大分配一页
-    unsigned int pages = (total_size + PGSIZE - 1) / PGSIZE;
+    unsigned int pages = (total_size + PAGE_SIZE - 1) / PAGE_SIZE;
     struct page *page = alloc_pages(pages - 1); // Convert order to pages
 
     if (page) {
@@ -125,7 +125,7 @@ void kfree(void *ptr) {
   if (header->flags & KMALLOC_LARGE) {
     // Calculate number of pages used
     size_t total_size = header->size + HEADER_SIZE;
-    unsigned int pages = (total_size + PGSIZE - 1) / PGSIZE;
+    unsigned int pages = (total_size + PAGE_SIZE - 1) / PAGE_SIZE;
 
     // Free the physical pages
     struct page *page = virt_to_page(header);

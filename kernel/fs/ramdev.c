@@ -59,7 +59,7 @@ struct device *init_rfs_device(const char *dev_name) {
   // for ( int i = 0; i < RAMDISK_BLOCK_COUNT; ++ i ){
   //   last_addr = curr_addr;
   //   curr_addr = alloc_page();
-  //   if ( last_addr != NULL && last_addr - curr_addr != PGSIZE ){
+  //   if ( last_addr != NULL && last_addr - curr_addr != PAGE_SIZE ){
   //     panic("RAM Disk0: address is discontinuous!\n");
   //   }
   // }

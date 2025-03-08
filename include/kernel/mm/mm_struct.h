@@ -180,7 +180,7 @@ int do_munmap(process *proc, uint64 addr, size_t length);
  * @param prot 保护标志
  * @return 成功返回映射的地址，失败返回NULL
  */
-void *mm_alloc_page(process *proc, uaddr addr, int prot);
+void *mm_user_alloc_page(process *proc, uaddr addr, int prot);
 
 
 /**

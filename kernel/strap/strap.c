@@ -22,20 +22,13 @@
 //
 // handling the syscalls. will call do_syscall() defined in kernel/syscall.c
 //
-static void handle_syscall(trapframe *tf) {
-  // tf->epc points to the address that our computer will jump to after the trap
-  // handling. for a syscall, we should return to the NEXT instruction after its
-  // handling. in RV64G, each instruction occupies exactly 32 bits (i.e., 4
-  // Bytes)
+static void handle_syscall(struct trapframe *tf) {
+
   tf->epc += 4;
 
-  // TODO (lab1_1): remove the panic call below, and call do_syscall (defined in
-  // kernel/syscall.c) to conduct real operations of the kernel side for a
-  // syscall. IMPORTANT: return value should be returned to user app, or else,
-  // you will encounter problems in later experiments!
+
   tf->regs.a0 = do_syscall(tf->regs.a0, tf->regs.a1, tf->regs.a2, tf->regs.a3,
                            tf->regs.a4, tf->regs.a5, tf->regs.a6, tf->regs.a7);
-  // panic( "call do_syscall to accomplish the syscall and lab1_1 here.\n" );
 }
 
 //
@@ -46,10 +39,6 @@ static uint64 g_ticks = 0;
 //
 void handle_mtimer_trap() {
   sprint("Ticks %d\n", g_ticks);
-  // TODO (lab1_3): increase g_ticks to record this "tick", and then clear the
-  // "SIP" field in sip register. hint: use write_csr to disable the SIP_SSIP
-  // bit in sip. panic( "lab1_3: increase g_ticks by one, and clear SIP field in
-  // sip register.\n" );
   g_ticks++;
   int hartid = read_tp();
   CURRENT->tick_count++;
@@ -93,10 +82,10 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 					}
 					
 					// 页地址对齐
-					uint64 page_va = ROUNDDOWN(addr, PGSIZE);
+					uint64 page_va = ROUNDDOWN(addr, PAGE_SIZE);
 					
 					// 计算页索引
-					int page_idx = (page_va - vma->vm_start) / PGSIZE;
+					int page_idx = (page_va - vma->vm_start) / PAGE_SIZE;
 					if (page_idx < 0 || page_idx >= vma->page_count) {
 							sprint("页索引越界: %d\n", page_idx);
 							goto error;
@@ -115,11 +104,11 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 					// 				// 复制页内容
 					// 				void *old_pa = page_to_virt(old_page);
 					// 				void *new_pa = page_to_virt(new_page);
-					// 				memcpy(new_pa, old_pa, PGSIZE);
+					// 				memcpy(new_pa, old_pa, PAGE_SIZE);
 									
 					// 				// 更新映射
-					// 				user_vm_unmap(proc->pagetable, page_va, PGSIZE, 0);
-					// 				user_vm_map(proc->pagetable, page_va, PGSIZE, (uint64)new_pa, 
+					// 				user_vm_unmap(proc->pagetable, page_va, PAGE_SIZE, 0);
+					// 				user_vm_map(proc->pagetable, page_va, PAGE_SIZE, (uint64)new_pa, 
 					// 									 prot_to_type(vma->vm_prot, 1));
 									
 					// 				// 更新页结构
@@ -131,14 +120,14 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 					// 		} else {
 					// 				// 页已分配但可能未映射，确保映射正确
 					// 				void *pa = page_to_virt(vma->pages[page_idx]);
-					// 				user_vm_map(proc->pagetable, page_va, PGSIZE, (uint64)pa,
+					// 				user_vm_map(proc->pagetable, page_va, PAGE_SIZE, (uint64)pa,
 					// 									prot_to_type(vma->vm_prot, 1));
 					// 				return;
 					// 		}
 					// }
 					
 					// 分配新页并映射
-					void *page_addr = mm_alloc_page(proc, page_va, vma->vm_prot);
+					void *page_addr = mm_user_alloc_page(proc, page_va, vma->vm_prot);
 					if (page_addr) return;
 			}
 	}
@@ -146,10 +135,10 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 	// // 如果没有找到VMA或VMA处理失败，回退到原有处理逻辑
 	// if (mcause == CAUSE_STORE_PAGE_FAULT) {
 	// 		// 检查是否是栈扩展
-	// 		if (stval >= proc->user_stack_bottom - PGSIZE) {
-	// 				proc->user_stack_bottom -= PGSIZE;
+	// 		if (stval >= proc->user_stack_bottom - PAGE_SIZE) {
+	// 				proc->user_stack_bottom -= PAGE_SIZE;
 	// 				void *pa = Alloc_page();
-	// 				user_vm_map(proc->pagetable, proc->user_stack_bottom, PGSIZE,
+	// 				user_vm_map(proc->pagetable, proc->user_stack_bottom, PAGE_SIZE,
 	// 									(uint64)pa, prot_to_type(PROT_WRITE | PROT_READ, 1));
 	// 				proc->mapped_info[STACK_SEGMENT].va = proc->user_stack_bottom;
 	// 				proc->mapped_info[STACK_SEGMENT].npages++;
@@ -161,9 +150,9 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 	// 		if (pte && ((uint64)*pte & PTE_W) == 0 && (*pte & PTE_X) == 0) {
 	// 				uint64 page_va = stval & (~0xfff);
 	// 				uint64 newpa = (uint64)Alloc_page();
-	// 				memcpy((void *)newpa, (void *)PTE2PA(*pte), PGSIZE);
-	// 				user_vm_unmap(proc->pagetable, page_va, PGSIZE, 0);
-	// 				user_vm_map(proc->pagetable, page_va, PGSIZE, newpa, 
+	// 				memcpy((void *)newpa, (void *)PTE2PA(*pte), PAGE_SIZE);
+	// 				user_vm_unmap(proc->pagetable, page_va, PAGE_SIZE, 0);
+	// 				user_vm_map(proc->pagetable, page_va, PAGE_SIZE, newpa, 
 	// 									 prot_to_type(PROT_WRITE | PROT_READ, 1));
 	// 				return;
 	// 		}

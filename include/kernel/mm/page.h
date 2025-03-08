@@ -25,7 +25,9 @@ struct page {
 
 /* 页大小相关定义 */
 #define PAGE_SHIFT      12
+#ifndef PAGE_SIZE
 #define PAGE_SIZE       (1UL << PAGE_SHIFT)
+#endif
 #define PAGE_MASK       (~(PAGE_SIZE-1))
 
 
@@ -47,9 +49,9 @@ struct page* alloc_page(void);                // 分配单个页并返回page结
 void page_free(struct page* page);            // 释放单个页
 
 // 页框号与地址转换函数
-struct page* pfn_to_page(unsigned long pfn);
+struct page* pfn_to_page(uint64 pfn);
 struct page* virt_to_page(void* addr);
-unsigned long page_to_pfn(struct page* page);
+uint64 page_to_pfn(struct page* page);
 void* page_to_virt(struct page* page);
 
 // 页引用计数操作

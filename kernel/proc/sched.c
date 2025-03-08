@@ -122,7 +122,7 @@ void schedule() {
 	process* cur = CURRENT;
 			//sprint("debug\n");
 	if(cur && cur->status == BLOCKED && cur->ktrapframe == NULL){
-		cur->ktrapframe = (trapframe *)kmalloc(sizeof(trapframe));
+		cur->ktrapframe = (struct trapframe *)kmalloc(sizeof(struct trapframe));
 		store_all_registers(cur->ktrapframe);
 		//sprint("cur->ktrapframe->regs.ra=0x%x\n",cur->ktrapframe->regs.ra);
 	}
