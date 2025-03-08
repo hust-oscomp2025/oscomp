@@ -1,7 +1,7 @@
 #include <kernel/address_space.h>
-#include <kernel/pmm.h>
+#include <kernel/kmalloc.h>
 #include <kernel/memlayout.h>
-#include <kernel/vmm.h>
+
 #include <kernel/spinlock.h>
 #include <kernel/atomic.h>
 #include <kernel/types.h>
@@ -435,5 +435,5 @@ void *alloc_page_buffer(void) {
 
 // 释放页缓存使用的物理页
 void free_page_buffer(void *addr) {
-    free_page(addr);  // 使用现有的物理页释放函数
+    put_free_page(addr);  // 使用现有的物理页释放函数
 }

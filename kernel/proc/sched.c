@@ -3,9 +3,9 @@
  */
 
 #include <kernel/sched.h>
-
+#include <kernel/kmalloc.h>
 #include <spike_interface/spike_utils.h>
-#include <kernel/pmm.h>
+
 
 #define store_all_registers(t6) \
     asm volatile(                \
@@ -122,7 +122,7 @@ void schedule() {
 	process* cur = CURRENT;
 			//sprint("debug\n");
 	if(cur && cur->status == BLOCKED && cur->ktrapframe == NULL){
-		cur->ktrapframe = Alloc_page();
+		cur->ktrapframe = (trapframe *)kmalloc(sizeof(trapframe));
 		store_all_registers(cur->ktrapframe);
 		//sprint("cur->ktrapframe->regs.ra=0x%x\n",cur->ktrapframe->regs.ra);
 	}
@@ -167,7 +167,7 @@ void schedule() {
 	cur->status = RUNNING;
 	if(cur->ktrapframe != NULL){
 		restore_all_registers(cur->ktrapframe);
-		free_page(cur->ktrapframe);
+		kfree(cur->ktrapframe);
 		cur->ktrapframe = NULL;
 		return;
 	}

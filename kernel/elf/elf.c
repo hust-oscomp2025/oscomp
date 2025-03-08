@@ -5,16 +5,19 @@
  */
 
 #include <kernel/elf.h>
-#include <kernel/pmm.h>
+
 #include <kernel/proc_file.h>
 #include <kernel/process.h>
 #include <kernel/riscv.h>
 #include <kernel/mm_struct.h>
 #include <kernel/vfs.h>
-#include <kernel/vmm.h>
+#include <kernel/kmalloc.h>
+#include <kernel/mmap.h>
+
+
 #include <util/string.h>
 #include <spike_interface/spike_utils.h>
-#include <kernel/mmap.h>
+
 
 /**
  * ELF加载器的上下文信息

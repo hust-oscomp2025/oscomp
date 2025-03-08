@@ -5,8 +5,7 @@
 #include <kernel/riscv.h>
 #include <kernel/elf.h>
 #include <kernel/process.h>
-#include <kernel/pmm.h>
-#include <kernel/vmm.h>
+
 #include <kernel/sched.h>
 #include <kernel/memlayout.h>
 #include <kernel/types.h>
@@ -14,10 +13,59 @@
 #include <kernel/rfs.h>
 #include <kernel/ramdev.h>
 #include <kernel/pagetable.h>
+#include <kernel/kmalloc.h>
 
 #include <util/string.h>
 
 #include <spike_interface/spike_utils.h>
+
+
+extern char _end[];
+extern uint64 g_mem_size;
+static uint64 free_mem_start_addr;  //beginning address of free memory
+static uint64 free_mem_end_addr;    //end address of free memory (not included)
+static void pmm_init() {
+  // 内核程序段起止地址
+  uint64 g_kernel_start = KERN_BASE;
+  uint64 g_kernel_end = (uint64)&_end;
+
+  uint64 pke_kernel_size = g_kernel_end - g_kernel_start;
+  sprint("PKE kernel start 0x%lx, PKE kernel end: 0x%lx, PKE kernel size: 0x%lx.\n",
+    g_kernel_start, g_kernel_end, pke_kernel_size);
+
+  // 空闲内存起始地址必须页对齐
+  free_mem_start_addr = ROUNDUP(g_kernel_end, PGSIZE);
+
+
+  // 重新计算g_mem_size以限制物理内存空间
+  g_mem_size = ROUNDDOWN((PKE_MAX_ALLOWABLE_RAM, g_mem_size),PGSIZE);
+	assert(g_mem_size > pke_kernel_size);
+  sprint("free physical memory address: [0x%lx, 0x%lx] \n", free_mem_start_addr,
+    DRAM_BASE + g_mem_size - 1);
+  
+
+
+  // 初始化页管理子系统
+  page_init(DRAM_BASE, g_mem_size, free_mem_start_addr);
+  
+
+  sprint("Physical memory manager initialization complete.\n");
+}
+
+extern char _etext[];
+static void kern_vm_init(void) {
+  g_kernel_pagetable = alloc_page()->virtual_address;
+  // 首先分配一个页当内核的页表
+
+  // map virtual address [KERN_BASE, _etext] to physical address [DRAM_BASE,
+  // DRAM_BASE+(_etext - KERN_BASE)], to maintin (direct) text section kernel
+  // address mapping.
+  for (int i = KERN_BASE; i <= ROUNDDOWN((uint64)_etext, PAGE_SIZE);
+       i += PAGE_SIZE) {
+    pgt_map_page(g_kernel_pagetable, i, i, PTE_R | PTE_X);
+  }
+}
+
 
 
 

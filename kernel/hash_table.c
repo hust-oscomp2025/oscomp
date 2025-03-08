@@ -1,11 +1,11 @@
 #include "util/hash_table.h"
 #include <kernel/types.h>
-#include <kernel/pmm.h>
+#include <kernel/kmalloc.h>
 
 static int default_equal(void *key1, void *key2) { return key1 == key2; }
 
 static int default_put(struct hash_table *hash_table, void *key, void *value) {
-  struct hash_node *node = (struct hash_node *)alloc_page();
+  struct hash_node *node = (struct hash_node *)kmalloc(sizeof(struct hash_node));
   if (hash_table->virtual_hash_get(hash_table, key) != NULL) return -1;
   node->key = key;
   node->value = value;
@@ -37,7 +37,7 @@ static int default_erase(struct hash_table *hash_table, void *key) {
   if (head->next) {
     struct hash_node *node = head->next;
     head->next = node->next;
-    free_page(node);
+    kfree(node);
     return 0;
   } else
     return -1;

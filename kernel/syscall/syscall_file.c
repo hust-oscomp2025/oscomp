@@ -1,6 +1,6 @@
 #include <kernel/vfs.h>
 #include <kernel/proc_file.h>
-#include <kernel/vmm.h>
+
 #include <kernel/process.h>
 #include <spike_interface/spike_utils.h>
 

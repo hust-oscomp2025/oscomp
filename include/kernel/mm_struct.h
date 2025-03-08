@@ -99,9 +99,9 @@ struct mm_struct {
  * @param user_va 用户空间虚拟地址
  * @return 物理地址，失败返回NULL
  */
-inline void *mm_lookuppa(struct mm_struct *mm, uaddr user_va) {
+inline uint64 mm_lookuppa(struct mm_struct *mm, uaddr user_va) {
   if (!mm || !mm->pagetable){
-    return NULL;
+    return 0;
 	}
   return pgt_lookuppa(mm->pagetable, user_va);
 }

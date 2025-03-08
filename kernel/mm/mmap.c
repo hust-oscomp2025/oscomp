@@ -1,132 +1,235 @@
 #include <kernel/mmap.h>
 #include <kernel/mm_struct.h>
 #include <kernel/pagetable.h>
+#include <kernel/process.h>
+#include <kernel/page.h>
+#include <kernel/kmalloc.h>
+#include <util/string.h>
 
 /**
- * 将单个物理页映射到虚拟地址
- * @param mm        内存描述符
- * @param vaddr     虚拟地址
- * @param page      物理页结构
- * @param prot      保护标志
- * @return          成功返回0，失败返回错误码
+ * 将保护标志(PROT_*)转换为页表项标志
  */
-int map_page(struct mm_struct *mm, unsigned long vaddr, struct page *page,
-             pgprot_t prot) {
-  // 确保地址页对齐
-  if (vaddr & (PAGE_SIZE - 1))
-    return -EINVAL;
-
-  // 获取页框号
-  unsigned long pfn = page_to_pfn(page);
-
-  // 建立映射
-  pte_t *pte = page_walk(mm->pagetable, vaddr, 1);
-  if (!pte)
-    return -ENOMEM;
-
-  if (*pte & _PAGE_PRESENT)
-    return -EEXIST; // 已存在映射
-
-  *pte = pfn_pte(pfn, prot);
-  return 0;
+uint64 prot_to_type(int prot, int user) {
+    uint64 type = 0;
+    if (prot & PROT_READ)
+        type |= _PAGE_READ;
+    if (prot & PROT_WRITE)
+        type |= _PAGE_WRITE;
+    if (prot & PROT_EXEC)
+        type |= _PAGE_EXEC;
+    
+    // 始终设置页面存在标志
+    type |= _PAGE_PRESENT;
+    
+    // 设置用户访问权限
+    if (user)
+        type |= _PAGE_USER;
+    
+    return type;
 }
 
 /**
- * 取消单个虚拟地址的映射
- * @param mm        内存描述符
- * @param vaddr     虚拟地址
- * @return          成功返回0，失败返回错误码
+ * 进程内存映射 - 将物理页映射到进程的虚拟地址空间
  */
-int unmap_page(struct mm_struct *mm, unsigned long vaddr) {
-  // 确保地址页对齐
-  if (vaddr & (PAGE_SIZE - 1))
-    return -EINVAL;
+int proc_map_page(process *proc, uaddr vaddr, struct page *page, int prot) {
+    // 参数检查
+    if (!proc || !proc->mm || !proc->mm->pagetable)
+        return -EINVAL;
 
-  pte_t *pte = page_walk(mm->pagetable, vaddr, 0);
-  if (!pte || !(*pte & _PAGE_PRESENT))
-    return -EFAULT; // 映射不存在
+    // 转换保护标志为页表项标志
+    uint64 perm = prot_to_type(prot, 1); // 1表示用户页
 
-  // 清除页表项
-  *pte = 0;
-  return 0;
+    // 获取物理页地址
+    uint64 pa = (uint64)page_to_virt(page);
+
+    // 使用页表管理接口建立映射
+    int result = pgt_map_page(proc->mm->pagetable, vaddr, pa, perm);
+    
+    // 映射成功后，更新VMA信息（此处简化处理）
+    if (result == 0) {
+        // 在实际实现中，可能需要更新或创建VMA
+        // 这里简化处理，仅刷新TLB
+        flush_tlb();
+    }
+
+    return result;
 }
 
 /**
- * 修改单个页面映射的保护属性
- * @param mm        内存描述符
- * @param vaddr     虚拟地址
- * @param prot      新的保护标志
- * @return          成功返回0，失败返回错误码
+ * 取消进程的内存映射
  */
-int protect_page(struct mm_struct *mm, unsigned long vaddr, pgprot_t prot) {
-	// 确保地址页对齐
-	if (vaddr & (PAGE_SIZE-1))
-			return -EINVAL;
-	
-	pte_t *pte = page_walk(mm->pagetable, vaddr, 0);
-	if (!pte || !(*pte & _PAGE_PRESENT))
-			return -EFAULT; // 映射不存在
-	
-	// 保留物理页号，修改保护位
-	unsigned long pfn = pte_pfn(*pte);
-	*pte = pfn_pte(pfn, prot);
-	
-	return 0;
-}
+int proc_unmap_page(process *proc, uaddr vaddr) {
+    // 参数检查
+    if (!proc || !proc->mm)
+        return -EINVAL;
 
+    // 确保地址页对齐
+    if (vaddr & (PAGE_SIZE - 1))
+        return -EINVAL;
 
+    // 获取进程页表
+    pagetable_t pagetable = proc->mm->pagetable;
+    if (!pagetable)
+        return -EINVAL;
 
+    // 使用页表管理接口取消映射
+    int result = pgt_unmap(pagetable, vaddr, PAGE_SIZE, 0); // 不释放物理页
+    
+    // 取消映射成功后，更新VMA信息（此处简化处理）
+    if (result == 0) {
+        // 在实际实现中，可能需要更新VMA
+        // 这里简化处理，仅刷新TLB
+        flush_tlb();
+    }
 
-/**
- * 查询虚拟地址的物理映射
- * @param mm        内存描述符
- * @param addr      虚拟地址
- * @param pfn       返回的物理页框号
- * @param prot      返回的保护标志
- * @return          成功返回0，失败返回错误码
- */
-int query_vm_mapping(struct mm_struct *mm, unsigned long addr,
-                     unsigned long *pfn, pgprot_t *prot) {
-  pte_t *pte = page_walk(mm->pagetable, addr, 0);
-  if (!pte || !(*pte & _PAGE_PRESENT))
-    return -EFAULT; // 映射不存在
-
-  if (pfn)
-    *pfn = pte_pfn(*pte);
-  if (prot)
-    *prot = pte_pgprot(*pte);
-
-  return 0;
+    return result;
 }
 
 /**
- * 将保护标志转换为页表项标志
+ * 修改进程内存映射的保护属性
  */
-static inline pgprot_t vm_get_page_prot(unsigned long vm_flags) {
-  pgprot_t prot = __pgprot(0);
+int proc_protect_page(process *proc, uaddr vaddr, int prot) {
+    // 参数检查
+    if (!proc || !proc->mm)
+        return -EINVAL;
+    
+    // 确保地址页对齐
+    if (vaddr & (PAGE_SIZE - 1))
+        return -EINVAL;
+    
+    // 获取进程页表
+    pagetable_t pagetable = proc->mm->pagetable;
+    if (!pagetable)
+        return -EINVAL;
 
-  if (vm_flags & VM_READ)
-    prot = __pgprot(prot | _PAGE_READ);
-  if (vm_flags & VM_WRITE)
-    prot = __pgprot(prot | _PAGE_WRITE);
-  if (vm_flags & VM_EXEC)
-    prot = __pgprot(prot | _PAGE_EXEC);
-  if (vm_flags & VM_USER)
-    prot = __pgprot(prot | _PAGE_USER);
-
-  return prot;
+    // 查找对应的页表项
+    pte_t *pte = pgt_walk(pagetable, vaddr, 0);
+    if (!pte || !(*pte & PTE_V))
+        return -EFAULT; // 映射不存在
+    
+    // 转换保护标志为页表项标志
+    uint64 perm = prot_to_type(prot, 1); // 1表示用户页
+    
+    // 保留物理页地址，更新权限位
+    uint64 pa = PTE2PA(*pte);
+    *pte = PA2PPN(pa) | perm;
+    
+    // 刷新TLB
+    flush_tlb();
+    
+    return 0;
 }
 
 /**
- * 从页表项中提取物理页框号
+ * 查询进程内存映射状态
  */
-static inline unsigned long pte_pfn(pte_t pte) {
-  return (pte_val(pte) & PTE_PFN_MASK) >> PAGE_SHIFT;
+int proc_query_mapping(process *proc, uaddr addr, 
+                     struct page **page_out, int *prot_out) {
+    // 参数检查
+    if (!proc || !proc->mm)
+        return -EINVAL;
+    
+    // 获取进程页表
+    pagetable_t pagetable = proc->mm->pagetable;
+    if (!pagetable)
+        return -EINVAL;
+
+    // 查找对应的页表项
+    pte_t *pte = pgt_walk(pagetable, addr, 0);
+    if (!pte || !(*pte & PTE_V))
+        return -EFAULT; // 映射不存在
+
+    // 获取物理地址
+    uint64 pa = PTE2PA(*pte);
+    
+    // 如果请求返回物理页结构
+    if (page_out) {
+        *page_out = virt_to_page((void*)pa);
+    }
+    
+    // 如果请求返回保护标志
+    if (prot_out) {
+        int prot = 0;
+        if (*pte & _PAGE_READ)
+            prot |= PROT_READ;
+        if (*pte & _PAGE_WRITE)
+            prot |= PROT_WRITE;
+        if (*pte & _PAGE_EXEC)
+            prot |= PROT_EXEC;
+        *prot_out = prot;
+    }
+
+    return 0;
 }
 
 /**
- * 从物理页框号和保护标志构建页表项
+ * 分配物理页并映射到进程的虚拟地址空间
  */
-static inline pte_t pfn_pte(unsigned long pfn, pgprot_t prot) {
-  return __pte((pfn << PAGE_SHIFT) | pgprot_val(prot));
+int proc_alloc_map_page(process *proc, uaddr vaddr, int prot) {
+    // 参数检查
+    if (!proc || !proc->mm)
+        return -EINVAL;
+
+    // 确保地址页对齐
+    if (vaddr & (PAGE_SIZE - 1))
+        return -EINVAL;
+
+    // 获取进程页表
+    pagetable_t pagetable = proc->mm->pagetable;
+    if (!pagetable)
+        return -EINVAL;
+
+    // 检查地址是否已经映射
+    pte_t *pte = pgt_walk(pagetable, vaddr, 0);
+    if (pte && (*pte & PTE_V))
+        return -EEXIST; // 已存在映射
+
+    // 分配物理页
+    struct page *page = alloc_page();
+    if (!page)
+        return -ENOMEM;
+
+    // 获取页的虚拟地址并清零
+    void *page_va = page_to_virt(page);
+    memset(page_va, 0, PAGE_SIZE);
+
+    // 映射页到进程地址空间
+    int result = proc_map_page(proc, vaddr, page, prot);
+    if (result != 0) {
+        // 映射失败，释放页
+        page_free(page);
+        return result;
+    }
+
+    return 0;
+}
+
+/**
+ * 取消进程内存映射并释放对应的物理页
+ */
+int proc_unmap_free_page(process *proc, uaddr vaddr) {
+    // 参数检查
+    if (!proc || !proc->mm)
+        return -EINVAL;
+
+    // 确保地址页对齐
+    if (vaddr & (PAGE_SIZE - 1))
+        return -EINVAL;
+
+    // 查询当前映射
+    struct page *page = NULL;
+    int result = proc_query_mapping(proc, vaddr, &page, NULL);
+    if (result != 0)
+        return result; // 映射不存在
+
+    // 取消映射
+    result = proc_unmap_page(proc, vaddr);
+    if (result != 0)
+        return result;
+
+    // 释放物理页
+    if (page)
+        page_free(page);
+    
+    return 0;
 }

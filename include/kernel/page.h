@@ -43,7 +43,7 @@ void page_init(uint64 mem_base, uint64 mem_size, uint64 start_addr);
 // 页分配与释放
 struct page* alloc_pages(int order);          // 分配2^order个连续页
 void free_pages(struct page* page, int order); // 释放2^order个连续页
-struct page* page_alloc(void);                // 分配单个页并返回page结构
+struct page* alloc_page(void);                // 分配单个页并返回page结构
 void page_free(struct page* page);            // 释放单个页
 
 // 页框号与地址转换函数

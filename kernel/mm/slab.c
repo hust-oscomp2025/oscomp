@@ -78,9 +78,9 @@
  /**
 	* @brief Initialize a new slab
 	*/
- static struct slab_header *slab_init(size_t obj_size) {
+ static struct slab_header *slab_header_init(size_t obj_size) {
 		 // Allocate a physical page
-		 struct page *page = page_alloc();
+		 struct page *page = alloc_page();
 		 if (!page) return NULL;
  
 		 // Use beginning of page for slab header
@@ -113,7 +113,7 @@
 				 // If no partial slabs, check free slabs
 				 if (list_empty(&cache->slabs_free)) {
 						 // Need to create a new slab
-						 struct slab_header *slab = slab_init(cache->obj_size);
+						 struct slab_header *slab = slab_header_init(cache->obj_size);
 						 if (!slab) return NULL;  // Out of memory
 						 
 						 // Add new slab to partial list

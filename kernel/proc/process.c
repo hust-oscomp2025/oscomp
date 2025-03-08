@@ -11,25 +11,17 @@
 #include <kernel/elf.h>
 #include <kernel/memlayout.h>
 #include <kernel/mm_struct.h>
-#include <kernel/pmm.h>
+#include <kernel/mmap.h>
+
 #include <kernel/process.h>
 #include <kernel/riscv.h>
 #include <kernel/sched.h>
 #include <kernel/semaphore.h>
 #include <kernel/strap.h>
-#include <kernel/vmm.h>
+
 #include <spike_interface/spike_utils.h>
 #include <util/string.h>
 
-// moved to global.h
-//
-// extern char smode_trap_vector[];
-// extern void return_to_user(trapframe *, uint64 satp);
-// extern char trap_sec_start[];
-
-// moved to global.c
-// process procs[NPROC];
-// process* current[NCPU];
 
 process procs[NPROC];
 process *current_percpu[NCPU];
@@ -91,25 +83,16 @@ process *find_empty_process() {
   panic("cannot find any free process structure.\n");
 }
 
-extern char trap_sec_start[];
+
+
 process *alloc_process() {
   // locate the first usable process structure
   process *ps = find_empty_process();
   ps->mm = user_mm_create();
   // 分配内核栈
-  ps->kstack = (uint64)Alloc_page() + PGSIZE;
+  ps->kstack = (uint64)alloc_page()->virtual_address + PGSIZE;
 
-  // 为中断帧创建VMA
-  uint64 trapframe_addr = (uint64)Alloc_page();
-  ps->trapframe = (trapframe *)trapframe_addr;
-  struct vm_area_struct *trapframe_vma =
-      create_vma(ps->mm, trapframe_addr, trapframe_addr + PGSIZE,
-                 PROT_WRITE | PROT_READ, VMA_PRIVATE, VM_PRIVATE);
-
-  // 为系统中断入口程序创建VMA
-  struct vm_area_struct *trap_sec_vma = create_vma(
-      ps->mm, (uint64)trap_sec_start, (uint64)trap_sec_start + PGSIZE,
-      PROT_READ | PROT_EXEC, VMA_SHARED, VM_SHARED);
+  ps->trapframe = (trapframe *)alloc_page()->virtual_address;
 
   // 创建信号量和初始化文件管理
   ps->sem_index = sem_new(0);

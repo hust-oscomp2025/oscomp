@@ -109,7 +109,7 @@ void pagetable_free(pagetable_t pagetable);
  * @param perm 权限标志(PTE_R, PTE_W, PTE_X, PTE_U等)
  * @return int 成功返回0，失败返回负值
  */
-int pgt_map(pagetable_t pagetable, uaddr va, uint64 pa, uint64 size,
+int pgt_map_page(pagetable_t pagetable, uaddr va, uint64 pa,
                   int perm);
 
 /**
@@ -141,7 +141,7 @@ pte_t *pgt_walk(pagetable_t pagetable, uaddr va, int alloc);
  * @param va 虚拟地址
  * @return uint64 物理地址，如果映射不存在则返回0
  */
-void* pgt_lookuppa(pagetable_t pagetable, uaddr va);
+uint64 pgt_lookuppa(pagetable_t pagetable, uaddr va);
 
 /**
  * @brief 复制页表结构(可选择是否复制映射)

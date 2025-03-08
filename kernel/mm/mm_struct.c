@@ -1,11 +1,14 @@
-#include <kernel/atomic.h>
+
+#include <kernel/kmalloc.h>
 #include <kernel/memlayout.h>
 #include <kernel/mm_struct.h>
 #include <kernel/page.h>
 #include <kernel/mmap.h>
-#include <kernel/pmm.h>
+
 #include <kernel/process.h>
-#include <kernel/vmm.h>
+
+#include <kernel/atomic.h>
+
 #include <spike_interface/spike_utils.h>
 #include <util/string.h>
 
@@ -95,7 +98,7 @@ int setup_user_memory(process *proc) {
 
   // 关联到进程
   proc->mm = mm;
-  mm->pagetable = page_alloc()->virtual_address;
+  mm->pagetable = alloc_page()->virtual_address;
 
   // 初始化栈区域：仅创建虚拟内存区域(VMA)，不分配物理页
   // 采用按需分页策略：物理页将在首次访问时通过缺页异常机制分配
@@ -350,7 +353,7 @@ void *mm_alloc_page(process *proc, uaddr addr, int prot) {
     return NULL;
 
   // 分配一个页结构体
-  struct page *page = page_alloc();
+  struct page *page = alloc_page();
   if (!page)
     return NULL;
 
@@ -358,7 +361,7 @@ void *mm_alloc_page(process *proc, uaddr addr, int prot) {
   void *pa = page_to_virt(page);
 
   // 映射到用户虚拟地址空间
-  int result = pgt_map(proc->mm->pagetable, addr, PGSIZE, (uint64)pa,
+  int result = pgt_map_page(proc->mm->pagetable, addr, (uint64)pa,
                          prot_to_type(prot, 1));
 
   if (result != 0) {

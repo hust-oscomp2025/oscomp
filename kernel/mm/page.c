@@ -43,7 +43,7 @@ void init_page_struct(struct page* page) {
   page->virtual_address = NULL;
   page->mapping = NULL;
   INIT_LIST_HEAD(&page->lru);
-  spinlock_init(&page->page_lock.lock);
+  spinlock_init(&page->page_lock);
 }
 
 // 初始化页管理子系统
@@ -136,7 +136,7 @@ void* page_to_virt(struct page* page) {
 }
 
 // 分配单个页结构及对应物理页
-struct page* page_alloc(void) {
+struct page* alloc_page(void) {
   void* pa = get_free_page();
   if (!pa)
     return NULL;
@@ -177,7 +177,7 @@ struct page* alloc_pages(int order) {
     return NULL;
     
   if (order == 0)
-    return page_alloc();  // 单页分配
+    return alloc_page();  // 单页分配
   
   // 目前不支持多页连续分配，可以在后续扩展中实现buddy系统
   return NULL;

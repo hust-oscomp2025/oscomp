@@ -4,7 +4,7 @@
 #include <kernel/types.h>
 #include <kernel/atomic.h>
 #include <kernel/spinlock.h>
-#include <kernel/vmm.h>
+
 #include <kernel/riscv.h>
 #include <kernel/list.h>
 #include <kernel/page.h>

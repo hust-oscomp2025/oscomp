@@ -3,7 +3,7 @@
  */
 
 #include <kernel/proc_file.h>
-#include <kernel/pmm.h>
+#include <kernel/kmalloc.h>
 #include <kernel/process.h>
 #include <kernel/riscv.h>
 #include "spike_interface/spike_file.h"
@@ -18,7 +18,7 @@
 // return the pointer to the page containing the data structure.
 //
 proc_file_management *init_proc_file_management(void) {
-  proc_file_management *pfiles = (proc_file_management *)alloc_page();
+  proc_file_management *pfiles = (proc_file_management *)kmalloc(sizeof(proc_file_management));
   pfiles->cwd = vfs_root_dentry; // by default, cwd is the root
   pfiles->nfiles = 0;
 
@@ -33,8 +33,8 @@ proc_file_management *init_proc_file_management(void) {
 // reclaim the open-file management data structure of a process.
 // note: this function is not used as PKE does not actually reclaim a process.
 //
-void reclaim_proc_file_management(proc_file_management *pfiles) {
-  free_page(pfiles);
+void free_proc_file_management(proc_file_management *pfiles) {
+	kfree(pfiles);
   return;
 }
 
@@ -66,7 +66,7 @@ int do_open(char *pathname, int flags) {
     struct file *pfile = CURRENT->pfiles->fd_table[fd];
     if (pfile == NULL) {
       // initialize this file structure
-			pfile = (struct file *)alloc_page();
+			pfile = (struct file *)kmalloc(sizeof(struct file));
       memcpy(pfile, opened_file, sizeof(struct file));
       CURRENT->pfiles->nfiles++;
       return fd;
@@ -163,7 +163,7 @@ int do_opendir(char *pathname) {
     struct file *pfile = CURRENT->pfiles->fd_table[fd];
     if (pfile == NULL) {
       // initialize this file structure
-			pfile = (struct file *)alloc_page();
+			pfile = (struct file *)kmalloc(sizeof(struct file));
       memcpy(pfile, opened_file, sizeof(struct file));
       CURRENT->pfiles->nfiles++;
       return fd;

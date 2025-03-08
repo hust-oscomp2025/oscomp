@@ -7,7 +7,7 @@
 
 #include <kernel/elf.h>
 
-#include <kernel/pmm.h>
+
 #include <kernel/proc_file.h>
 #include <kernel/process.h>
 #include <kernel/sched.h>
@@ -17,7 +17,7 @@
 #include <kernel/syscall.h>
 #include <kernel/types.h>
 #include <kernel/mm_struct.h>
-#include <kernel/vmm.h>
+
 #include <util/string.h>
 
 #include <kernel/semaphore.h>

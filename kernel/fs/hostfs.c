@@ -2,8 +2,8 @@
  * Interface functions between VFS and host-fs. added @lab4_1.
  */
 #include <kernel/hostfs.h>
+#include <kernel/kmalloc.h>
 
-#include <kernel/pmm.h>
 #include "spike_interface/spike_file.h"
 #include <spike_interface/spike_utils.h>
 #include <util/string.h>
@@ -35,7 +35,7 @@ const struct inode_operations hostfs_i_ops = {
 // append hostfs to the fs list.
 //
 int register_hostfs() {
-  struct file_system_type *fs_type = (struct file_system_type *)alloc_page();
+  struct file_system_type *fs_type = kmalloc(sizeof(struct file_system_type));
   fs_type->type_num = HOSTFS_TYPE;
   fs_type->get_superblock = hostfs_get_superblock;
 
@@ -64,7 +64,7 @@ struct device *init_host_device(char *name) {
     panic("init_host_device: No HOSTFS file system found!\n");
 
   // allocate a vfs device
-  struct device *device = (struct device *)alloc_page();
+  struct device *device = kmalloc(sizeof(struct device));
   // set the device name and index
   strcpy(device->dev_name, name);
   // we only support one host-fs device
@@ -285,7 +285,7 @@ int hostfs_hook_close(struct inode *f_inode, struct dentry *dentry) {
 /**** vfs-hostfs file system type interface functions ****/
 struct super_block *hostfs_get_superblock(struct device *dev) {
   // set the data for the vfs super block
-  struct super_block *sb = alloc_page();
+  struct super_block *sb = kmalloc(sizeof(struct super_block));
   sb->s_dev = dev;
 
   struct inode *root_inode = hostfs_alloc_vinode(sb);

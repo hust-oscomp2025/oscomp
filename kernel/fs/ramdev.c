@@ -4,7 +4,7 @@
 
 #include <kernel/ramdev.h>
 #include <kernel/vfs.h>
-#include <kernel/pmm.h>
+#include <kernel/kmalloc.h>
 #include <kernel/riscv.h>
 #include <kernel/types.h>
 #include <util/string.h>
@@ -40,68 +40,69 @@ int ramdisk_read(struct rfs_device *rfs_device, int blkno){
 // setup an vfs node, initialize RAM disk device, and attach the device with the vfs node.
 //
 struct device *init_rfs_device(const char *dev_name) {
-  // find rfs in registered fs list
-  struct file_system_type *fs_type = NULL;
-  for (int i = 0; i < MAX_SUPPORTED_FS; i++) {
-    if (fs_list[i] != NULL && fs_list[i]->type_num == RFS_TYPE) {
-      fs_type = fs_list[i];
-      break; 
-    }
-  }
-  if (!fs_type) {
-    panic("No RFS file system found!\n");
-  }
+  // // find rfs in registered fs list
+  // struct file_system_type *fs_type = NULL;
+  // for (int i = 0; i < MAX_SUPPORTED_FS; i++) {
+  //   if (fs_list[i] != NULL && fs_list[i]->type_num == RFS_TYPE) {
+  //     fs_type = fs_list[i];
+  //     break; 
+  //   }
+  // }
+  // if (!fs_type) {
+  //   panic("No RFS file system found!\n");
+  // }
 
-  // alloc blocks for the RAM Disk
-  void *curr_addr = NULL;
-  void *last_addr = NULL;
-  void *ramdisk_addr = NULL;
-  for ( int i = 0; i < RAMDISK_BLOCK_COUNT; ++ i ){
-    last_addr = curr_addr;
-    curr_addr = alloc_page();
-    if ( last_addr != NULL && last_addr - curr_addr != PGSIZE ){
-      panic("RAM Disk0: address is discontinuous!\n");
-    }
-  }
-  ramdisk_addr = curr_addr;
+  // // alloc blocks for the RAM Disk
+  // void *curr_addr = NULL;
+  // void *last_addr = NULL;
+  // void *ramdisk_addr = NULL;
+  // for ( int i = 0; i < RAMDISK_BLOCK_COUNT; ++ i ){
+  //   last_addr = curr_addr;
+  //   curr_addr = alloc_page();
+  //   if ( last_addr != NULL && last_addr - curr_addr != PGSIZE ){
+  //     panic("RAM Disk0: address is discontinuous!\n");
+  //   }
+  // }
+  // ramdisk_addr = curr_addr;
 
-  // find a free rfs device
-  struct rfs_device **rfs_device = NULL;
-  int device_id = 0;
-  for (int i = 0; i < MAX_RAMDISK_COUNT; i++) {
-    if (rfs_device_list[i] == NULL) {
-      rfs_device = &rfs_device_list[i];
-      device_id = i;
-      break;
-    }
-  }
-  if (!rfs_device) {
-    panic("RAM Disk0: no free device!\n");
-  }
+  // // find a free rfs device
+  // struct rfs_device **rfs_device = NULL;
+  // int device_id = 0;
+  // for (int i = 0; i < MAX_RAMDISK_COUNT; i++) {
+  //   if (rfs_device_list[i] == NULL) {
+  //     rfs_device = &rfs_device_list[i];
+  //     device_id = i;
+  //     break;
+  //   }
+  // }
+  // if (!rfs_device) {
+  //   panic("RAM Disk0: no free device!\n");
+  // }
   
-  *rfs_device = (struct rfs_device *)alloc_page();
-  (*rfs_device)->d_blocks = RAMDISK_BLOCK_COUNT;
-  (*rfs_device)->d_blocksize = RAMDISK_BLOCK_SIZE;
-  (*rfs_device)->d_write = ramdisk_write;
-  (*rfs_device)->d_read = ramdisk_read;
-  (*rfs_device)->d_address = ramdisk_addr;
-  (*rfs_device)->iobuffer = alloc_page();
+  // *rfs_device = (struct rfs_device *)alloc_page();
+  // (*rfs_device)->d_blocks = RAMDISK_BLOCK_COUNT;
+  // (*rfs_device)->d_blocksize = RAMDISK_BLOCK_SIZE;
+  // (*rfs_device)->d_write = ramdisk_write;
+  // (*rfs_device)->d_read = ramdisk_read;
+  // (*rfs_device)->d_address = ramdisk_addr;
+  // (*rfs_device)->iobuffer = alloc_page();
 
-  // allocate a vfs device
-  struct device * device = (struct device *)alloc_page();
-  // set the device name and index
-  strcpy(device->dev_name, dev_name);
-  device->dev_id = device_id;
-  device->fs_type = fs_type;
+  // // allocate a vfs device
+  // struct device * device = (struct device *)alloc_page();
+  // // set the device name and index
+  // strcpy(device->dev_name, dev_name);
+  // device->dev_id = device_id;
+  // device->fs_type = fs_type;
 
-  // add the device to the vfs device list
-  for(int i = 0; i < MAX_VFS_DEV; i++) {
-    if (vfs_dev_list[i] == NULL) {
-      vfs_dev_list[i] = device;
-      break;
-    }
-  }
+  // // add the device to the vfs device list
+  // for(int i = 0; i < MAX_VFS_DEV; i++) {
+  //   if (vfs_dev_list[i] == NULL) {
+  //     vfs_dev_list[i] = device;
+  //     break;
+  //   }
+  // }
 
-  sprint("%s: base address of %s is: %p\n",dev_name, dev_name, ramdisk_addr);
-  return device;
+  // sprint("%s: base address of %s is: %p\n",dev_name, dev_name, ramdisk_addr);
+  // return device;
+	return NULL;
 }

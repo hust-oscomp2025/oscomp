@@ -3,9 +3,10 @@
  */
 
 #include <kernel/strap.h>
+#include <kernel/mmap.h>
 
 #include <kernel/memlayout.h>
-#include <kernel/pmm.h>
+
 #include <kernel/page.h>
 #include <kernel/mm_struct.h>
 #include <kernel/process.h>
@@ -14,7 +15,7 @@
 #include <util/string.h>
 #include <kernel/syscall.h>
 
-#include <kernel/vmm.h>
+
 
 #include <spike_interface/spike_utils.h>
 
@@ -108,7 +109,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 					// 		if (pte && (*pte & PTE_V) && ((*pte & PTE_W) == 0) && (*pte & PTE_R) && mcause == CAUSE_STORE_PAGE_FAULT) {
 					// 				// 写时复制
 					// 				struct page *old_page = vma->pages[page_idx];
-					// 				struct page *new_page = page_alloc();
+					// 				struct page *new_page = alloc_page();
 					// 				if (!new_page) goto error;
 									
 					// 				// 复制页内容
