@@ -17,7 +17,7 @@ struct page {
     uint64 flags;                // 页标志
     atomic_t _refcount;          // 引用计数
     uint64 index;                // 在映射文件中的页索引
-    void *virtual_address;       // 页的虚拟地址
+    void *virtual_address;       // 页在内核空间中的虚拟地址
     struct address_space *mapping; // 所属的address_space
     struct list_head lru;        // LRU链表节点
     spinlock_t page_lock;        // 页锁，用于同步访问

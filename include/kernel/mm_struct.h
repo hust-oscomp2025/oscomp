@@ -12,12 +12,16 @@
  * 虚拟内存区域类型
  */
 enum vma_type {
-    VMA_ANONYMOUS = 0,  // 匿名映射区域
-    VMA_FILE,          // 文件映射区域
-    VMA_STACK,         // 栈区域
-    VMA_HEAP,          // 堆区域
-    VMA_CODE,          // 代码区域
-    VMA_DATA           // 数据区域
+	VMA_ANONYMOUS = 0,  // 匿名映射（如堆）
+	VMA_PRIVATE,        // 私有映射
+	VMA_SHARED,         // 共享映射
+	VMA_FILE,           // 文件映射
+	VMA_STACK,          // 栈区域
+	VMA_HEAP,           // 堆区域
+	VMA_TEXT,           // 代码段
+	VMA_DATA,           // 数据段
+	VMA_BSS,            // BSS段
+	VMA_VDSO            // 虚拟动态共享对象
 };
 
 /**
@@ -50,22 +54,31 @@ struct vm_area_struct {
     spinlock_t vma_lock;     // VMA锁
 };
 
-// VMA标志位
-#define VM_READ     0x00000001  // 可读
-#define VM_WRITE    0x00000002  // 可写
-#define VM_EXEC     0x00000004  // 可执行
-#define VM_SHARED   0x00000008  // 共享映射
-#define VM_PRIVATE  0x00000010  // 私有映射
-#define VM_GROWSUP  0x00000020  // 向上增长（堆）
-#define VM_GROWSDOWN 0x00000040 // 向下增长（栈）
-#define VM_DONTCOPY 0x00000080  // fork时不复制
-#define VM_DONTEXPAND 0x00000100 // 不允许扩展
+/**
+ * VMA标志位 - 可按位组合使用
+ */
+#define VM_READ         0x00000001  // 可读
+#define VM_WRITE        0x00000002  // 可写
+#define VM_EXEC         0x00000004  // 可执行
+#define VM_SHARED       0x00000008  // 共享映射
+#define VM_PRIVATE      0x00000010  // 私有映射（写时复制）
+#define VM_GROWSDOWN    0x00000100  // 向下增长（用于栈）
+#define VM_GROWSUP      0x00000200  // 向上增长（用于堆）
+#define VM_DONTCOPY     0x00000400  // fork时不复制
+#define VM_DONTEXPAND   0x00000800  // 不允许扩展
+#define VM_LOCKED       0x00001000  // 页面锁定，不允许换出
+#define VM_IO           0x00002000  // 映射到I/O地址空间
 
+
+typedef uint64 pte_t;
+typedef uint64* pagetable_t;  // 512 PTEs
 /**
  * 用户内存布局
  * 仿照 mm_struct，管理进程的整个地址空间
  */
 struct mm_struct {
+    // 页表
+    pagetable_t pagetable;          // 页表
     // VMA链表
     struct list_head mmap;     // VMA链表头
     int map_count;             // VMA数量
@@ -88,9 +101,11 @@ struct mm_struct {
     atomic_t mm_users;        // 用户数量
     atomic_t mm_count;        // 引用计数
     
-    // 页表
-    pagetable_t pgd;          // 页表
+
 };
+
+void *user_va_to_pa(struct mm_struct *mm, uaddr user_va);
+
 
 /**
  * 初始化用户内存管理子系统

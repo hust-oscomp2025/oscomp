@@ -50,10 +50,7 @@ enum fork_choice {
 // the extremely simple definition of process, used for begining labs of PKE
 typedef struct process_t {
   uint64 kstack;		// 分配一个页面当内核栈，注意内核栈的范围是[kstack-PGSIZE, kstack)
-  pagetable_t pagetable;
   trapframe* trapframe;
-
-	// lab3_challenge2新增：内核上下文。用来从内核阻塞中恢复。
 	trapframe* ktrapframe;
 
   struct mm_struct *mm;

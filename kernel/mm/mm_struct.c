@@ -1,11 +1,11 @@
-#include <spike_interface/spike_utils.h>
 #include <kernel/atomic.h>
 #include <kernel/memlayout.h>
+#include <kernel/mm_struct.h>
 #include <kernel/page.h>
 #include <kernel/pmm.h>
 #include <kernel/process.h>
-#include <kernel/user_mm.h>
 #include <kernel/vmm.h>
+#include <spike_interface/spike_utils.h>
 #include <util/string.h>
 
 /**
@@ -14,6 +14,25 @@
 void user_mem_init(void) {
   // 初始化可能的全局资源
   sprint("User memory management subsystem initialized\n");
+}
+
+/**
+ * 将用户虚拟地址转换为物理地址
+ *
+ * @param mm 内存管理结构体
+ * @param user_va 用户空间虚拟地址
+ * @return 物理地址，失败返回NULL
+ */
+void *user_va_to_pa(struct mm_struct *mm, uaddr user_va) {
+  if (!mm || !mm->pagetable){
+    return NULL;
+	}
+
+
+  pte_t *pte = page_walk(mm->pagetable, user_va, 0);
+  if (pte == 0)
+    return NULL;
+  return (void *)(PTE2PA(*pte) + (user_va & (PGSIZE - 1)));
 }
 
 /**
@@ -93,9 +112,10 @@ int setup_user_memory(process *proc) {
 
   // 关联到进程
   proc->mm = mm;
-  mm->pgd = proc->pagetable;
+  mm->pagetable = page_alloc()->virtual_address;
 
-  // 初始化栈区域
+  // 初始化栈区域：仅创建虚拟内存区域(VMA)，不分配物理页
+  // 采用按需分页策略：物理页将在首次访问时通过缺页异常机制分配
   struct vm_area_struct *stack_vma =
       create_vma(mm, mm->start_stack, mm->end_stack, PROT_READ | PROT_WRITE,
                  VMA_STACK, VM_GROWSDOWN | VM_PRIVATE);
@@ -274,7 +294,7 @@ int do_munmap(process *proc, uint64 addr, size_t length) {
         if (vma->pages[i]) {
           // 取消对应虚拟地址的映射
           uint64 page_va = vma->vm_start + (i * PGSIZE);
-          user_vm_unmap(proc->pagetable, page_va, PGSIZE, 1);
+          user_vm_unmap(mm->pagetable, page_va, PGSIZE, 1);
 
           // 释放页
           page_free(vma->pages[i]);
@@ -343,7 +363,7 @@ int do_munmap(process *proc, uint64 addr, size_t length) {
  * 分配一个页并映射到指定地址
  */
 void *user_alloc_page(process *proc, uaddr addr, int prot) {
-  if (!proc || !proc->pagetable)
+  if (!proc || !proc->mm || !proc->mm->pagetable)
     return NULL;
 
   // 分配一个页结构体
@@ -355,7 +375,7 @@ void *user_alloc_page(process *proc, uaddr addr, int prot) {
   void *pa = page_to_virt(page);
 
   // 映射到用户虚拟地址空间
-  int result = map_pages(proc->pagetable, addr, PGSIZE, (uint64)pa,
+  int result = map_pages(proc->mm->pagetable, addr, PGSIZE, (uint64)pa,
                          prot_to_type(prot, 1));
 
   if (result != 0) {
@@ -452,7 +472,7 @@ uint64 do_brk(process *proc, int64 increment) {
       for (int i = start_idx; i < end_idx; i++) {
         if (vma->pages[i]) {
           uint64 page_va = vma->vm_start + (i * PGSIZE);
-          user_vm_unmap(proc->pagetable, page_va, PGSIZE, 1);
+          user_vm_unmap(mm->pagetable, page_va, PGSIZE, 1);
           page_free(vma->pages[i]);
           vma->pages[i] = NULL;
         }
@@ -682,7 +702,7 @@ void print_proc_memory_layout(process *proc) {
     case VMA_HEAP:
       type_str = "heap";
       break;
-    case VMA_CODE:
+    case VMA_TEXT:
       type_str = "code";
       break;
     case VMA_DATA:

@@ -225,7 +225,6 @@ static inline void flush_tlb(void) { asm volatile("sfence.vma zero, zero"); }
 // that have the high bit set.
 #define MAXVA (1L << (9 + 9 + 9 + 12 - 1))
 
-typedef uint64 pte_t;
-typedef uint64 *pagetable_t;  // 512 PTEs
+
 
 #endif

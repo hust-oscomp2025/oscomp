@@ -9,7 +9,7 @@
 #include <kernel/proc_file.h>
 #include <kernel/process.h>
 #include <kernel/riscv.h>
-#include <kernel/user_mm.h>
+#include <kernel/mm_struct.h>
 #include <kernel/vfs.h>
 #include <kernel/vmm.h>
 #include <util/string.h>
@@ -133,7 +133,7 @@ static int load_segment(elf_context *ctx, elf_prog_header *ph) {
     prot |= PROT_WRITE;
   if (ph->flags & SEGMENT_EXECUTABLE) {
     prot |= PROT_EXEC;
-    vma_type = VMA_CODE;
+    vma_type = VMA_TEXT;
     vma_flags |= VM_EXEC;
 
     // 更新代码段范围

@@ -2,7 +2,7 @@
  * virtual address mapping related functions.
  */
 
-#include <kernel/user_mm.h>
+#include <kernel/mm_struct.h>
 #include <kernel/vmm.h>
 
 #include <spike_interface/spike_utils.h>
@@ -167,29 +167,6 @@ void kern_vm_init(void) {
   g_kernel_pagetable = t_page_dir;
 }
 
-/* --- user page table part --- */
-//
-// convert and return the corresponding physical address of a virtual address
-// (va) of application.
-//
-void *user_va_to_pa(pagetable_t page_dir, void *va) {
-  // TODO (lab2_1): implement user_va_to_pa to convert a given user virtual
-  // address "va" to its corresponding physical address, i.e., "pa". To do it,
-  // we need to walk through the page table, starting from its directory
-  // "page_dir", to locate the PTE that maps "va". If found, returns the "pa" by
-  // using: pa = PYHS_ADDR(PTE) + (va & (1<<PGSHIFT -1)) Here, PYHS_ADDR() means
-  // retrieving the starting address (4KB aligned), and (va & (1<<PGSHIFT -1))
-  // means computing the offset of "va" inside its page. Also, it is possible
-  // that "va" is not mapped at all. in such case, we can find invalid PTE, and
-  // should return NULL. panic( "You have to implement user_va_to_pa (convert
-  // user va to pa) to print messages in lab2_1.\n" );
-  pte_t *pte = page_walk(page_dir, (uint64)va, 0);
-  uint64 offset = (uint64)va & ((1UL << PGSHIFT) - 1);
-  if (pte == 0)
-    return NULL;
-  return (void *)(PTE2PA(*pte) + offset);
-}
-
 //
 // unmap virtual address [va, va+size] from the user app.
 // reclaim the physical pages if free!=0
@@ -210,56 +187,4 @@ void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free) {
       }
       *pte = 0;
     }
-}
-// 计算用户请求的内存大小，跳过堆元数据部分
-#define USER_MEM_SIZE(size) ((size) + sizeof(heap_block))
-
-void free(void *ptr) {
-  int hartid = read_tp();
-  // 如果指针为 NULL，直接返回
-  if (ptr == NULL) {
-    return;
-  }
-
-  // 获取指向 heap_block 的指针，跳过用户数据区域
-  heap_block *block = (heap_block *)((uintptr_t)ptr - sizeof(heap_block));
-  heap_block *pa_block = user_va_to_pa(CURRENT->pagetable, block);
-  // 如果该块已经是空闲的，说明已经释放过了，直接返回
-  if (pa_block->free) {
-    return;
-  }
-
-  // 标记为已释放
-  pa_block->free = 1;
-
-  heap_block *block_prev = pa_block->prev;
-  heap_block *pa_block_prev = user_va_to_pa(CURRENT->pagetable, block_prev);
-  heap_block *block_next = pa_block->next;
-  heap_block *pa_block_next = user_va_to_pa(CURRENT->pagetable, block_next);
-  // 合并前面的空闲块
-  if (block_prev != NULL && pa_block_prev->free) {
-    // 合并前一个空闲块
-    pa_block_prev->size += pa_block->size;
-    pa_block_prev->next = pa_block->next;
-    if (pa_block->next != NULL) {
-
-      pa_block_next->prev = pa_block->prev;
-    }
-    block = pa_block->prev; // 更新块指针，合并后变成前一个块
-  }
-
-  // 合并后面的空闲块
-  if (block_next != NULL && pa_block_next->free) {
-    // 合并后一个空闲块
-    pa_block->size += pa_block_next->size;
-    pa_block->next = pa_block_next->next;
-    if (block_next != NULL) {
-      pa_block_next->prev = block;
-    }
-  }
-
-  // 合并会自动设置好堆的头指针，所以不需要做更多工作。
-  // if (block_prev == NULL) {
-  //  CURRENT->heap = block; // 更新堆的头部
-  //}
 }

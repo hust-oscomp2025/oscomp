@@ -2,6 +2,7 @@
 #define _STRING_H
 
 #include <stddef.h>
+#include <string.h>
 
 void *memcpy(void* dest, const void* src, size_t len);
 void *memset(void* dest, int byte, size_t len);

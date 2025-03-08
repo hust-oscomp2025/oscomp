@@ -24,7 +24,7 @@ typedef struct heap_block_t {
 } heap_block;
 
 uint64 prot_to_type(int prot, int user);
-pte_t *page_walk(pagetable_t pagetable, uint64 va, int alloc);
+pte_t *page_walk(pagetable_t pagetable, uaddr va, int alloc);
 uint64 lookup_pa(pagetable_t pagetable, uint64 va);
 
 /* --- kernel page table --- */
@@ -36,8 +36,6 @@ void kern_vm_map(pagetable_t page_dir, uint64 va, uint64 pa, uint64 sz, int perm
 // Initialize the kernel pagetable
 void kern_vm_init(void);
 
-/* --- user page table --- */
-void *user_va_to_pa(pagetable_t page_dir, void *va);
 void user_vm_map(pagetable_t page_dir, uint64 va, uint64 size, uint64 pa, int perm);
 void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free);
 void print_proc_vmspace(process* proc);
