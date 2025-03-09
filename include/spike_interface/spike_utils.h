@@ -29,10 +29,9 @@ void kassert_fail(const char* s) __attribute__((noreturn));
 
 //void shutdown(int code);
 
-#define panic(s, ...)                \
-  do {                               \
-    do_panic(s "\n", ##__VA_ARGS__); \
-  } while (0)
+#define panic(s, ...)do_panic(s "\n", ##__VA_ARGS__)
+
+
 #define kassert(cond)                    \
   do {                                   \
     if (!(cond)) kassert_fail("" #cond); \

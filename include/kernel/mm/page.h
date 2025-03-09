@@ -40,7 +40,7 @@ struct page {
 #define PAGE_RESERVED  (1UL << 5)  // 页已被保留，不可分配
 
 // 初始化页管理子系统
-void page_init(uint64 mem_base, uint64 mem_size, uint64 start_addr);
+void init_page_manager();
 
 // 页分配与释放
 struct page* alloc_pages(int order);          // 分配2^order个连续页

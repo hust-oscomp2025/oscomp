@@ -26,9 +26,9 @@ extern void mtrapvec();
 // htif is defined in spike_interface/spike_htif.c, marks the availability of
 // HTIF
 extern __uint64_t htif;
-// g_mem_size is defined in spike_interface/spike_memory.c, size of the emulated
+// spike_mem_size is defined in spike_interface/spike_memory.c, size of the emulated
 // memory
-extern uint64 g_mem_size;
+extern uint64 spike_mem_size;
 // struct riscv_regs is define in kernel/riscv.h, and g_itrframe is used to save
 // registers when interrupt hapens in M mode. added @lab1_2
 riscv_regs g_itrframe;
@@ -51,7 +51,7 @@ static void init_dtb(uint64 dtb) {
   // defined in spike_interface/spike_memory.c, obtain information about
   // emulated memory
   query_mem(dtb);
-  sprint("(Emulated) memory size: %ld MB\n", g_mem_size >> 20);
+  sprint("(Emulated) memory size: %ld MB\n", spike_mem_size >> 20);
 }
 
 //

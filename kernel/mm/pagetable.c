@@ -5,10 +5,11 @@
 
 #include <kernel/mm/page.h>
 #include <kernel/mm/pagetable.h>
+
 #include <spike_interface/spike_utils.h>
 
-#include <util/spinlock.h>
 
+#include <util/spinlock.h>
 #include <util/string.h>
 
 // pointer to kernel page director
@@ -17,6 +18,10 @@ pagetable_t g_kernel_pagetable;
 static spinlock_t pagetable_lock = SPINLOCK_INIT;
 // 全局页表统计信息
 pagetable_stats_t pt_stats;
+
+
+#define VIRTUAL_TO_PHYSICAL(vaddr) ((uint64)(vaddr))
+#define PHYSICAL_TO_VIRTUAL(paddr) ((uint64)(paddr))
 
 /**
  * 初始化页表子系统
@@ -444,4 +449,55 @@ void pagetable_dump(pagetable_t pagetable) {
          atomic_read(&pt_stats.page_tables),
          atomic_read(&pt_stats.mapped_pages));
   sprint("=======================\n");
+}
+
+// 检查特定地址的映射
+void check_address_mapping(pagetable_t pagetable, uint64 va) {
+  uint64 vpn[3];
+  vpn[2] = (va >> 30) & 0x1FF;
+  vpn[1] = (va >> 21) & 0x1FF;
+  vpn[0] = (va >> 12) & 0x1FF;
+  
+  sprint("Checking mapping for address 0x%lx (vpn: %d,%d,%d)\n", 
+         va, vpn[2], vpn[1], vpn[0]);
+  
+  // 检查第一级
+  pte_t *pte1 = &pagetable[vpn[2]];
+  sprint("L1 PTE at 0x%lx: 0x%lx\n", (uint64)pte1, *pte1);
+  if (!(*pte1 & PTE_V)) {
+    sprint("  Invalid L1 entry!\n");
+    return;
+  }
+  
+  // 检查第二级
+  pagetable_t pt2 = (pagetable_t)PTE2PA(*pte1);
+  // 转换为虚拟地址以便访问
+  pt2 = (pagetable_t)PHYSICAL_TO_VIRTUAL((uint64)pt2);
+  pte_t *pte2 = &pt2[vpn[1]];
+  sprint("L2 PTE at 0x%lx: 0x%lx\n", (uint64)pte2, *pte2);
+  if (!(*pte2 & PTE_V)) {
+    sprint("  Invalid L2 entry!\n");
+    return;
+  }
+  
+  // 检查第三级
+  pagetable_t pt3 = (pagetable_t)PTE2PA(*pte2);
+  pt3 = (pagetable_t)PHYSICAL_TO_VIRTUAL((uint64)pt3);
+  pte_t *pte3 = &pt3[vpn[0]];
+  sprint("L3 PTE at 0x%lx: 0x%lx\n", (uint64)pte3, *pte3);
+  if (!(*pte3 & PTE_V)) {
+    sprint("  Invalid L3 entry!\n");
+    return;
+  }
+  
+  // 分析最终PTE的权限
+  sprint("  Physical addr: 0x%lx\n", PTE2PA(*pte3));
+  sprint("  Permissions: %s%s%s%s%s%s%s\n",
+         (*pte3 & PTE_R) ? "R" : "-",
+         (*pte3 & PTE_W) ? "W" : "-",
+         (*pte3 & PTE_X) ? "X" : "-",
+         (*pte3 & PTE_U) ? "U" : "-",
+         (*pte3 & PTE_G) ? "G" : "-",
+         (*pte3 & PTE_A) ? "A" : "-",
+         (*pte3 & PTE_D) ? "D" : "-");
 }

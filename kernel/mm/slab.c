@@ -18,14 +18,14 @@
  // These sizes are the total allocation size
  #define SLAB_SIZES_COUNT 8
  const size_t slab_sizes[SLAB_SIZES_COUNT] = {
-		 16,    // 8 bytes user data + 8 byte header
-		 32,    // 24 bytes user data + 8 byte header
-		 64,    // 56 bytes user data + 8 byte header
-		 128,   // 120 bytes user data + 8 byte header
-		 256,   // 248 bytes user data + 8 byte header
-		 512,   // 504 bytes user data + 8 byte header
-		 1024,  // 1016 bytes user data + 8 byte header
-		 2048   // 2040 bytes user data + 8 byte header
+		 16,    // 8 bytes kernel data + 8 byte header
+		 32,    // 24 bytes kernel data + 8 byte header
+		 64,    // 56 bytes kernel data + 8 byte header
+		 128,   // 120 bytes kernel data + 8 byte header
+		 256,   // 248 bytes kernel data + 8 byte header
+		 512,   // 504 bytes kernel data + 8 byte header
+		 1024,  // 1016 bytes kernel data + 8 byte header
+		 2048   // 2040 bytes kernel data + 8 byte header
  };
  
  // Global array of slab caches

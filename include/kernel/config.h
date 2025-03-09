@@ -14,7 +14,7 @@
 #define DRAM_BASE 0x80000000
 
 // the beginning virtual address of PKE kernel
-#define KERN_BASE 0x80000000
+#define KERN_BASE 0x80200000
 
 // virtual address of stack top of user process
 #define USER_STACK_TOP 0x80000000

@@ -10,6 +10,7 @@
 #include <kernel/mm/kmalloc.h>
 #include <kernel/mm/page.h>
 #include <kernel/mm/slab.h>
+
 #include <spike_interface/spike_utils.h>
 #include <util/atomic.h>
 #include <util/list.h>

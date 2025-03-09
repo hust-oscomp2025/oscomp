@@ -1,13 +1,17 @@
 #include <kernel/mm/page.h>
+#include <kernel/config.h>
+
 #include <util/atomic.h>
 #include <util/spinlock.h>
 #include <util/list.h>
 #include <util/string.h>
-#include <spike_interface/spike_utils.h>
 #include <util/sync_utils.h>
 
+#include <spike_interface/spike_utils.h>
+
+
 // 页结构数组，用于跟踪所有物理页
-static struct page *page_map = NULL;
+static struct page *page_pool = NULL;
 static uint64 total_pages = 0;
 static uint64 page_map_size = 0;
 
@@ -47,42 +51,51 @@ void init_page_struct(struct page* page) {
 }
 
 // 初始化页管理子系统
-void page_init(uint64 mem_base, uint64 mem_size_bytes, uint64 start_addr) {
-  // 保存物理内存布局信息
-  mem_base_addr = mem_base;
-	sprint("mem_size_bytes=%lx\n",mem_size_bytes);
-  mem_size = mem_size_bytes;
+extern char _end[];
+void init_page_manager() {
+  // 内核程序段起止地址
+	uint64 kernel_end = (uint64)&_end;
+	uint64 pke_kernel_size = kernel_end - KERN_BASE;
+	sprint("PKE kernel start 0x%lx, PKE kernel end: 0x%lx, PKE kernel size: 0x%lx.\n",
+    KERN_BASE, kernel_end, pke_kernel_size);
+  // 空闲内存起始地址必须页对齐
+  uint64 free_mem_start_addr = ROUNDUP(kernel_end, PAGE_SIZE);
 
+	extern uint64 spike_mem_size;	//在spike_memory.c中获取
+	mem_base_addr = KERN_BASE;
+	mem_size = ROUNDDOWN(MIN(PKE_MAX_ALLOWABLE_RAM, spike_mem_size),PAGE_SIZE);
+	assert(mem_size > pke_kernel_size);
+  sprint("Free physical memory address: [0x%lx, 0x%lx) \n", free_mem_start_addr,
+    DRAM_BASE + mem_size);
 	free_page_counter = 0;
 
-  total_pages = (mem_size_bytes / PAGE_SIZE);
+  total_pages = (mem_size / PAGE_SIZE);
   // 为页结构数组分配空间
   uint64 page_map_size = ROUNDUP( total_pages * sizeof(struct page), PAGE_SIZE );
   
   // 保留空间给页结构数组
-  page_map = (struct page *)start_addr;
+  page_pool = (struct page *)free_mem_start_addr;
   
   // 初始化所有页结构
   for (uint64 i = 0; i < total_pages; i++) {
-    init_page_struct(&page_map[i]);
+    init_page_struct(&page_pool[i]);
   }
   
   sprint("Page subsystem initialized: %d pages, map size: %lx bytes at 0x%lx\n", 
-         total_pages, page_map_size, (uint64)page_map);
+         total_pages, page_map_size, (uint64)page_pool);
   
   // 返回空闲内存开始地址（页结构后的地址）
-  uint64 free_start = start_addr + page_map_size;
-  sprint("Free memory starts at: 0x%lxaa\n", free_start);
+  uint64 free_start = free_mem_start_addr + page_map_size;
+  sprint("Free memory starts at: 0x%lx\n", free_start);
 
   // 初始化空闲页链表
   free_page_list.next = NULL;  // 确保链表为空
 
-	for(uint64 i = free_start;i < mem_base_addr + mem_size_bytes; i += PAGE_SIZE){
+	for(uint64 i = free_start;i < DRAM_BASE + mem_size; i += PAGE_SIZE){
 		put_free_page((void *)i);
 		//sprint("Free page list initialized with %lx pages\n", i);
-		free_page_counter++;
 	}
-	sprint("Free page list initialized with %d pages\n", free_page_counter);
+  sprint("Physical memory manager initialization complete.\n");
 
 }
 
@@ -116,7 +129,7 @@ struct page* pfn_to_page(uint64 pfn) {
   if (pfn >= total_pages)
     return NULL;
 	//sprint("pfn_to_page: pfn = %lx\n",pfn);
-  return &page_map[pfn];
+  return &page_pool[pfn];
 }
 
 // 根据物理地址获取页结构
@@ -130,7 +143,7 @@ struct page* virt_to_page(void *addr) {
 uint64 page_to_pfn(struct page* page) {
   if (!page)
     return 0;
-  return page - page_map;
+  return page - page_pool;
 }
 
 // 根据页结构获取物理地址

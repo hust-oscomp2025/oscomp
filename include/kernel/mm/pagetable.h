@@ -175,6 +175,8 @@ void pagetable_activate(pagetable_t pagetable);
  */
 pagetable_t pagetable_current(void);
 
+void check_address_mapping(pagetable_t pagetable, uint64 va);
+
 extern pagetable_stats_t pt_stats; // 全局页表统计信息
 // pointer to kernel page directory
 extern pagetable_t g_kernel_pagetable;
