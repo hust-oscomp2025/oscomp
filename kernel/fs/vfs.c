@@ -6,7 +6,8 @@
 #include <kernel/mm/kmalloc.h>
 #include <kernel/mm/page.h>
 #include <kernel/fs/hostfs.h>
-#include <kernel/fs/rfs.h>
+//#include <kernel/fs/rfs.h>
+#include <kernel/fs/ramfs.h>
 #include <kernel/types.h>
 #include <kernel/fs/inode.h>
 
@@ -39,11 +40,13 @@ void fs_init(void) {
   vfs_mount("HOSTDEV", MOUNT_AS_ROOT);
 
   // register and mount rfs
-  if (register_rfs() < 0)
-    panic("fs_init: cannot register rfs.\n");
-  struct device *ramdisk0 = init_rfs_device("RAMDISK0");
-  rfs_format_dev(ramdisk0);
+  if (register_ramfs() < 0)
+    panic("fs_init: cannot register ramfs.\n");
+  struct device *ramdisk0 = init_ramfs_device("RAMDISK0");
+  ramfs_format_dev(ramdisk0);
   vfs_mount("RAMDISK0", MOUNT_DEFAULT);
+
+
 	sprint("fs_init: Fs initialized\n");
 
 }

@@ -44,7 +44,7 @@ struct inode {
 
   struct super_block *sb;          // super block of the vfs inode
   const struct inode_operations *i_op;  // vfs inode operations
-	const struct file_operations	*i_fop;	/* former ->i_op->default_file_ops */
+	const struct file_operations	*i_fop;
 
   void *i_private;           // filesystem-specific info (see s_fs_info)
 

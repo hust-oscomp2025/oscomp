@@ -23,7 +23,8 @@ struct file {
 	//struct mutex		f_pos_lock;
   int f_pos;
 	// struct file_ra_state	f_ra;
-	// struct address_space	*f_mapping;
+	struct address_space	*f_mapping;
+	// 和对应的inode指向的是同一个address_space*页缓存
 };
 
 
