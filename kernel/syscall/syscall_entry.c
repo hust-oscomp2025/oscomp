@@ -4,7 +4,6 @@
 #include <kernel/syscall.h>
 
 
-
 // 按字母顺序排列
 struct syscall_function sys_table[] = {
     [1023] = {0, 0},
@@ -25,7 +24,7 @@ struct syscall_function sys_table[] = {
     // [SYS_faccessat] = {sys_faccessat, "faccessat"},
     // [SYS_fchmod] = {sys_fchmod, "fchmod"},
     // [SYS_fcntl] = {sys_fcntl, "fcntl"},
-    [SYS_fstat] = {sys_fstat, "fstat"},
+    // [SYS_fstat] = {sys_fstat, "fstat"},
     // [SYS_fstatat] = {sys_fstatat, "fstatat"},
     // [SYS_fsync] = {sys_fsync, "fsync"},
     // [SYS_ftruncate] = {sys_ftruncate, "ftruncate"},
@@ -56,10 +55,12 @@ struct syscall_function sys_table[] = {
     // [SYS_madvise] = {sys_madvise, "sys_madvise"},
     // [SYS_membarrier] = {sys_membarrier, "membarrier"},
     // [SYS_mkdirat] = {sys_mkdirat, "mkdirat"},
+
+		// [SYS_mmap] = {sys_mmap, "mkdirat"},
     // [SYS_mount] = {sys_mount, "mount"},
-    // [SYS_mprotect] = {sys_mprotect, "mprotect"},
+    //[SYS_mprotect] = {sys_mprotect, "mprotect"},
     // [SYS_msync] = {sys_msync, "msync"},
-    // [SYS_munmap] = {sys_unmap, "munmap"},
+    //[SYS_munmap] = {sys_unmap, "munmap"},
     // [SYS_nanosleep] = {sys_nanosleep, "nanosleep"},
     // [SYS_openat] = {sys_openat, "openat"},
     // [SYS_pipe2] = {sys_pipe2, "pipe2"},

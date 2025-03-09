@@ -2,38 +2,91 @@
  * Supervisor-mode startup codes
  */
 
-#include "kernel/riscv.h"
-#include <util/string.h>
+#include <kernel/riscv.h>
 #include <kernel/elf.h>
 #include <kernel/process.h>
-#include <kernel/pmm.h>
-#include <kernel/vmm.h>
+
 #include <kernel/sched.h>
-#include <kernel/memlayout.h>
-#include "spike_interface/spike_utils.h"
+
 #include <kernel/types.h>
-#include <kernel/vfs.h>
-#include <kernel/rfs.h>
-#include <kernel/ramdev.h>
+#include <kernel/fs/vfs.h>
 
 
-//
-// trap_sec_start points to the beginning of S-mode trap segment (i.e., the entry point of
-// S-mode trap vector). added @lab2_1
-//
-// extern char trap_sec_start[];
+#include <kernel/mm/pagetable.h>
+#include <kernel/mm/slab.h>
 
-//
-// turn on paging. added @lab2_1
-//
-void enable_paging() {
-  // write the pointer to kernel page (table) directory into the CSR of "satp".
-  write_csr(satp, MAKE_SATP(g_kernel_pagetable));
+#include <util/string.h>
+#include <util/spinlock.h>
 
-  // refresh tlb to invalidate its content.
-  flush_tlb();
-  sprint("kernel page table is on \n");
+#include <spike_interface/spike_utils.h>
+
+
+
+
+
+extern char _etext[];
+extern char _edata[];
+static void kern_vm_init(void) {
+	// // 分配一个页作为内核的根页表
+	// g_kernel_pagetable = alloc_page()->virtual_address;
+	// memset(g_kernel_pagetable, 0, PAGE_SIZE);
+	// sprint("kern_vm_init: global pagetable page address: %lx\n", g_kernel_pagetable);
+	// sprint("kern_vm_init: pagetable memory address: %lx\n", &g_kernel_pagetable);
+	
+	// // 获取页表的物理地址
+	// uint64 pagetable_pa = VIRTUAL_TO_PHYSICAL(g_kernel_pagetable);
+	
+	// // 1. 首先映射页表自身，确保在启用 MMU 后还能访问页表
+	// pgt_map_page(g_kernel_pagetable, (uint64)g_kernel_pagetable, pagetable_pa, PTE_R | PTE_W);
+	
+	// // 2. 映射内核代码段 (.text)
+	// uint64 text_start = KERN_BASE;
+	// uint64 text_end = ROUNDUP((uint64)_etext, PAGE_SIZE);
+	// sprint("kern_vm_init: mapping text section [%lx-%lx]\n", text_start, text_end);
+	
+	// for (uint64 va = text_start, pa = VIRTUAL_TO_PHYSICAL(va); 
+	// 		 va < text_end; 
+	// 		 va += PAGE_SIZE, pa += PAGE_SIZE) {
+	// 		pgt_map_page(g_kernel_pagetable, va, pa, PTE_R | PTE_X); // 代码段：可读可执行
+	// }
+	
+	// // 3. 映射内核数据段 (.data)
+	// uint64 data_start = ROUNDDOWN((uint64)_etext, PAGE_SIZE);
+	// uint64 data_end = ROUNDUP((uint64)_edata, PAGE_SIZE);
+	// sprint("kern_vm_init: mapping data section [%lx-%lx]\n", data_start, data_end);
+	
+	// for (uint64 va = data_start, pa = VIRTUAL_TO_PHYSICAL(va); 
+	// 		 va < data_end; 
+	// 		 va += PAGE_SIZE, pa += PAGE_SIZE) {
+	// 		pgt_map_page(g_kernel_pagetable, va, pa, PTE_R | PTE_W); // 数据段：可读可写
+	// }
+	
+	// // 4. 映射内核 BSS 段
+	// uint64 bss_start = ROUNDDOWN((uint64)_edata, PAGE_SIZE);
+	// uint64 bss_end = ROUNDUP((uint64)_end, PAGE_SIZE);
+	// sprint("kern_vm_init: mapping bss section [%lx-%lx]\n", bss_start, bss_end);
+	
+	// for (uint64 va = bss_start, pa = VIRTUAL_TO_PHYSICAL(va); 
+	// 		 va < bss_end; 
+	// 		 va += PAGE_SIZE, pa += PAGE_SIZE) {
+	// 		pgt_map_page(g_kernel_pagetable, va, pa, PTE_R | PTE_W); // BSS段：可读可写
+	// }
+	//g_kernel_pagetable = alloc_page()->virtual_address;
+	g_kernel_pagetable = alloc_page()->virtual_address;
+	memset(g_kernel_pagetable, 0, PAGE_SIZE);
+	for (uint64 va = KERN_BASE, pa = KERN_BASE; 
+			 va < DRAM_BASE + PKE_MAX_ALLOWABLE_RAM; 
+			 va += PAGE_SIZE, pa += PAGE_SIZE) {
+			pgt_map_page(g_kernel_pagetable, va, pa, PTE_R |PTE_W| PTE_A | PTE_X| PTE_D); // BSS段：可读可写
+	}
+	//pagetable_dump(g_kernel_pagetable);
+	
+	// // 6. 映射MMIO区域（如果有需要）
+	// // 例如UART、PLIC等外设的内存映射IO区域
+	
+	// sprint("kern_vm_init: complete\n");
 }
+
 
 
 typedef union {
@@ -74,8 +127,6 @@ process* load_user_program() {
   int hartid = read_tp();
   process* proc;
   proc = alloc_process();
-	init_user_stack(proc);
-	init_user_heap(proc);
 
 	
   sprint("User application is loading.\n");
@@ -88,6 +139,17 @@ process* load_user_program() {
   return proc;
 }
 
+
+static void memory_init(){
+	init_page_manager();
+	kern_vm_init();
+	slab_init();
+
+}
+
+
+
+
 //
 // s_start: S-mode entry point of riscv-pke OS kernel.
 //
@@ -99,21 +161,22 @@ int s_start(void) {
 
   int hartid = read_tp();
   if(hartid == 0){
-    pmm_init();
-    kern_vm_init();
+    memory_init();
     sig = 0;
-  }
-  while(sig){}
+  }else{
+		while(sig){}
+	}
+  
   
   //sync_barrier(&sync_counter, NCPU);
 
   //  写入satp寄存器并刷新tlb缓存
   //    从这里开始，所有内存访问都通过MMU进行虚实转换
-  enable_paging();
-  // added @lab3_1
+
+	pagetable_activate(g_kernel_pagetable);
   init_proc_pool();
 
-  // init file system, added @lab4_1
+
   fs_init();
 
   sprint("Switch to user mode...\n");

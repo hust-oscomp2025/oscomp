@@ -28,11 +28,6 @@ file(GLOB_RECURSE KERNEL_ASM_SOURCES "*.S")
 
 add_executable(riscv-pke ${KERNEL_SOURCES} ${KERNEL_ASM_SOURCES})
 
-# 确保 spike_interface 和 util 先编译完成
-add_dependencies(riscv-pke util spike_interface )
-
-target_link_libraries(riscv-pke util spike_interface)
-
 target_include_directories(riscv-pke PRIVATE 
 	${CMAKE_SOURCE_DIR}/include
 	${CMAKE_SOURCE_DIR}/

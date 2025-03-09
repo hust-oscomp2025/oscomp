@@ -3,11 +3,11 @@
  */
 
 #include <kernel/proc_file.h>
-#include <kernel/pmm.h>
+#include <kernel/mm/kmalloc.h>
 #include <kernel/process.h>
 #include <kernel/riscv.h>
 #include "spike_interface/spike_file.h"
-#include "spike_interface/spike_utils.h"
+#include <spike_interface/spike_utils.h>
 
 #include <util/string.h>
 
@@ -18,7 +18,7 @@
 // return the pointer to the page containing the data structure.
 //
 proc_file_management *init_proc_file_management(void) {
-  proc_file_management *pfiles = (proc_file_management *)alloc_page();
+  proc_file_management *pfiles = (proc_file_management *)kmalloc(sizeof(proc_file_management));
   pfiles->cwd = vfs_root_dentry; // by default, cwd is the root
   pfiles->nfiles = 0;
 
@@ -33,8 +33,8 @@ proc_file_management *init_proc_file_management(void) {
 // reclaim the open-file management data structure of a process.
 // note: this function is not used as PKE does not actually reclaim a process.
 //
-void reclaim_proc_file_management(proc_file_management *pfiles) {
-  free_page(pfiles);
+void free_proc_file_management(proc_file_management *pfiles) {
+	kfree(pfiles);
   return;
 }
 
@@ -57,16 +57,20 @@ struct file *get_opened_file(int fd) {
 // return: -1 on failure; non-zero file-descriptor on success.
 //
 int do_open(char *pathname, int flags) {
+	sprint("do_open: begin.\n");
   struct file *opened_file = NULL;
   if ((opened_file = vfs_open(pathname, flags)) == NULL)
     return -1;
+
+
+	sprint("do_open: allocating fd.\n");
 
 	// 从进程控制块中分配fd
   for (int fd = 0; fd < MAX_FILES; ++fd) {
     struct file *pfile = CURRENT->pfiles->fd_table[fd];
     if (pfile == NULL) {
       // initialize this file structure
-			pfile = (struct file *)alloc_page();
+			pfile = (struct file *)kmalloc(sizeof(struct file));
       memcpy(pfile, opened_file, sizeof(struct file));
       CURRENT->pfiles->nfiles++;
       return fd;
@@ -163,7 +167,7 @@ int do_opendir(char *pathname) {
     struct file *pfile = CURRENT->pfiles->fd_table[fd];
     if (pfile == NULL) {
       // initialize this file structure
-			pfile = (struct file *)alloc_page();
+			pfile = (struct file *)kmalloc(sizeof(struct file));
       memcpy(pfile, opened_file, sizeof(struct file));
       CURRENT->pfiles->nfiles++;
       return fd;

@@ -1,9 +1,9 @@
 #include <kernel/semaphore.h>
 
 
-#include <kernel/pmm.h>
+
 #include <kernel/sched.h>
-#include "spike_interface/spike_utils.h"
+#include <spike_interface/spike_utils.h>
 //信号灯库
 semaphore sem_pool[NSEM];
 // 获取一个新的信号灯编号，成功返回0-64，失败返回-1

@@ -3,7 +3,7 @@
 
 #include "spike_interface/spike_file.h"
 #include <kernel/types.h>
-#include <kernel/vfs.h>
+#include <kernel/fs/vfs.h>
 
 //
 // file operations
@@ -44,6 +44,6 @@ typedef struct proc_file_management_t {
 
 proc_file_management *init_proc_file_management(void);
 
-void reclaim_proc_file_management(proc_file_management *pfiles);
+void free_proc_file_management(proc_file_management *pfiles);
 
 #endif

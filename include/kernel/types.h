@@ -32,7 +32,7 @@ typedef signed long long int64;
 
 
 // 用来标记用户的虚拟内存地址
-#define __user
+typedef uint64 uaddr;
 
 #define MOUNT_DEFAULT 0
 #define MOUNT_AS_ROOT 1

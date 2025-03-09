@@ -1,14 +1,14 @@
 /*
  * Interface functions between VFS and host-fs. added @lab4_1.
  */
-#include <kernel/hostfs.h>
+#include <kernel/fs/hostfs.h>
+#include <kernel/mm/kmalloc.h>
 
-#include <kernel/pmm.h>
 #include "spike_interface/spike_file.h"
-#include "spike_interface/spike_utils.h"
+#include <spike_interface/spike_utils.h>
 #include <util/string.h>
 #include <kernel/types.h>
-#include <kernel/vfs.h>
+#include <kernel/fs/vfs.h>
 
 /**** host-fs vinode interface ****/
 const struct inode_operations hostfs_i_ops = {
@@ -35,13 +35,17 @@ const struct inode_operations hostfs_i_ops = {
 // append hostfs to the fs list.
 //
 int register_hostfs() {
-  struct file_system_type *fs_type = (struct file_system_type *)alloc_page();
+	sprint("register_hostfs: begin\n");
+
+  struct file_system_type *fs_type = kmalloc(sizeof(struct file_system_type));
   fs_type->type_num = HOSTFS_TYPE;
   fs_type->get_superblock = hostfs_get_superblock;
 
   for (int i = 0; i < MAX_SUPPORTED_FS; i++) {
     if (fs_list[i] == NULL) {
       fs_list[i] = fs_type;
+			sprint("register_hostfs: end\n");
+
       return 0;
     }
   }
@@ -64,7 +68,7 @@ struct device *init_host_device(char *name) {
     panic("init_host_device: No HOSTFS file system found!\n");
 
   // allocate a vfs device
-  struct device *device = (struct device *)alloc_page();
+  struct device *device = kmalloc(sizeof(struct device));
   // set the device name and index
   strcpy(device->dev_name, name);
   // we only support one host-fs device
@@ -119,6 +123,8 @@ int hostfs_write_back_vinode(struct inode *vinode) { return 0; }
 // populate the vfs inode of an hostfs file, according to its stats.
 //
 int hostfs_update_vinode(struct inode *vinode) {
+	sprint("hostfs_update_vinode: called\n");
+
   spike_file_t *f = vinode->i_private;
   if ((int64)f < 0) {  // is a direntry
     vinode->i_mode = S_IFDIR;
@@ -134,9 +140,12 @@ int hostfs_update_vinode(struct inode *vinode) {
   vinode->blocks = stat.st_blocks;
 
   if (S_ISDIR(stat.st_mode)) {
+		sprint("hostfs_update_vinode: vinode is dir\n");
     vinode->i_mode = S_IFDIR;
   } else if (S_ISREG(stat.st_mode)) {
     vinode->i_mode = S_IFREG;
+		sprint("hostfs_update_vinode: vinode is file\n");
+
   } else {
     sprint("hostfs_lookup:unknown file type!");
     return -1;
@@ -182,14 +191,18 @@ ssize_t hostfs_write(struct inode *f_inode, const char *w_buf, ssize_t len,
 // lookup a hostfs file, and establish its vfs inode in PKE vfs.
 //
 struct inode *hostfs_lookup(struct inode *parent, struct dentry *sub_dentry) {
+	sprint("hostfs_lookup: called.\n");
   // get complete path string
   char path[MAX_PATH_LEN];
   get_path_string(path, sub_dentry);
+	sprint("hostfs_lookup: hostfs path is %s\n",path);
 
   spike_file_t *f = spike_file_open(path, O_RDWR, 0);
 
   struct inode *child_inode = hostfs_alloc_vinode(parent->sb);
   child_inode->i_private = f;
+	child_inode->i_mode = S_IFREG;
+	sprint("hostfs_lookup: child_inode->i_private = %lx\n",f);
   hostfs_update_vinode(child_inode);
 	atomic_set(&(child_inode->i_count), 0);
   return child_inode;
@@ -285,7 +298,7 @@ int hostfs_hook_close(struct inode *f_inode, struct dentry *dentry) {
 /**** vfs-hostfs file system type interface functions ****/
 struct super_block *hostfs_get_superblock(struct device *dev) {
   // set the data for the vfs super block
-  struct super_block *sb = alloc_page();
+  struct super_block *sb = kmalloc(sizeof(struct super_block));
   sb->s_dev = dev;
 
   struct inode *root_inode = hostfs_alloc_vinode(sb);

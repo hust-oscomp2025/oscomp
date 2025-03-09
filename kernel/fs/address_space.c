@@ -1,9 +1,8 @@
-#include <kernel/address_space.h>
-#include <kernel/pmm.h>
-#include <kernel/memlayout.h>
-#include <kernel/vmm.h>
-#include <kernel/spinlock.h>
-#include <kernel/atomic.h>
+#include <kernel/fs/address_space.h>
+#include <kernel/mm/kmalloc.h>
+
+#include <util/spinlock.h>
+#include <util/atomic.h>
 #include <kernel/types.h>
 #include <string.h>
 
@@ -190,7 +189,7 @@ struct address_space *address_space_create(struct inode *host,
     mapping->host = host;
     mapping->a_ops = a_ops;
     atomic_set(&mapping->i_mmap_writable, 0);
-		atomic_flag_clear(&mapping->tree_lock);
+		spinlock_init(&mapping->tree_lock);
     mapping->page_tree = NULL;
     mapping->nrpages = 0;
     
@@ -314,12 +313,12 @@ int write_page(struct page *page) {
 
 // 将数据从用户空间复制到页
 ssize_t copy_to_page(struct page *page, const char *buf, size_t count, loff_t offset) {
-    if (!page || !page->virtual_address || offset >= PGSIZE)
+    if (!page || !page->virtual_address || offset >= PAGE_SIZE)
         return -1;
     
     // 确保不超出页大小
-    if (offset + count > PGSIZE)
-        count = PGSIZE - offset;
+    if (offset + count > PAGE_SIZE)
+        count = PAGE_SIZE - offset;
     
     // 复制数据
     memcpy((char *)page->virtual_address + offset, buf, count);
@@ -332,12 +331,12 @@ ssize_t copy_to_page(struct page *page, const char *buf, size_t count, loff_t of
 
 // 将数据从页复制到用户空间
 ssize_t copy_from_page(struct page *page, char *buf, size_t count, loff_t offset) {
-    if (!page || !page->virtual_address || offset >= PGSIZE)
+    if (!page || !page->virtual_address || offset >= PAGE_SIZE)
         return -1;
     
     // 确保不超出页大小
-    if (offset + count > PGSIZE)
-        count = PGSIZE - offset;
+    if (offset + count > PAGE_SIZE)
+        count = PAGE_SIZE - offset;
     
     // 复制数据
     memcpy(buf, (char *)page->virtual_address + offset, count);
@@ -435,5 +434,5 @@ void *alloc_page_buffer(void) {
 
 // 释放页缓存使用的物理页
 void free_page_buffer(void *addr) {
-    free_page(addr);  // 使用现有的物理页释放函数
+    put_free_page(addr);  // 使用现有的物理页释放函数
 }

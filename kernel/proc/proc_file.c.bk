@@ -33,7 +33,7 @@ proc_file_management *init_proc_file_management(void) {
 // note: this function is not used as PKE does not actually reclaim a process.
 //
 void reclaim_proc_file_management(proc_file_management *pfiles) {
-  free_page(pfiles);
+  put_free_page(pfiles);
   return;
 }
 

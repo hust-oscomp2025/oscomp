@@ -4,8 +4,8 @@
 
 #include <kernel/config.h>
 #include <kernel/riscv.h>
-#include <kernel/sync_utils.h>
-#include "spike_interface/spike_utils.h"
+#include <util/sync_utils.h>
+#include <spike_interface/spike_utils.h>
 #include <kernel/types.h>
 
 //
@@ -26,9 +26,9 @@ extern void mtrapvec();
 // htif is defined in spike_interface/spike_htif.c, marks the availability of
 // HTIF
 extern __uint64_t htif;
-// g_mem_size is defined in spike_interface/spike_memory.c, size of the emulated
+// spike_mem_size is defined in spike_interface/spike_memory.c, size of the emulated
 // memory
-extern uint64 g_mem_size;
+extern uint64 spike_mem_size;
 // struct riscv_regs is define in kernel/riscv.h, and g_itrframe is used to save
 // registers when interrupt hapens in M mode. added @lab1_2
 riscv_regs g_itrframe;
@@ -41,7 +41,7 @@ riscv_regs g_itrframe;
 // in Intel series CPUs. it records the details of devices and memory of the
 // platform simulated using Spike.
 //
-void init_dtb(uint64 dtb) {
+static void init_dtb(uint64 dtb) {
   // defined in spike_interface/spike_htif.c, enabling Host-Target InterFace
   // (HTIF)
   query_htif(dtb);
@@ -51,7 +51,7 @@ void init_dtb(uint64 dtb) {
   // defined in spike_interface/spike_memory.c, obtain information about
   // emulated memory
   query_mem(dtb);
-  sprint("(Emulated) memory size: %ld MB\n", g_mem_size >> 20);
+  sprint("(Emulated) memory size: %ld MB\n", spike_mem_size >> 20);
 }
 
 //
@@ -139,7 +139,7 @@ void m_start(uintptr_t hartid, uintptr_t dtb) {
 
   // init timing. added @lab1_3
   // lab1_challenge1 为了调试便利，禁用了外部时钟中断：
-  timerinit(hartid);
+  //timerinit(hartid);
 
   // switch to supervisor mode (S mode) and jump to s_start(), i.e., set pc to
   // mepc
