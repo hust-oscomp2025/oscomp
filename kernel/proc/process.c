@@ -91,7 +91,7 @@ process *find_empty_process() {
 process *alloc_process() {
   // locate the first usable process structure
   process *ps = find_empty_process();
-  ps->mm = user_mm_create();
+	mm_init(ps);
   // 分配内核栈
   ps->kstack = (uint64)alloc_page()->virtual_address + PAGE_SIZE;
 

@@ -113,7 +113,7 @@ void *kmalloc(size_t size) {
 void kfree(void *ptr) {
   if (!ptr)
     return;
-
+	sprint("calling kfree with ptr=%lx\n",ptr);
   // Get allocation header
   struct kmalloc_header *header = ptr_to_header(ptr);
 

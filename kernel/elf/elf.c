@@ -6,18 +6,16 @@
 
 #include <kernel/elf.h>
 
+#include <kernel/fs/vfs.h>
+#include <kernel/mm/kmalloc.h>
+#include <kernel/mm/mm_struct.h>
+#include <kernel/mm/mmap.h>
 #include <kernel/proc_file.h>
 #include <kernel/process.h>
 #include <kernel/riscv.h>
-#include <kernel/mm/mm_struct.h>
-#include <kernel/fs/vfs.h>
-#include <kernel/mm/kmalloc.h>
-#include <kernel/mm/mmap.h>
 
-
-#include <util/string.h>
 #include <spike_interface/spike_utils.h>
-
+#include <util/string.h>
 
 /**
  * ELF加载器的上下文信息
@@ -356,15 +354,17 @@ void load_elf_from_file(process *proc, char *filename) {
   if (fd < 0) {
     panic("Failed to open application file: %s (error %d)\n", filename, fd);
   }
+	sprint("load_elf_from_file: do_open ended.\n");
 
   // 确保进程有有效的内存布局
-  if (!proc->mm) {
-    proc->mm = user_mm_create();
+  if (unlikely(!proc->mm)) {
+		mm_init(proc);
     if (!proc->mm) {
       do_close(fd);
       panic("Failed to create memory layout for process\n");
     }
   }
+	sprint("load_elf_from_file: process has mm_struct.\n");
 
   // 初始化ELF上下文
   if (init_elf_context(&ctx, fd, proc) != 0) {
@@ -380,7 +380,7 @@ void load_elf_from_file(process *proc, char *filename) {
 
   // 如果需要，加载调试信息
   load_debug_information(&ctx);
-
+	sprint("load_elf_from_file: load debug information\n");
   // 关闭文件
   do_close(fd);
 

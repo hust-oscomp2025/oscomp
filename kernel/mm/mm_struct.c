@@ -1,14 +1,9 @@
-
 #include <kernel/mm/kmalloc.h>
-
 #include <kernel/mm/mm_struct.h>
 #include <kernel/mm/page.h>
 #include <kernel/mm/mmap.h>
-
 #include <kernel/process.h>
-
 #include <util/atomic.h>
-
 #include <spike_interface/spike_utils.h>
 #include <util/string.h>
 
@@ -20,14 +15,21 @@ void user_mem_init(void) {
   sprint("User memory management subsystem initialized\n");
 }
 
-
 /**
- * 创建用户内存布局
+ * 为进程分配和初始化mm_struct
+ * 这是主要的接口函数，类似Linux中的mm_alloc
+ * 
+ * @param proc 目标进程
+ * @return 成功返回0，失败返回负值
  */
-struct mm_struct *user_mm_create(void) {
+int mm_init(process *proc) {
+  if (!proc)
+    return -1;
+
+  // 创建mm结构
   struct mm_struct *mm = (struct mm_struct *)kmalloc(sizeof(struct mm_struct));
   if (!mm)
-    return NULL;
+    return -1;
 
   // 初始化mm结构
   memset(mm, 0, sizeof(struct mm_struct));
@@ -38,16 +40,45 @@ struct mm_struct *user_mm_create(void) {
   atomic_set(&mm->mm_count, 1);
 
   // 用户空间默认布局
-  mm->start_code = 0x00400000;               // 代码段默认起始地址
-  mm->end_code = 0x00400000;                 // 初始时代码段为空
-  mm->start_data = 0x10000000;               // 数据段默认起始地址
-  mm->end_data = 0x10000000;                 // 初始时数据段为空
-  mm->start_brk = USER_FREE_ADDRESS_START;   // 堆默认起始地址
-  mm->brk = USER_FREE_ADDRESS_START;         // 初始时堆为空
+  mm->start_code = 0x00400000;             // 代码段默认起始地址
+  mm->end_code = 0x00400000;               // 初始时代码段为空
+  mm->start_data = 0x10000000;             // 数据段默认起始地址
+  mm->end_data = 0x10000000;               // 初始时数据段为空
+  mm->start_brk = USER_FREE_ADDRESS_START; // 堆默认起始地址
+  mm->brk = USER_FREE_ADDRESS_START;       // 初始时堆为空
   mm->start_stack = USER_STACK_TOP - PAGE_SIZE; // 栈默认起始地址
-  mm->end_stack = USER_STACK_TOP;            // 栈默认结束地址
+  mm->end_stack = USER_STACK_TOP;          // 栈默认结束地址
 
-  return mm;
+  // 分配页表
+  struct page *page = alloc_page();
+  if (!page) {
+    kfree(mm);
+    return -1;
+  }
+  
+  mm->pagetable = page->virtual_address;
+  proc->mm = mm;
+
+  // 创建初始栈区域VMA
+  struct vm_area_struct *stack_vma =
+      create_vma(mm, mm->start_stack, mm->end_stack, PROT_READ | PROT_WRITE,
+                 VMA_STACK, VM_GROWSDOWN | VM_PRIVATE);
+  if (!stack_vma) {
+    user_mm_free(mm);
+    proc->mm = NULL;
+    return -1;
+  }
+
+  // 分配并映射初始栈页
+  void *page_addr =
+      mm_user_alloc_page(proc, mm->start_stack, PROT_READ | PROT_WRITE);
+  if (!page_addr) {
+    user_mm_free(mm);
+    proc->mm = NULL;
+    return -1;
+  }
+
+  return 0;
 }
 
 /**
@@ -79,48 +110,14 @@ void user_mm_free(struct mm_struct *mm) {
       kfree(vma);
     }
 
+    // 释放页表
+    if (mm->pagetable) {
+      pagetable_free(mm->pagetable);
+    }
+
     // 释放mm结构
     kfree(mm);
   }
-}
-
-/**
- * 为进程初始化内存布局
- */
-int setup_user_memory(process *proc) {
-  if (!proc)
-    return -1;
-
-  // 创建mm结构
-  struct mm_struct *mm = user_mm_create();
-  if (!mm)
-    return -1;
-
-  // 关联到进程
-  proc->mm = mm;
-  mm->pagetable = alloc_page()->virtual_address;
-
-  // 初始化栈区域：仅创建虚拟内存区域(VMA)，不分配物理页
-  // 采用按需分页策略：物理页将在首次访问时通过缺页异常机制分配
-  struct vm_area_struct *stack_vma =
-      create_vma(mm, mm->start_stack, mm->end_stack, PROT_READ | PROT_WRITE,
-                 VMA_STACK, VM_GROWSDOWN | VM_PRIVATE);
-  if (!stack_vma) {
-    user_mm_free(mm);
-    proc->mm = NULL;
-    return -1;
-  }
-
-  // 分配并映射初始栈页
-  void *page_addr =
-      mm_user_alloc_page(proc, mm->start_stack, PROT_READ | PROT_WRITE);
-  if (!page_addr) {
-    user_mm_free(mm);
-    proc->mm = NULL;
-    return -1;
-  }
-
-  return 0;
 }
 
 /**
@@ -629,31 +626,7 @@ ssize_t copy_from_user(process *proc, void *dst, const void *src, size_t len) {
 }
 
 /**
- * 用户空间内存初始化
- * 为用户程序设置基本的内存布局
- */
-int init_user_memory(process *proc) {
-  if (!proc)
-    return -1;
-
-  // 初始化内存布局
-  if (setup_user_memory(proc) != 0)
-    return -1;
-
-  // 为用户栈分配初始页
-  void *stack_addr =
-      mm_user_alloc_page(proc, proc->mm->start_stack, PROT_READ | PROT_WRITE);
-  if (!stack_addr)
-    return -1;
-
-
-  return 0;
-}
-
-// 一些辅助函数，可根据需要添加
-
-/**
- * 打印进程的内存布局信息
+ * 打印进程的内存布局信息，用于调试
  */
 void print_proc_memory_layout(process *proc) {
   if (!proc || !proc->mm)

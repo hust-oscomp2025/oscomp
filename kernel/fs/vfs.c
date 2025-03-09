@@ -2,14 +2,14 @@
  * VFS (Virtual File System) interface utilities. added @lab4_1.
  */
 
+#include <kernel/fs/hostfs.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/mm/kmalloc.h>
 #include <kernel/mm/page.h>
-#include <kernel/fs/hostfs.h>
 //
+#include <kernel/fs/inode.h>
 #include <kernel/fs/ramfs.h>
 #include <kernel/types.h>
-#include <kernel/fs/inode.h>
 
 #include <util/hash_table.h>
 #include <util/string.h>
@@ -28,7 +28,7 @@ struct file_system_type *fs_list[MAX_SUPPORTED_FS];
 // initialize file system
 //
 void fs_init(void) {
-	sprint("fs_init: Initiating fs\n");
+  sprint("fs_init: Initiating fs\n");
 
   // initialize the vfs
   vfs_init();
@@ -46,16 +46,14 @@ void fs_init(void) {
   ramfs_format_dev(ramdisk0);
   vfs_mount("RAMDISK0", MOUNT_DEFAULT);
 
-
-	sprint("fs_init: Fs initialized\n");
-
+  sprint("fs_init: Fs initialized\n");
 }
 
 //
 // initializes the dentry hash list and vinode hash list
 //
 int vfs_init() {
-	sprint("vfs_init: Initiating vfs\n");
+  sprint("vfs_init: Initiating vfs\n");
 
   int ret;
 
@@ -66,7 +64,7 @@ int vfs_init() {
   if ((ret = hash_table_init(&vinode_hash_table, inode_hash_equal,
                              inode_hash_func, NULL, NULL, NULL)) != 0)
     return ret;
-	sprint("vfs_init: Vfs init.\n");
+  sprint("vfs_init: Vfs init.\n");
 
   return 0;
 }
@@ -142,7 +140,7 @@ struct super_block *vfs_mount(const char *dev_name, int mnt_type) {
   } else {
     panic("vfs_mount: unknown mount type!\n");
   }
-	sprint("vfs_mount: mount device %s successfully.\n",dev_name);
+  sprint("vfs_mount: mount device %s successfully.\n", dev_name);
   return sb;
 }
 
@@ -162,6 +160,7 @@ struct file *vfs_open(const char *path, int flags) {
 
   // file does not exist
   if (!file_dentry) {
+    sprint("vfs_open: file_dentry not found.\n");
     int creatable = flags & O_CREAT;
 
     // create the file if O_CREAT bit is set
@@ -182,7 +181,7 @@ struct file *vfs_open(const char *path, int flags) {
         panic("vfs_open: cannot create file!\n");
 
       file_dentry->dentry_inode = new_inode;
-			atomic_inc(&(new_inode->i_count));
+      atomic_inc(&(new_inode->i_count));
       hash_put_dentry(file_dentry);
       hash_put_inode(new_inode);
     } else {
@@ -190,6 +189,9 @@ struct file *vfs_open(const char *path, int flags) {
       return NULL;
     }
   }
+
+
+	sprint("vfs_open: open dentry file_dentry=%s\n",file_dentry->name);
 
   if (file_dentry->dentry_inode->i_mode != S_IFREG) {
     sprint("vfs_open: cannot open a directory!\n");
@@ -389,7 +391,7 @@ int vfs_unlink(const char *path) {
   // remove the dentry from the hash table
   hash_erase_dentry(file_dentry);
   free_vfs_dentry(file_dentry);
-	atomic_dec(&unlinked_vinode->i_count);
+  atomic_dec(&unlinked_vinode->i_count);
 
   // if this inode has been removed from disk
   if (unlinked_vinode->i_nlink == 0) {
@@ -430,14 +432,14 @@ int vfs_close(struct file *file) {
     // free the dentry
     hash_erase_dentry(dentry);
     free_vfs_dentry(dentry);
-		atomic_dec(&inode->i_count);
+    atomic_dec(&inode->i_count);
     // no other opened hard link
     if (atomic_read(&inode->i_count) == 0) {
       // write back the inode and free it
       if (viop_write_back_vinode(inode) != 0)
         panic("vfs_close: free inode failed!\n");
       hash_erase_inode(inode);
-      put_free_page(inode);
+      kfree(inode);
     }
   }
 
@@ -515,13 +517,13 @@ int vfs_mkdir(const char *path) {
   struct dentry *new_dentry = alloc_vfs_dentry(basename, NULL, parent);
   struct inode *new_dir_inode = viop_mkdir(parent->dentry_inode, new_dentry);
   if (!new_dir_inode) {
-    put_free_page(new_dentry);
+    kfree(new_dentry);
     sprint("vfs_mkdir: cannot create directory!\n");
     return -1;
   }
 
   new_dentry->dentry_inode = new_dir_inode;
-	atomic_inc(&new_dir_inode->i_count);
+  atomic_inc(&new_dir_inode->i_count);
   hash_put_dentry(new_dentry);
   hash_put_inode(new_dir_inode);
   return 0;
@@ -559,6 +561,8 @@ int vfs_closedir(struct file *file) {
 //
 struct dentry *lookup_final_dentry(const char *path, struct dentry **parent,
                                    char *miss_name) {
+
+  sprint("lookup_final_dentry: path = %s.\n", path);
   char path_copy[MAX_PATH_LEN];
   strcpy(path_copy, path);
 
@@ -609,42 +613,56 @@ struct dentry *lookup_final_dentry(const char *path, struct dentry **parent,
       continue;
     }
 
+    sprint("lookup_final_dentry: hash_get_dentry.\n", path);
     this = hash_get_dentry((*parent), token); // try hash first
     if (this == NULL) {
       // if not found in hash, try to find it in the directory
+      sprint("lookup_final_dentry: alloc_vfs_dentry.\n", path);
       this = alloc_vfs_dentry(token, NULL, *parent);
       // lookup subfolder/file in its parent directory. note:
       // hostfs and rfs will take different procedures for lookup.
       struct inode *found_vinode = viop_lookup((*parent)->dentry_inode, this);
+      sprint("lookup_final_dentry: found_vinode=0x%lx.\n", found_vinode);
+
       if (found_vinode == NULL) {
         // not found in both hash table and directory file on disk.
-        put_free_page(this);
+        kfree(this);
         strcpy(miss_name, token);
         return NULL;
       }
 
       struct inode *same_inode =
           hash_get_inode(found_vinode->sb, found_vinode->i_ino);
+      sprint("lookup_final_dentry: same_inode=0x%lx.\n", same_inode);
+
       if (same_inode != NULL) {
         // the vinode is already in the hash table (i.e. we are opening another
         // hard link)
-        this->dentry_inode = same_inode;
-				atomic_inc(&same_inode->i_count);
+				sprint("lookup_final_dentry: this->dentry_inode = same_inode.\n");
 
-        put_free_page(found_vinode);
+        this->dentry_inode = same_inode;
+        atomic_inc(&same_inode->i_count);
+
+        kfree(found_vinode);
       } else {
+				sprint("lookup_final_dentry: this->dentry_inode = found_vinode.\n");
+
         // the vinode is not in the hash table
         this->dentry_inode = found_vinode;
-				atomic_inc(&found_vinode->i_count);
+        atomic_inc(&found_vinode->i_count);
         hash_put_inode(found_vinode);
       }
 
       hash_put_dentry(this);
+      sprint("lookup_final_dentry: hash_put_dentry=0x%lx.\n", this);
     }
+    sprint("lookup_final_dentry: token = %s\n", token);
 
     // get next token
     token = strtok(NULL, "/");
   }
+	sprint("lookup_final_dentry: end.\n");
+
   return this;
 }
 
@@ -713,14 +731,14 @@ void get_base_name(const char *path, char *base_name) {
 struct dentry *alloc_vfs_dentry(const char *name, struct inode *inode,
                                 struct dentry *parent) {
   struct dentry *dentry = kmalloc(sizeof(struct dentry));
-	if (!dentry) {
-		return NULL;
-	}
+  if (!dentry) {
+    return NULL;
+  }
   strcpy(dentry->name, name);
   dentry->dentry_inode = inode;
-  if (inode){
-		atomic_inc(&inode->i_count);
-	}
+  if (inode) {
+    atomic_inc(&inode->i_count);
+  }
 
   dentry->parent = parent;
   dentry->d_ref = 0;
@@ -735,7 +753,7 @@ int free_vfs_dentry(struct dentry *dentry) {
     sprint("free_vfs_dentry: dentry is still in use!\n");
     return -1;
   }
-  put_free_page((void *)dentry);
+  kfree((void *)dentry);
   return 0;
 }
 
@@ -773,15 +791,15 @@ struct dentry *hash_get_dentry(struct dentry *parent, char *name) {
 
 int hash_put_dentry(struct dentry *dentry) {
   struct dentry_key *key = kmalloc(sizeof(struct dentry_key));
-	if (!key) {
-		return -1;
-	}
+  if (!key) {
+    return -1;
+  }
   key->name = dentry->name;
   key->parent = dentry->parent;
 
   int ret = dentry_hash_table.virtual_hash_put(&dentry_hash_table, key, dentry);
   if (ret != 0)
-    put_free_page(key);
+    kfree(key);
   return ret;
 }
 
@@ -812,22 +830,22 @@ struct inode *hash_get_inode(struct super_block *sb, int inum) {
     return NULL;
   struct inode_key key = {.sb = sb, .inum = inum};
   return (struct inode *)vinode_hash_table.virtual_hash_get(&vinode_hash_table,
-                                                             &key);
+                                                            &key);
 }
 
 int hash_put_inode(struct inode *vinode) {
   if (vinode->i_ino < 0)
     return -1;
   struct inode_key *key = kmalloc(sizeof(struct inode_key));
-	if (!key) {
-		return -1;
-	}
+  if (!key) {
+    return -1;
+  }
   key->sb = vinode->sb;
   key->inum = vinode->i_ino;
 
   int ret = vinode_hash_table.virtual_hash_put(&vinode_hash_table, key, vinode);
   if (ret != 0)
-    put_free_page(key);
+    kfree(key);
   return ret;
 }
 
@@ -843,13 +861,13 @@ int hash_erase_inode(struct inode *vinode) {
 //
 struct inode *default_alloc_vinode(struct super_block *sb) {
   struct inode *vinode = kmalloc(sizeof(struct inode));
-	if (!vinode) {
-		return NULL;
-	}
+  if (!vinode) {
+    return NULL;
+  }
   vinode->blocks = 0;
   vinode->i_ino = 0;
   vinode->i_nlink = 0;
-	atomic_set(&vinode->i_count, 0);
+  atomic_set(&vinode->i_count, 0);
   vinode->sb = sb;
   vinode->i_size = 0;
   return vinode;

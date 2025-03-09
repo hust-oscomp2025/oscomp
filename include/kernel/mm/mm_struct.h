@@ -73,23 +73,21 @@ struct mm_struct {
     
     // 地址空间边界
     uaddr start_code;
-		uaddr end_code;       // 代码段范围
+    uaddr end_code;       // 代码段范围
 
     uaddr start_data;
-		uaddr end_data;       // 数据段范围
+    uaddr end_data;       // 数据段范围
 
     uaddr start_brk;
-		uaddr brk;             // 堆范围
+    uaddr brk;             // 堆范围
 
     uaddr start_stack;
-		uaddr end_stack;     // 栈范围
+    uaddr end_stack;     // 栈范围
     
     // 锁和引用计数
     spinlock_t mm_lock;       // mm锁
     atomic_t mm_users;        // 用户数量
     atomic_t mm_count;        // 引用计数
-    
-
 };
 
 /**
@@ -102,11 +100,9 @@ struct mm_struct {
 inline uint64 mm_lookuppa(struct mm_struct *mm, uaddr user_va) {
   if (!mm || !mm->pagetable){
     return 0;
-	}
+  }
   return pgt_lookuppa(mm->pagetable, user_va);
 }
-
-
 
 /**
  * 初始化用户内存管理子系统
@@ -114,19 +110,18 @@ inline uint64 mm_lookuppa(struct mm_struct *mm, uaddr user_va) {
 void user_mem_init(void);
 
 /**
- * 创建用户内存布局
+ * 为进程分配和初始化mm_struct
+ * 这是主要的接口函数，类似Linux中的mm_alloc
+ * 
+ * @param proc 目标进程
+ * @return 成功返回0，失败返回负值
  */
-struct mm_struct *user_mm_create(void);
+int mm_init(process *proc);
 
 /**
  * 释放用户内存布局
  */
 void user_mm_free(struct mm_struct *mm);
-
-/**
- * 为进程初始化内存布局
- */
-int setup_user_memory(process *proc);
 
 /**
  * 创建新的VMA
@@ -229,5 +224,10 @@ ssize_t copy_to_user(process *proc, void *dst, const void *src, size_t len);
  * @return 成功复制的字节数，失败返回-1
  */
 ssize_t copy_from_user(process *proc, void *dst, const void *src, size_t len);
+
+/**
+ * 打印进程的内存布局信息，用于调试
+ */
+void print_proc_memory_layout(process *proc);
 
 #endif /* _USER_MEM_H */

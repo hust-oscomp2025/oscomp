@@ -57,9 +57,13 @@ struct file *get_opened_file(int fd) {
 // return: -1 on failure; non-zero file-descriptor on success.
 //
 int do_open(char *pathname, int flags) {
+	sprint("do_open: begin.\n");
   struct file *opened_file = NULL;
   if ((opened_file = vfs_open(pathname, flags)) == NULL)
     return -1;
+
+
+	sprint("do_open: allocating fd.\n");
 
 	// 从进程控制块中分配fd
   for (int fd = 0; fd < MAX_FILES; ++fd) {

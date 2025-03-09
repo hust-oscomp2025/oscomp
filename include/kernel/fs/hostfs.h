@@ -5,7 +5,7 @@
 #define HOSTFS_TYPE 1
 
 // root directory
-#define H_ROOT_DIR "./hostfs_root"
+#define H_ROOT_DIR "./hostfs"
 
 // hostfs utility functin declarations
 int register_hostfs();
