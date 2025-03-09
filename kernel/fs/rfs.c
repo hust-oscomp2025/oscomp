@@ -50,11 +50,12 @@ static struct rfs_dinode *rfs_alloc_dinode(struct rfs_device *rdev, int *inum);
 int register_rfs() {
   struct file_system_type *fs_type = kmalloc(sizeof(struct file_system_type));
   fs_type->type_num = RFS_TYPE;
-  fs_type->get_superblock = rfs_get_superblock;
+  fs_type->get_superblock = rfs_alloc_superblock;
 
   for (int i = 0; i < MAX_SUPPORTED_FS; i++) {
     if (fs_list[i] == NULL) {
       fs_list[i] = fs_type;
+			sprint("register_rfs: end successfully.\n");
       return 0;
     }
   }
@@ -856,7 +857,7 @@ struct inode *rfs_mkdir(struct inode *parent, struct dentry *sub_dentry) {
 }
 
 /**** vfs-rfs file system type interface functions ****/
-struct super_block *rfs_get_superblock(struct device *dev) {
+struct super_block *rfs_alloc_superblock(struct device *dev) {
   struct rfs_device *rdev = rfs_device_list[dev->dev_id];
 
   // read super block from ramdisk
@@ -875,7 +876,7 @@ struct super_block *rfs_get_superblock(struct device *dev) {
   sb->s_dev = dev;
 
   if (sb->magic != RFS_MAGIC)
-    panic("rfs_get_superblock: wrong ramdisk device!\n");
+    panic("rfs_alloc_superblock: wrong ramdisk device!\n");
 
   // build root dentry and root inode
   struct inode *root_inode = rfs_alloc_vinode(sb);

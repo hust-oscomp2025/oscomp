@@ -68,6 +68,8 @@ void init_proc_pool() {
     procs[i].status = FREE;
     procs[i].pid = i;
   }
+	sprint("Process pool initiated\n");
+
 }
 
 //

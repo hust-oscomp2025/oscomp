@@ -262,6 +262,7 @@ void pagetable_activate(pagetable_t pagetable) {
   // 确保所有映射都已完成
   write_csr(satp, MAKE_SATP(pagetable));
   flush_tlb(); // 刷新TLB
+  sprint("Global pagetable activate.\n");
 
 }
 

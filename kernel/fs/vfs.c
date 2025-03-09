@@ -27,6 +27,8 @@ struct file_system_type *fs_list[MAX_SUPPORTED_FS];
 // initialize file system
 //
 void fs_init(void) {
+	sprint("fs_init: Initiating fs\n");
+
   // initialize the vfs
   vfs_init();
 
@@ -42,12 +44,16 @@ void fs_init(void) {
   struct device *ramdisk0 = init_rfs_device("RAMDISK0");
   rfs_format_dev(ramdisk0);
   vfs_mount("RAMDISK0", MOUNT_DEFAULT);
+	sprint("fs_init: Fs initialized\n");
+
 }
 
 //
 // initializes the dentry hash list and vinode hash list
 //
 int vfs_init() {
+	sprint("vfs_init: Initiating vfs\n");
+
   int ret;
 
   if ((ret = hash_table_init(&dentry_hash_table, dentry_hash_equal,
@@ -57,6 +63,7 @@ int vfs_init() {
   if ((ret = hash_table_init(&vinode_hash_table, inode_hash_equal,
                              inode_hash_func, NULL, NULL, NULL)) != 0)
     return ret;
+	sprint("vfs_init: Vfs init.\n");
 
   return 0;
 }
@@ -132,7 +139,7 @@ struct super_block *vfs_mount(const char *dev_name, int mnt_type) {
   } else {
     panic("vfs_mount: unknown mount type!\n");
   }
-
+	sprint("vfs_mount: mount device %s successfully.\n",dev_name);
   return sb;
 }
 

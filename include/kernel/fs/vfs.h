@@ -4,6 +4,7 @@
 #include <kernel/types.h>
 #include <kernel/fs/file.h>
 #include <kernel/fs/inode.h>
+#include <kernel/fs/dentry.h>
 #include <kernel/fs/super_block.h>
 
 #define MAX_VFS_DEV 10            // the maximum number of vfs_dev_list

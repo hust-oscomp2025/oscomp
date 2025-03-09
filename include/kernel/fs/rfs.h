@@ -87,7 +87,7 @@ int rfs_hook_closedir(struct inode *dir_vinode, struct dentry *dentry);
 int rfs_readdir(struct inode *dir_vinode, struct dir *dir, int *offset);
 struct inode *rfs_mkdir(struct inode *parent, struct dentry *sub_dentry);
 
-struct super_block *rfs_get_superblock(struct device *dev);
+struct super_block *rfs_alloc_superblock(struct device *dev);
 
 extern const struct inode_operations rfs_i_ops;
 

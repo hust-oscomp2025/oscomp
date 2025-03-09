@@ -174,12 +174,9 @@ int s_start(void) {
   //    从这里开始，所有内存访问都通过MMU进行虚实转换
 
 	pagetable_activate(g_kernel_pagetable);
-  sprint("Global pagetable activate.\n");
-
-  // added @lab3_1
   init_proc_pool();
-	sprint("Process pool initiated\n");
-  // init file system, added @lab4_1
+
+
   fs_init();
 
   sprint("Switch to user mode...\n");
