@@ -702,3 +702,225 @@
 		 /* 未找到 */
 		 return NULL;
  }
+
+ /* 创建新目录 */
+static struct inode *ramfs_mkdir(struct inode *dir, struct dentry *dentry) {
+	struct ramfs_sb_info *sbi = (struct ramfs_sb_info *)dir->sb->s_fs_info;
+	
+	/* 分配新的inode编号 */
+	uint32 new_ino = sbi->next_ino++;
+	
+	/* 创建内存inode */
+	struct ramfs_inode *mem_inode = kmalloc(sizeof(struct ramfs_inode));
+	if (!mem_inode)
+			return NULL;
+	
+	/* 初始化内存inode */
+	mem_inode->inum = new_ino;
+	mem_inode->type = RAMFS_DIR;
+	mem_inode->nlinks = 2;  // 目录有自己的"."和父目录的".."链接
+	mem_inode->size = 0;
+	mem_inode->uid = mem_inode->gid = 0;
+	mem_inode->atime = mem_inode->mtime = mem_inode->ctime = 0; // 应该使用当前时间
+	
+	/* 创建VFS inode */
+	struct inode *inode = default_alloc_vinode(dir->sb);
+	if (!inode) {
+			kfree(mem_inode);
+			return NULL;
+	}
+	
+	/* 初始化VFS inode */
+	inode->i_ino = new_ino;
+	inode->i_mode = S_IFDIR;
+	inode->i_nlink = 2;
+	inode->i_size = 0;
+	inode->blocks = 0;
+	inode->i_op = &ramfs_dir_inode_operations;
+	inode->i_fop = &ramfs_dir_operations;
+	
+	/* 创建地址空间 */
+	inode->i_mapping = address_space_create(inode, &ramfs_aops);
+	if (!inode->i_mapping) {
+			kfree(mem_inode);
+			kfree(inode);
+			return NULL;
+	}
+	
+	/* 创建inode信息 */
+	struct ramfs_inode_info *inode_info = kmalloc(sizeof(struct ramfs_inode_info));
+	if (!inode_info) {
+			address_space_destroy(inode->i_mapping);
+			kfree(mem_inode);
+			kfree(inode);
+			return NULL;
+	}
+	
+	/* 初始化inode信息 */
+	inode_info->mem_inode = mem_inode;
+	inode_info->dir_data = NULL;  // 空目录
+	inode->i_private = inode_info;
+	
+	/* 增加inode计数 */
+	sbi->inode_count++;
+	
+	/* 添加到父目录 */
+	struct ramfs_inode_info *dir_info = dir->i_private;
+	struct ramfs_direntry *entries = dir_info->dir_data;
+	uint64 dir_size = dir->i_size;
+	uint64 entry_count = dir_size / sizeof(struct ramfs_direntry);
+	
+	/* 重新分配目录条目数组 */
+	entries = krealloc(entries, dir_size + sizeof(struct ramfs_direntry));
+	if (!entries) {
+			address_space_destroy(inode->i_mapping);
+			kfree(mem_inode);
+			kfree(inode_info);
+			kfree(inode);
+			return NULL;
+	}
+	
+	/* 添加新条目 */
+	struct ramfs_direntry *new_entry = &entries[entry_count];
+	new_entry->inum = new_ino;
+	strncpy(new_entry->name, dentry->name, MAX_FILE_NAME_LEN - 1);
+	new_entry->name[MAX_FILE_NAME_LEN - 1] = '\0';
+	
+	/* 更新目录信息 */
+	dir_info->dir_data = entries;
+	dir->i_size += sizeof(struct ramfs_direntry);
+	
+	/* 增加父目录的链接计数 */
+	dir->i_nlink++;
+	
+	return inode;
+}
+
+/* 创建硬链接 */
+static int ramfs_link(struct inode *dir, struct dentry *dentry, struct inode *inode) {
+	struct ramfs_inode_info *dir_info = dir->i_private;
+	struct ramfs_direntry *entries = dir_info->dir_data;
+	uint64 dir_size = dir->i_size;
+	uint64 entry_count = dir_size / sizeof(struct ramfs_direntry);
+	
+	/* 检查链接目标是否为目录 */
+	if (S_ISDIR(inode->i_mode)) {
+			return -1;  // 不允许为目录创建硬链接
+	}
+	
+	/* 重新分配目录条目数组 */
+	entries = krealloc(entries, dir_size + sizeof(struct ramfs_direntry));
+	if (!entries) {
+			return -1;
+	}
+	
+	/* 添加新条目 */
+	struct ramfs_direntry *new_entry = &entries[entry_count];
+	new_entry->inum = inode->i_ino;
+	strncpy(new_entry->name, dentry->name, MAX_FILE_NAME_LEN - 1);
+	new_entry->name[MAX_FILE_NAME_LEN - 1] = '\0';
+	
+	/* 更新目录信息 */
+	dir_info->dir_data = entries;
+	dir->i_size += sizeof(struct ramfs_direntry);
+	
+	/* 增加inode的链接计数 */
+	inode->i_nlink++;
+	struct ramfs_inode_info *inode_info = inode->i_private;
+	inode_info->mem_inode->nlinks++;
+	
+	return 0;
+}
+
+/* 删除链接 */
+static int ramfs_unlink(struct inode *dir, struct dentry *dentry, struct inode *inode) {
+	struct ramfs_inode_info *dir_info = dir->i_private;
+	struct ramfs_direntry *entries = dir_info->dir_data;
+	uint64 dir_size = dir->i_size;
+	uint64 entry_count = dir_size / sizeof(struct ramfs_direntry);
+	int found = 0;
+	
+	/* 查找要删除的条目 */
+	for (uint64 i = 0; i < entry_count; i++) {
+			if (strcmp(entries[i].name, dentry->name) == 0) {
+					/* 移动后面的条目来填补空缺 */
+					if (i < entry_count - 1) {
+							memmove(&entries[i], &entries[i + 1], 
+											(entry_count - i - 1) * sizeof(struct ramfs_direntry));
+					}
+					found = 1;
+					break;
+			}
+	}
+	
+	if (!found) {
+			return -1;
+	}
+	
+	/* 更新目录大小 */
+	dir->i_size -= sizeof(struct ramfs_direntry);
+	
+	/* 如果是目录，减少父目录的链接计数 */
+	if (S_ISDIR(inode->i_mode)) {
+			dir->i_nlink--;
+	}
+	
+	/* 减少inode的链接计数 */
+	inode->i_nlink--;
+	struct ramfs_inode_info *inode_info = inode->i_private;
+	inode_info->mem_inode->nlinks--;
+	
+	/* 如果链接计数为0，可以考虑释放inode资源 */
+	if (inode->i_nlink == 0) {
+			/* 在完整实现中，这里应该将inode标记为可删除 */
+			/* 但在此简化版本中，我们暂不实现此功能 */
+	}
+	
+	return 0;
+}
+
+/* 写回inode到存储 */
+static int ramfs_write_back_inode(struct inode *inode) {
+	/* 在内存文件系统中，我们不需要真正写回存储 */
+	/* 只需更新内存中的inode信息 */
+	struct ramfs_inode_info *inode_info = inode->i_private;
+	struct ramfs_inode *mem_inode = inode_info->mem_inode;
+	
+	/* 更新内存inode信息 */
+	mem_inode->size = inode->i_size;
+	mem_inode->nlinks = inode->i_nlink;
+	
+	/* 对于目录，需要更新其目录数据 */
+	if (S_ISDIR(inode->i_mode)) {
+			if (inode_info->dir_data) {
+					/* 目录数据可能已经在内存中更新过，此处无需额外操作 */
+			}
+	}
+	
+	return 0;
+}
+
+/* 读取目录内容 */
+static int ramfs_readdir(struct inode *dir, struct dir *dir_out, int *offset) {
+	struct ramfs_inode_info *dir_info = dir->i_private;
+	struct ramfs_direntry *entries = dir_info->dir_data;
+	uint64 entry_count = dir->i_size / sizeof(struct ramfs_direntry);
+	
+	/* 检查偏移量是否有效 */
+	if (*offset < 0 || (uint64)*offset >= entry_count) {
+			return 0;  // 没有更多条目
+	}
+	
+	/* 获取当前条目 */
+	struct ramfs_direntry *current_entry = &entries[*offset];
+	
+	/* 填充输出结构 */
+	dir_out->inum = current_entry->inum;
+	strncpy(dir_out->name, current_entry->name, MAX_FILE_NAME_LEN - 1);
+	dir_out->name[MAX_FILE_NAME_LEN - 1] = '\0';
+	
+	/* 增加偏移量 */
+	(*offset)++;
+	
+	return 1;  // 成功读取一个条目
+}
