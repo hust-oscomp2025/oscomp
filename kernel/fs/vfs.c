@@ -6,7 +6,7 @@
 #include <kernel/mm/kmalloc.h>
 #include <kernel/mm/page.h>
 #include <kernel/fs/hostfs.h>
-//#include <kernel/fs/rfs.h>
+//
 #include <kernel/fs/ramfs.h>
 #include <kernel/types.h>
 #include <kernel/fs/inode.h>

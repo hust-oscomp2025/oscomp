@@ -349,7 +349,7 @@ static int load_debug_information(elf_context *ctx) {
 void load_elf_from_file(process *proc, char *filename) {
   elf_context ctx;
 
-  sprint("Loading application: %s\n", filename);
+  sprint("load_elf_from_file: Loading application: %s\n", filename);
 
   // 使用内核标准文件接口打开ELF文件
   int fd = do_open(filename, O_RDONLY);
