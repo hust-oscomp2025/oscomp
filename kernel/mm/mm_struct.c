@@ -22,7 +22,7 @@ void user_mem_init(void) {
  * @param proc 目标进程
  * @return 成功返回0，失败返回负值
  */
-int mm_init(process *proc) {
+int mm_init(struct task_struct *proc) {
   if (!proc)
     return -1;
 
@@ -208,7 +208,7 @@ struct vm_area_struct *find_vma_intersection(struct mm_struct *mm, uint64 start,
 /**
  * 映射内存区域
  */
-uint64 do_mmap(process *proc, uint64 addr, size_t length, int prot,
+uint64 do_mmap(struct task_struct *proc, uint64 addr, size_t length, int prot,
                enum vma_type type, uint64 flags) {
   if (!proc || !proc->mm || length == 0)
     return -1;
@@ -345,7 +345,7 @@ int do_munmap(process *proc, uint64 addr, size_t length) {
 /**
  * 分配一个页并映射到指定地址
  */
-void *mm_user_alloc_page(process *proc, uaddr addr, int prot) {
+void *mm_user_alloc_page(struct task_struct *proc, uaddr addr, int prot) {
   if (!proc || !proc->mm || !proc->mm->pagetable)
     return NULL;
 
@@ -388,7 +388,7 @@ void *mm_user_alloc_page(process *proc, uaddr addr, int prot) {
 /**
  * 扩展堆
  */
-uint64 do_brk(process *proc, int64 increment) {
+uint64 do_brk(struct task_struct *proc, int64 increment) {
   if (!proc || !proc->mm)
     return -1;
 
@@ -474,7 +474,7 @@ uint64 do_brk(process *proc, int64 increment) {
 /**
  * 分配特定数量的页到用户空间
  */
-void *user_alloc_pages(process *proc, int nr_pages, uint64 addr, int prot) {
+void *user_alloc_pages(struct task_struct *proc, int nr_pages, uint64 addr, int prot) {
   if (!proc || !proc->mm || nr_pages <= 0)
     return NULL;
 
@@ -503,7 +503,7 @@ void *user_alloc_pages(process *proc, int nr_pages, uint64 addr, int prot) {
 /**
  * 从用户空间释放页
  */
-int user_free_pages(process *proc, uint64 addr, int nr_pages) {
+int user_free_pages(struct task_struct *proc, uint64 addr, int nr_pages) {
   if (!proc || !proc->mm || nr_pages <= 0)
     return -1;
 
@@ -517,7 +517,7 @@ int user_free_pages(process *proc, uint64 addr, int nr_pages) {
 /**
  * 安全地将数据复制到用户空间
  */
-ssize_t copy_to_user(process *proc, void *dst, const void *src, size_t len) {
+ssize_t copy_to_user(struct task_struct *proc, void *dst, const void *src, size_t len) {
   if (!proc || !proc->mm || !dst || !src || len == 0)
     return -1;
 
@@ -573,7 +573,7 @@ ssize_t copy_to_user(process *proc, void *dst, const void *src, size_t len) {
 /**
  * 安全地从用户空间复制数据
  */
-ssize_t copy_from_user(process *proc, void *dst, const void *src, size_t len) {
+ssize_t copy_from_user(struct task_struct *proc, void *dst, const void *src, size_t len) {
   if (!proc || !proc->mm || !dst || !src || len == 0)
     return -1;
 
@@ -628,7 +628,7 @@ ssize_t copy_from_user(process *proc, void *dst, const void *src, size_t len) {
 /**
  * 打印进程的内存布局信息，用于调试
  */
-void print_proc_memory_layout(process *proc) {
+void print_proc_memory_layout(struct task_struct *proc) {
   if (!proc || !proc->mm)
     return;
 

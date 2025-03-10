@@ -83,11 +83,11 @@
     )
 
 
-process* ready_queue = NULL;
+		struct task_struct* ready_queue = NULL;
 //
 // insert a process, proc, into the END of ready queue.
 //
-void insert_to_ready_queue( process* proc ) {
+void insert_to_ready_queue( struct task_struct* proc ) {
   sprint( "going to insert process %d to ready queue.\n", proc->pid );
   // if the queue is empty in the beginning
   if( ready_queue == NULL ){
@@ -98,7 +98,7 @@ void insert_to_ready_queue( process* proc ) {
     return;
   }
   // ready queue is not empty
-  process *p;
+  struct task_struct *p;
   // browse the ready queue to see if proc is already in-queue
   for( p=ready_queue; p->queue_next!=NULL; p=p->queue_next )
     if( p == proc ) return;  //already in queue
@@ -117,9 +117,9 @@ void insert_to_ready_queue( process* proc ) {
 // ready_queue_insert), and then call schedule().
 //
 void schedule() {
-	extern process procs[NPROC];
+	extern struct task_struct procs[NPROC];
 	int hartid = read_tp();
-	process* cur = CURRENT;
+	struct task_struct* cur = CURRENT;
 			//sprint("debug\n");
 	if(cur && cur->status == BLOCKED && cur->ktrapframe == NULL){
 		cur->ktrapframe = (struct trapframe *)kmalloc(sizeof(struct trapframe));

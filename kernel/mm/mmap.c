@@ -34,7 +34,7 @@ uint64 prot_to_type(int prot, int user) {
 /**
  * 进程内存映射 - 将物理页映射到进程的虚拟地址空间
  */
-int proc_map_page(process *proc, uaddr vaddr, struct page *page, int prot) {
+int proc_map_page(struct task_struct *proc, uaddr vaddr, struct page *page, int prot) {
     // 参数检查
     if (!proc || !proc->mm || !proc->mm->pagetable)
         return -EINVAL;
@@ -61,7 +61,7 @@ int proc_map_page(process *proc, uaddr vaddr, struct page *page, int prot) {
 /**
  * 取消进程的内存映射
  */
-int proc_unmap_page(process *proc, uaddr vaddr) {
+int proc_unmap_page(struct task_struct *proc, uaddr vaddr) {
     // 参数检查
     if (!proc || !proc->mm)
         return -EINVAL;
@@ -91,7 +91,7 @@ int proc_unmap_page(process *proc, uaddr vaddr) {
 /**
  * 修改进程内存映射的保护属性
  */
-int proc_protect_page(process *proc, uaddr vaddr, int prot) {
+int proc_protect_page(struct task_struct *proc, uaddr vaddr, int prot) {
     // 参数检查
     if (!proc || !proc->mm)
         return -EINVAL;
@@ -126,7 +126,7 @@ int proc_protect_page(process *proc, uaddr vaddr, int prot) {
 /**
  * 查询进程内存映射状态
  */
-int proc_query_mapping(process *proc, uaddr addr, 
+int proc_query_mapping(struct task_struct *proc, uaddr addr, 
                      struct page **page_out, int *prot_out) {
     // 参数检查
     if (!proc || !proc->mm)
@@ -168,7 +168,7 @@ int proc_query_mapping(process *proc, uaddr addr,
 /**
  * 分配物理页并映射到进程的虚拟地址空间
  */
-int proc_alloc_map_page(process *proc, uaddr vaddr, int prot) {
+int proc_alloc_map_page(struct task_struct *proc, uaddr vaddr, int prot) {
     // 参数检查
     if (!proc || !proc->mm)
         return -EINVAL;
@@ -210,7 +210,7 @@ int proc_alloc_map_page(process *proc, uaddr vaddr, int prot) {
 /**
  * 取消进程内存映射并释放对应的物理页
  */
-int proc_unmap_free_page(process *proc, uaddr vaddr) {
+int proc_unmap_free_page(struct task_struct *proc, uaddr vaddr) {
     // 参数检查
     if (!proc || !proc->mm)
         return -EINVAL;

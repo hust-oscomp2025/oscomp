@@ -228,6 +228,7 @@ struct file *vfs_open(const char *path, int flags) {
       sprint("vfs_open: hook_open failed!\n");
     }
   }
+	sprint("vfs_open: end\n");
 
   return file;
 }

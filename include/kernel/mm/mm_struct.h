@@ -116,7 +116,7 @@ void user_mem_init(void);
  * @param proc 目标进程
  * @return 成功返回0，失败返回负值
  */
-int mm_init(process *proc);
+int mm_init(struct task_struct *proc);
 
 /**
  * 释放用户内存布局
@@ -156,7 +156,7 @@ struct vm_area_struct *find_vma_intersection(struct mm_struct *mm, uint64 start,
  * @param flags VMA标志
  * @return 成功返回映射的起始地址，失败返回-1
  */
-uint64 do_mmap(process *proc, uint64 addr, size_t length, int prot, 
+uint64 do_mmap(struct task_struct *proc, uint64 addr, size_t length, int prot, 
                enum vma_type type, uint64 flags);
 
 /**
@@ -166,7 +166,7 @@ uint64 do_mmap(process *proc, uint64 addr, size_t length, int prot,
  * @param length 长度
  * @return 成功返回0，失败返回-1
  */
-int do_munmap(process *proc, uint64 addr, size_t length);
+int do_munmap(struct task_struct *proc, uint64 addr, size_t length);
 
 /**
  * 分配一个页并映射到指定地址
@@ -175,7 +175,7 @@ int do_munmap(process *proc, uint64 addr, size_t length);
  * @param prot 保护标志
  * @return 成功返回映射的地址，失败返回NULL
  */
-void *mm_user_alloc_page(process *proc, uaddr addr, int prot);
+void *mm_user_alloc_page(struct task_struct *proc, uaddr addr, int prot);
 
 
 /**
@@ -184,7 +184,7 @@ void *mm_user_alloc_page(process *proc, uaddr addr, int prot);
  * @param increment 增加或减少的字节数
  * @return 成功返回新的brk地址，失败返回-1
  */
-uint64 do_brk(process *proc, int64 increment);
+uint64 do_brk(struct task_struct *proc, int64 increment);
 
 /**
  * 分配特定数量的页到用户空间
@@ -194,7 +194,7 @@ uint64 do_brk(process *proc, int64 increment);
  * @param prot 保护标志
  * @return 成功返回分配的起始地址，失败返回NULL
  */
-void *user_alloc_pages(process *proc, int nr_pages, uint64 addr, int prot);
+void *user_alloc_pages(struct task_struct *proc, int nr_pages, uint64 addr, int prot);
 
 /**
  * 从用户空间释放页
@@ -203,7 +203,7 @@ void *user_alloc_pages(process *proc, int nr_pages, uint64 addr, int prot);
  * @param nr_pages 页数量
  * @return 成功返回0，失败返回-1
  */
-int user_free_pages(process *proc, uint64 addr, int nr_pages);
+int user_free_pages(struct task_struct *proc, uint64 addr, int nr_pages);
 
 /**
  * 安全地将数据复制到用户空间
@@ -213,7 +213,7 @@ int user_free_pages(process *proc, uint64 addr, int nr_pages);
  * @param len 复制长度
  * @return 成功复制的字节数，失败返回-1
  */
-ssize_t copy_to_user(process *proc, void *dst, const void *src, size_t len);
+ssize_t copy_to_user(struct task_struct *proc, void *dst, const void *src, size_t len);
 
 /**
  * 安全地从用户空间复制数据
@@ -223,11 +223,11 @@ ssize_t copy_to_user(process *proc, void *dst, const void *src, size_t len);
  * @param len 复制长度
  * @return 成功复制的字节数，失败返回-1
  */
-ssize_t copy_from_user(process *proc, void *dst, const void *src, size_t len);
+ssize_t copy_from_user(struct task_struct *proc, void *dst, const void *src, size_t len);
 
 /**
  * 打印进程的内存布局信息，用于调试
  */
-void print_proc_memory_layout(process *proc);
+void print_proc_memory_layout(struct task_struct *proc);
 
 #endif /* _USER_MEM_H */

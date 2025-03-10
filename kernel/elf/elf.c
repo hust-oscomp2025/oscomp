@@ -23,7 +23,7 @@
  */
 typedef struct elf_context {
   int fd;             // 文件描述符
-  process *proc;      // 目标进程
+  struct task_struct *proc;      // 目标进程
   elf_header ehdr;    // ELF头部
   uint64 entry_point; // 入口点
 } elf_context;
@@ -97,7 +97,7 @@ static int validate_elf_header(elf_header *ehdr) {
  * @return 0表示成功，非0表示失败
  */
 static int load_segment(elf_context *ctx, elf_prog_header *ph) {
-  process *proc = ctx->proc;
+  struct task_struct *proc = ctx->proc;
   struct mm_struct *mm = proc->mm;
 
   // 只加载可加载的段
@@ -269,7 +269,7 @@ static void setup_global_pointer(elf_context *ctx) {
  * @param proc 目标进程
  * @return 0表示成功，非0表示失败
  */
-static int init_elf_context(elf_context *ctx, int fd, process *proc) {
+static int init_elf_context(elf_context *ctx, int fd, struct task_struct *proc) {
   memset(ctx, 0, sizeof(elf_context));
   ctx->fd = fd;
   ctx->proc = proc;
@@ -344,13 +344,13 @@ static int load_debug_information(elf_context *ctx) {
  * @param proc 目标进程
  * @param filename ELF文件名
  */
-void load_elf_from_file(process *proc, char *filename) {
+void load_elf_from_file(struct task_struct *proc, char *filename) {
   elf_context ctx;
 
   sprint("load_elf_from_file: Loading application: %s\n", filename);
 
   // 使用内核标准文件接口打开ELF文件
-  int fd = do_open(filename, O_RDONLY);
+  int fd = do_open(proc, filename, O_RDONLY);
   if (fd < 0) {
     panic("Failed to open application file: %s (error %d)\n", filename, fd);
   }
