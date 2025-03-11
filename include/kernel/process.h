@@ -107,37 +107,41 @@ struct task_struct {
 	struct trapframe* ktrapframe;
 
   struct mm_struct *mm;
+	struct mm_struct *active_mm;
   proc_file_management *pfiles;
   // heap management
   // process_heap_manager user_heap;
 
   // process id
   pid_t pid;
-  // process status
-  unsigned int status;
+  // process state
+  unsigned int state;
 	unsigned int flags;
   // parent process
   struct task_struct *parent;
-  // next queue element
-  struct task_struct *queue_next;
+  struct list_head *children;
+	struct list_head* sibling;
 
   // accounting. added @lab3_3
   int tick_count;
 
 	int sem_index;
 
-
+	/* The signal sent when the parent dies: */
 	int				exit_state;
 	int				exit_code;
 	int				exit_signal;
-	/* The signal sent when the parent dies: */
 
+	uid_t uid;
+	uid_t euid;
+	gid_t gid;
+	gid_t egid;
 
 
 };
 struct task_struct* alloc_init_task();
 
-void switch_to(struct task_struct*);
+
 
 struct task_struct* alloc_process();
 int free_process( struct task_struct* proc );
@@ -146,6 +150,11 @@ int free_process( struct task_struct* proc );
 int do_fork(struct task_struct* parent);
 int do_exec(void *path);
 ssize_t do_wait(int pid);
+
+/**
+ * 打印进程的内存布局信息，用于调试
+ */
+void print_proc_memory_layout(struct task_struct *proc);
 
 
 #endif

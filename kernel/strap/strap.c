@@ -11,7 +11,7 @@
 #include <kernel/mm/mm_struct.h>
 #include <kernel/process.h>
 #include <kernel/riscv.h>
-#include <kernel/sched.h>
+#include <kernel/sched/sched.h>
 #include <util/string.h>
 #include <kernel/syscall.h>
 
@@ -72,7 +72,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 	// 处理基于 VMA 的内存管理
 	if (proc->mm) {
 			// 查找地址所在的VMA
-			struct vm_area_struct *vma = find_vma(proc->mm, addr);
+			struct vm_area_struct *vma = mm_find_vma(proc->mm, addr);
 			
 			if (vma) {
 					// 确认访问权限
@@ -127,7 +127,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 					// }
 					
 					// 分配新页并映射
-					void *page_addr = mm_user_alloc_page(proc, page_va, vma->vm_prot);
+					void *page_addr = mm_alloc_page(proc, page_va, vma->vm_prot);
 					if (page_addr) return;
 			}
 	}
@@ -171,7 +171,7 @@ void rrsched() {
   // TODO (lab3_3): implements round-robin scheduling.
   // hint: increase the tick_count member of current process by one, if it is
   // bigger than TIME_SLICE_LEN (means it has consumed its time slice), change
-  // its status into READY, place it in the rear of ready queue, and finally
+  // its state into READY, place it in the rear of ready queue, and finally
   // schedule next process to run.
   // panic( "You need to further implement the timer handling in lab3_3.\n" );
   int hartid = read_tp();

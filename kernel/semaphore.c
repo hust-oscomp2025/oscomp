@@ -2,7 +2,7 @@
 
 
 
-#include <kernel/sched.h>
+#include <kernel/sched/sched.h>
 #include <spike_interface/spike_utils.h>
 //信号灯库
 semaphore sem_pool[NSEM];
@@ -43,7 +43,7 @@ int sem_P(int sem_index) {
     // sprint("BLOCK!\n");
     int hartid = read_tp();
     struct task_struct *cur = CURRENT;
-    cur->status = TASK_INTERRUPTIBLE;
+    cur->state = TASK_INTERRUPTIBLE;
     cur->queue_next = sem->wait_queue;
     sem->wait_queue = cur;
 
@@ -66,7 +66,7 @@ int sem_V(int sem_index) {
   if (sem->value == 0 && sem->wait_queue != NULL) {
     insert_to_ready_queue(sem->wait_queue);
 		//insert_to_ready_queue(current);
-    // sem->wait_queue->status = READY;
+    // sem->wait_queue->state = READY;
     sem->wait_queue = sem->wait_queue->queue_next;
     //schedule();
     return 0;

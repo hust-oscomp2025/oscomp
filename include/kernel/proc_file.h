@@ -5,6 +5,9 @@
 #include <kernel/types.h>
 #include <kernel/fs/vfs.h>
 
+
+proc_file_management *init_proc_file_management(void);
+
 //
 // file operations
 //
@@ -30,7 +33,6 @@ ssize_t do_ccwd(char* path);
 
 
 
-void fs_init(void);
 
 
 
@@ -42,7 +44,6 @@ typedef struct proc_file_management_t {
   int nfiles;  // the number of files opened by a process
 } proc_file_management;
 
-proc_file_management *init_proc_file_management(void);
 
 void free_proc_file_management(proc_file_management *pfiles);
 

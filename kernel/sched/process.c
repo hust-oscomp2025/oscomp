@@ -16,14 +16,16 @@
 
 #include <kernel/process.h>
 #include <kernel/riscv.h>
-#include <kernel/sched.h>
+#include <kernel/sched/sched.h>
+#include <kernel/sched/pid.h>
 #include <kernel/semaphore.h>
 #include <kernel/strap.h>
 
 #include <spike_interface/spike_utils.h>
 #include <util/string.h>
 
-
+static void* alloc_kernel_stack();
+static void free_kernel_stack(void* kstack);
 
 //
 // switch to a user-mode process
@@ -31,54 +33,18 @@
 
 extern void return_to_user(struct trapframe *, uint64 satp);
 
-void switch_to(struct task_struct *proc) {
-
-  assert(proc);
-  CURRENT = proc;
-
-  extern char smode_trap_vector[];
-  write_csr(stvec, (uint64)smode_trap_vector);
-  // set up trapframe values (in process structure) that smode_trap_vector will
-  // need when the process next re-enters the kernel.
-  proc->trapframe->kernel_sp = proc->kstack;     // process's kernel stack
-  proc->trapframe->kernel_satp = read_csr(satp); // kernel page table
-  proc->trapframe->kernel_trap = (uint64)smode_trap_handler;
-  proc->trapframe->kernel_schedule = (uint64)schedule;
-
-  // SSTATUS_SPP and SSTATUS_SPIE are defined in kernel/riscv.h
-  // set S Previous Privilege mode (the SSTATUS_SPP bit in sstatus register) to
-  // User mode,to to enable interrupts, and sret destination.
-
-  write_csr(sstatus, ((read_csr(sstatus) & ~SSTATUS_SPP) | SSTATUS_SPIE));
-
-  // set S Exception Program Counter (sepc register) to the elf entry pc.
-  write_csr(sepc, proc->trapframe->epc);
-  sprint("return to user\n");
-  return_to_user(proc->trapframe, MAKE_SATP(proc->mm->pagetable));
-}
-
 
 //
 // allocate an empty process, init its vm space. returns the pointer to
 // process strcuture. added @lab3_1
 //
-
-
-
-struct task_struct* alloc_init_task(){
-	struct task_struct* ps = (struct task_struct*)kmalloc(sizeof(struct task_struct));
-
-
-}
-
-
-
 struct task_struct *alloc_process() {
   // locate the first usable process structure
   struct task_struct *ps = alloc_empty_process();
 	mm_init(ps);
   // 分配内核栈
-  ps->kstack = (uint64)alloc_page()->virtual_address + PAGE_SIZE;
+  ps->kstack = alloc_kernel_stack();
+	ps->pid = pid_alloc();
 
   ps->trapframe = (struct trapframe*)kmalloc(sizeof(struct trapframe));
 
@@ -111,7 +77,7 @@ ssize_t do_wait(int pid) {
         struct task_struct *p = procs[i];
         // sprint("p = 0x%lx,\n",p);
         if (p->parent != NULL && p->parent->pid == CURRENT->pid &&
-            p->status & TASK_DEAD) {
+            p->state & TASK_DEAD) {
           // sprint("DEBUG LINE\n");
 
           free_process(p);
@@ -129,7 +95,7 @@ ssize_t do_wait(int pid) {
     struct task_struct *p = procs[pid];
     if (p->parent != CURRENT) {
       return -1;
-    } else if (p->status & TASK_DEAD) {
+    } else if (p->state & TASK_DEAD) {
       free_process(p);
       return pid;
     } else {
@@ -140,4 +106,72 @@ ssize_t do_wait(int pid) {
     }
   }
   return -1;
+}
+
+static void* alloc_kernel_stack(){
+	void* kstack = kmalloc(PAGE_SIZE);
+	return kstack + PAGE_SIZE - 16;
+}
+
+static void free_kernel_stack(void* kstack){
+	kfree(ROUNDDOWN((uint64)kstack,PAGE_SIZE));
+}
+
+
+
+/**
+ * 打印进程的内存布局信息，用于调试
+ */
+void print_proc_memory_layout(struct task_struct *proc) {
+  if (!proc || !proc->mm)
+    return;
+
+  struct mm_struct *mm = proc->mm;
+
+  sprint("Process %d memory layout:\n", proc->pid);
+  sprint("  code: 0x%lx - 0x%lx\n", mm->start_code, mm->end_code);
+  sprint("  data: 0x%lx - 0x%lx\n", mm->start_data, mm->end_data);
+  sprint("  heap: 0x%lx - 0x%lx\n", mm->start_brk, mm->brk);
+  sprint("  stack: 0x%lx - 0x%lx\n", mm->start_stack, mm->end_stack);
+
+  sprint("  VMAs (%d):\n", mm->map_count);
+
+  struct vm_area_struct *vma;
+  list_for_each_entry(vma, &mm->vma_list, vm_list) {
+    const char *type_str;
+    switch (vma->vm_type) {
+    case VMA_ANONYMOUS:
+      type_str = "anon";
+      break;
+    case VMA_FILE:
+      type_str = "file";
+      break;
+    case VMA_STACK:
+      type_str = "stack";
+      break;
+    case VMA_HEAP:
+      type_str = "heap";
+      break;
+    case VMA_TEXT:
+      type_str = "code";
+      break;
+    case VMA_DATA:
+      type_str = "data";
+      break;
+    default:
+      type_str = "unknown";
+      break;
+    }
+
+    char prot_str[8] = {0};
+    if (vma->vm_prot & PROT_READ)
+      strcat(prot_str, "r");
+    if (vma->vm_prot & PROT_WRITE)
+      strcat(prot_str, "w");
+    if (vma->vm_prot & PROT_EXEC)
+      strcat(prot_str, "x");
+
+    sprint("    %s: 0x%lx - 0x%lx [%s] pages:%d\n", type_str, vma->vm_start,
+           vma->vm_end, prot_str, vma->page_count);
+  }
 }

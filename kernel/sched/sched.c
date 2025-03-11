@@ -3,13 +3,27 @@
  */
 
 #include <kernel/mm/kmalloc.h>
-#include <kernel/sched.h>
+#include <kernel/sched/sched.h>
 #include <kernel/trapframe.h>
 #include <spike_interface/spike_utils.h>
 
 struct task_struct *ready_queue = NULL;
 struct task_struct* procs[NPROC];
 struct task_struct* current_percpu[NCPU];
+
+//
+// initialize process pool (the procs[] array). added @lab3_1
+//
+void init_scheduler() {
+	pid_init();
+  memset(procs, 0, sizeof(struct task_struct*) * NPROC);
+
+  for (int i = 0; i < NPROC; ++i) {
+    procs[i] = NULL;
+  }
+	sprint("Scheduler initiated\n");
+
+}
 
 struct task_struct *alloc_empty_process() {
   for (int i = 0; i < NPROC; i++) {
@@ -47,19 +61,7 @@ void insert_to_ready_queue(struct task_struct *proc) {
   return;
 }
 
-//
-// initialize process pool (the procs[] array). added @lab3_1
-//
-void init_scheduler() {
-	pid_init();
-  memset(procs, 0, sizeof(struct task_struct*) * NPROC);
 
-  for (int i = 0; i < NPROC; ++i) {
-    procs[i] = NULL;
-  }
-	sprint("Process pool initiated\n");
-
-}
 
 
 //
@@ -74,8 +76,8 @@ void schedule() {
   struct task_struct *cur = CURRENT;
   // sprint("debug\n");
   if (cur &&
-      (cur->status == TASK_INTERRUPTIBLE |
-       cur->status == TASK_UNINTERRUPTIBLE) &&
+      (cur->state == TASK_INTERRUPTIBLE |
+       cur->state == TASK_UNINTERRUPTIBLE) &&
       cur->ktrapframe == NULL) {
     cur->ktrapframe = (struct trapframe *)kmalloc(sizeof(struct trapframe));
     store_all_registers(cur->ktrapframe);
@@ -84,7 +86,7 @@ void schedule() {
 
   if (!ready_queue) {
     // by default, if there are no ready process, and all processes are in the
-    // status of FREE and ZOMBIE, we should shutdown the emulated RISC-V
+    // state of FREE and ZOMBIE, we should shutdown the emulated RISC-V
     // machine.
     int should_shutdown = 1;
 
@@ -128,3 +130,31 @@ void schedule() {
   sprint("going to schedule process %d to run.\n", cur->pid);
   switch_to(cur);
 }
+
+
+void switch_to(struct task_struct *proc) {
+
+  assert(proc);
+  CURRENT = proc;
+
+  extern char smode_trap_vector[];
+  write_csr(stvec, (uint64)smode_trap_vector);
+  // set up trapframe values (in process structure) that smode_trap_vector will
+  // need when the process next re-enters the kernel.
+  proc->trapframe->kernel_sp = proc->kstack;     // process's kernel stack
+  proc->trapframe->kernel_satp = read_csr(satp); // kernel page table
+  proc->trapframe->kernel_trap = (uint64)smode_trap_handler;
+  proc->trapframe->kernel_schedule = (uint64)schedule;
+
+  // SSTATUS_SPP and SSTATUS_SPIE are defined in kernel/riscv.h
+  // set S Previous Privilege mode (the SSTATUS_SPP bit in sstatus register) to
+  // User mode,to to enable interrupts, and sret destination.
+
+  write_csr(sstatus, ((read_csr(sstatus) & ~SSTATUS_SPP) | SSTATUS_SPIE));
+
+  // set S Exception Program Counter (sepc register) to the elf entry pc.
+  write_csr(sepc, proc->trapframe->epc);
+  sprint("return to user\n");
+  return_to_user(proc->trapframe, MAKE_SATP(proc->mm->pagetable));
+}
+

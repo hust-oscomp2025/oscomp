@@ -14,6 +14,8 @@ void init_scheduler();
 void insert_to_ready_queue( struct task_struct* proc );
 struct task_struct *alloc_empty_process();
 
+void switch_to(struct task_struct*);
+
 void schedule();
 
 #endif
