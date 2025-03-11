@@ -351,7 +351,7 @@ void load_elf_from_file(struct task_struct *proc, char *filename) {
   sprint("load_elf_from_file: Loading application: %s\n", filename);
 
   // 使用内核标准文件接口打开ELF文件
-  int fd = do_open(proc, filename, O_RDONLY);
+  int fd = do_open(filename, O_RDONLY);
   if (fd < 0) {
     panic("Failed to open application file: %s (error %d)\n", filename, fd);
   }

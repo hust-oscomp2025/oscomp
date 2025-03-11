@@ -56,7 +56,7 @@ struct file *get_opened_file(int fd) {
 // open a file named as "pathname" with the permission of "flags".
 // return: -1 on failure; non-zero file-descriptor on success.
 //
-int do_open(struct task_struct* proc,char *pathname, int flags) {
+int do_open(char *pathname, int flags) {
 	sprint("do_open: begin.\n");
   struct file *opened_file = NULL;
   if ((opened_file = vfs_open(pathname, flags)) == NULL)
@@ -67,7 +67,7 @@ int do_open(struct task_struct* proc,char *pathname, int flags) {
 
 	// 从进程控制块中分配fd
   for (int fd = 0; fd < MAX_FILES; ++fd) {
-    struct file *pfile = proc->pfiles->fd_table[fd];
+    struct file *pfile = CURRENT->pfiles->fd_table[fd];
     if (pfile == NULL) {
 			sprint("do_open: choosing fd=%d.\n",fd);
 
