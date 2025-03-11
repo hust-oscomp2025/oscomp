@@ -8,6 +8,19 @@
 #include <spike_interface/spike_utils.h>
 
 struct task_struct *ready_queue = NULL;
+struct task_struct* procs[NPROC];
+struct task_struct* current_percpu[NCPU];
+
+struct task_struct *alloc_empty_process() {
+  for (int i = 0; i < NPROC; i++) {
+    if (procs[i] == NULL) {
+			procs[i] = (struct task_struct*)kmalloc(sizeof(struct task_struct));
+			memset(procs[i],0,sizeof(struct task_struct));
+      return procs[i];
+    }
+  }
+  panic("cannot find any free process structure.\n");
+}
 //
 // insert a process, proc, into the END of ready queue.
 //
@@ -33,6 +46,21 @@ void insert_to_ready_queue(struct task_struct *proc) {
   proc->queue_next = NULL;
   return;
 }
+
+//
+// initialize process pool (the procs[] array). added @lab3_1
+//
+void init_scheduler() {
+	pid_init();
+  memset(procs, 0, sizeof(struct task_struct*) * NPROC);
+
+  for (int i = 0; i < NPROC; ++i) {
+    procs[i] = NULL;
+  }
+	sprint("Process pool initiated\n");
+
+}
+
 
 //
 // choose a proc from the ready queue, and put it to run.

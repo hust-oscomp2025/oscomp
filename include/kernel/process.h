@@ -5,15 +5,6 @@
 #include <kernel/proc_file.h>
 #include <kernel/trapframe.h>
 
-
-
-
-// riscv-pke kernel supports at most 32 processes
-#define NPROC 32
-
-
-
-
 /* Linux内核进程flags定义表 */
 
 /* 进程标志(task->flags) */
@@ -121,7 +112,7 @@ struct task_struct {
   // process_heap_manager user_heap;
 
   // process id
-  uint64 pid;
+  pid_t pid;
   // process status
   unsigned int status;
 	unsigned int flags;
@@ -145,9 +136,9 @@ struct task_struct {
 
 };
 struct task_struct* alloc_init_task();
-// switch to run user app
+
 void switch_to(struct task_struct*);
-void init_proc_pool();
+
 struct task_struct* alloc_process();
 int free_process( struct task_struct* proc );
 
@@ -155,11 +146,6 @@ int free_process( struct task_struct* proc );
 int do_fork(struct task_struct* parent);
 int do_exec(void *path);
 ssize_t do_wait(int pid);
-// current_percpu points to the currently running user-mode application.
 
-// current_percpu running process
-// extern process* current_percpu[NCPU];
-extern struct task_struct* current_percpu[NCPU];
-#define CURRENT (current_percpu[read_tp()])
 
 #endif

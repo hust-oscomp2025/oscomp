@@ -24,8 +24,7 @@
 #include <util/string.h>
 
 
-struct task_struct* procs[NPROC];
-struct task_struct* current_percpu[NCPU];
+
 //
 // switch to a user-mode process
 //
@@ -58,32 +57,13 @@ void switch_to(struct task_struct *proc) {
   return_to_user(proc->trapframe, MAKE_SATP(proc->mm->pagetable));
 }
 
-//
-// initialize process pool (the procs[] array). added @lab3_1
-//
-void init_proc_pool() {
-  memset(procs, 0, sizeof(struct task_struct*) * NPROC);
-
-  for (int i = 0; i < NPROC; ++i) {
-    procs[i] = NULL;
-  }
-	sprint("Process pool initiated\n");
-
-}
 
 //
 // allocate an empty process, init its vm space. returns the pointer to
 // process strcuture. added @lab3_1
 //
 
-struct task_struct *find_empty_process() {
-  for (int i = 0; i < NPROC; i++) {
-    if (procs[i] == NULL) {
-      return &(procs[i]);
-    }
-  }
-  panic("cannot find any free process structure.\n");
-}
+
 
 struct task_struct* alloc_init_task(){
 	struct task_struct* ps = (struct task_struct*)kmalloc(sizeof(struct task_struct));
@@ -95,7 +75,7 @@ struct task_struct* alloc_init_task(){
 
 struct task_struct *alloc_process() {
   // locate the first usable process structure
-  struct task_struct *ps = find_empty_process();
+  struct task_struct *ps = alloc_empty_process();
 	mm_init(ps);
   // 分配内核栈
   ps->kstack = (uint64)alloc_page()->virtual_address + PAGE_SIZE;
@@ -120,7 +100,7 @@ int free_process(struct task_struct *proc) {
 
 ssize_t do_wait(int pid) {
   // sprint("DEBUG LINE, pid = %d\n",pid);
-  extern struct task_struct procs[NPROC];
+  extern struct task_struct* procs[NPROC];
   int hartid = read_tp();
   // int child_found_flag = 0;
   if (pid == -1) {
@@ -128,7 +108,7 @@ ssize_t do_wait(int pid) {
       for (int i = 0; i < NPROC; i++) {
         // sprint("DEBUG LINE\n");
 
-        struct task_struct *p = &(procs[i]);
+        struct task_struct *p = procs[i];
         // sprint("p = 0x%lx,\n",p);
         if (p->parent != NULL && p->parent->pid == CURRENT->pid &&
             p->status & TASK_DEAD) {
@@ -146,7 +126,7 @@ ssize_t do_wait(int pid) {
   if (0 < pid && pid < NPROC) {
     // sprint("DEBUG LINE\n");
 
-    struct task_struct *p = &procs[pid];
+    struct task_struct *p = procs[pid];
     if (p->parent != CURRENT) {
       return -1;
     } else if (p->status & TASK_DEAD) {

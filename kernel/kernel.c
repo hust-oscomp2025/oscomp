@@ -234,7 +234,7 @@ int s_start(void) {
   //    从这里开始，所有内存访问都通过MMU进行虚实转换
 
   pagetable_activate(g_kernel_pagetable);
-  init_proc_pool();
+  init_scheduler();
 
   fs_init();
 
