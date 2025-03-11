@@ -3,6 +3,7 @@
 
 #include <kernel/riscv.h>
 #include <kernel/proc_file.h>
+#include <kernel/trapframe.h>
 
 
 
@@ -11,22 +12,7 @@
 #define NPROC 32
 
 
-struct trapframe {
-  // space to store context (all common registers)
-  /* offset:0   */ riscv_regs regs;
 
-  // process's "user kernel" stack
-  /* offset:248 */ uint64 kernel_sp;
-  // pointer to smode_trap_handler
-  /* offset:256 */ uint64 kernel_trap;
-  // saved user process counter
-  /* offset:264 */ uint64 epc;
-
-  // kernel page table. added @lab2_1
-  /* offset:272 */ uint64 kernel_satp;
-	// kernel scheduler, added @lab3_challenge2
-	/* offset:280 */ uint64 kernel_schedule;
-};
 
 /* Linux内核进程flags定义表 */
 
@@ -71,24 +57,42 @@ struct trapframe {
 
 
 
-/* Linux内核进程状态定义表 */
+/*
+ * Task state bitmask. NOTE! These bits are also
+ * encoded in fs/proc/array.c: get_task_state().
+ *
+ * We have two separate sets of flags: task->state
+ * is about runnability, while task->exit_state are
+ * about the task exiting. Confusing, but this way
+ * modifying one set can't modify the other one by
+ * mistake.
+ */
 
-/* 基本进程状态 */
-#define TASK_RUNNING                    0  // 进程正在运行或在运行队列中等待被调度
-#define TASK_INTERRUPTIBLE              1  // 进程处于可中断的睡眠状态，可以被信号唤醒
-#define TASK_UNINTERRUPTIBLE            2  // 进程处于不可中断的睡眠状态，不响应信号，直到某个条件满足
-#define __TASK_STOPPED                  4  // 进程已停止执行，通常因为收到SIGSTOP信号
-#define __TASK_TRACED                   8  // 进程正在被调试(通过ptrace)
+/* Used in tsk->state: */
+#define TASK_RUNNING			0x00000000
+// TASK_RUNNING同时表示就绪状态和运行状态，就绪状态在进程队列中，加以区分。
+#define TASK_INTERRUPTIBLE		0x00000001
+#define TASK_UNINTERRUPTIBLE		0x00000002
+#define __TASK_STOPPED			0x00000004
+#define __TASK_TRACED			0x00000008
+/* Used in tsk->exit_state: */
+#define EXIT_DEAD			0x00000010
+#define EXIT_ZOMBIE			0x00000020
+#define EXIT_TRACE			(EXIT_ZOMBIE | EXIT_DEAD)
+/* Used in tsk->state again: */
+#define TASK_PARKED			0x00000040
+#define TASK_DEAD			0x00000080
+#define TASK_WAKEKILL			0x00000100
+#define TASK_WAKING			0x00000200
+#define TASK_NOLOAD			0x00000400
+#define TASK_NEW			0x00000800
+#define TASK_RTLOCK_WAIT		0x00001000
+#define TASK_FREEZABLE			0x00002000
+//#define __TASK_FREEZABLE_UNSAFE	       (0x00004000 * IS_ENABLED(CONFIG_LOCKDEP))
+#define TASK_FROZEN			0x00008000
+#define TASK_STATE_MAX			0x00010000
 
-/* 特殊状态标志 */
-#define TASK_PARKED                   0x10  // 进程已被临时挂起(用于功耗管理) 
-#define TASK_DEAD                     0x20  // 进程已终止，正在被清理
-#define TASK_WAKEKILL                 0x40  // 进程会在唤醒时被杀死(用于SIGKILL处理) 
-#define TASK_WAKING                   0x80  // 进程正在被唤醒过程中
-#define TASK_NOLOAD                  0x100  // 不计入负载统计的任务
-#define TASK_NEW                     0x200  // 刚创建，尚未完全初始化的进程
-#define TASK_STATE_MAX               0x400  // 状态值的最大边界
-
+#define TASK_ANY			(TASK_STATE_MAX-1)
 /* 复合状态(组合状态) */
 #define TASK_KILLABLE        (TASK_WAKEKILL | TASK_UNINTERRUPTIBLE)  // 不可中断但可被SIGKILL终止
 #define TASK_STOPPED         (TASK_WAKEKILL | __TASK_STOPPED)        // 已停止并会在唤醒时被杀死 
@@ -112,7 +116,7 @@ struct task_struct {
 	struct trapframe* ktrapframe;
 
   struct mm_struct *mm;
-
+  proc_file_management *pfiles;
   // heap management
   // process_heap_manager user_heap;
 
@@ -130,8 +134,14 @@ struct task_struct {
   int tick_count;
 
 	int sem_index;
-  // file system. added @lab4_1
-  proc_file_management *pfiles;
+
+
+	int				exit_state;
+	int				exit_code;
+	int				exit_signal;
+	/* The signal sent when the parent dies: */
+
+
 
 };
 struct task_struct* alloc_init_task();

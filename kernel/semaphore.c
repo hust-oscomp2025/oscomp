@@ -43,7 +43,7 @@ int sem_P(int sem_index) {
     // sprint("BLOCK!\n");
     int hartid = read_tp();
     struct task_struct *cur = CURRENT;
-    cur->status = BLOCKED;
+    cur->status = TASK_INTERRUPTIBLE;
     cur->queue_next = sem->wait_queue;
     sem->wait_queue = cur;
 

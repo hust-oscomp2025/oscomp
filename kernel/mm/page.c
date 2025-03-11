@@ -30,13 +30,19 @@ typedef struct node {
 static list_node free_page_list = {NULL};
 volatile static int free_page_counter;
 
+static void init_page_struct(struct page *page);
+static void *get_free_page(void); // 获取一个空闲物理页，不设置page结构
+static void put_free_page(void *addr); // 释放一个物理页到空闲列表，不涉及page结构
+
+
+
 // 获取页框号 (PFN)
 static uint64 get_pfn(void *addr) {
   return ((uint64)addr - mem_base_addr) / PAGE_SIZE;
 }
 
 // 初始化页结构
-void init_page_struct(struct page *page) {
+static void init_page_struct(struct page *page) {
   if (!page)
     return;
 
@@ -99,7 +105,7 @@ void init_page_manager() {
 }
 
 // 获取一个空闲物理页，不设置page结构
-void *get_free_page(void) {
+static void *get_free_page(void) {
   list_node *n = free_page_list.next;
   if (n) {
     free_page_list.next = n->next;
@@ -108,8 +114,12 @@ void *get_free_page(void) {
   return (void *)n;
 }
 
+
+
+
+// put_free_page
 // 释放一个物理页到空闲列表，不涉及page结构
-void put_free_page(void *addr) {
+static void put_free_page(void *addr) {
   // 检查地址是否在有效范围内
   if (((uint64)addr % PAGE_SIZE) != 0 || (uint64)addr < mem_base_addr ||
       (uint64)addr >= mem_base_addr + mem_size) {
@@ -174,7 +184,7 @@ struct page *alloc_page(void) {
 }
 
 // 释放单个页结构及对应物理页
-void page_free(struct page *page) {
+void free_page(struct page *page) {
   if (!page)
     return;
 
@@ -211,7 +221,7 @@ void free_pages(struct page *page, int order) {
     return;
 
   if (order == 0) {
-    page_free(page); // 单页释放
+    free_page(page); // 单页释放
     return;
   }
 

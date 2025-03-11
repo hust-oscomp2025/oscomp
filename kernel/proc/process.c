@@ -131,7 +131,7 @@ ssize_t do_wait(int pid) {
         struct task_struct *p = &(procs[i]);
         // sprint("p = 0x%lx,\n",p);
         if (p->parent != NULL && p->parent->pid == CURRENT->pid &&
-            p->status == ZOMBIE) {
+            p->status & TASK_DEAD) {
           // sprint("DEBUG LINE\n");
 
           free_process(p);
@@ -149,7 +149,7 @@ ssize_t do_wait(int pid) {
     struct task_struct *p = &procs[pid];
     if (p->parent != CURRENT) {
       return -1;
-    } else if (p->status == ZOMBIE) {
+    } else if (p->status & TASK_DEAD) {
       free_process(p);
       return pid;
     } else {

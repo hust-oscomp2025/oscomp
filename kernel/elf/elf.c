@@ -13,6 +13,7 @@
 #include <kernel/proc_file.h>
 #include <kernel/process.h>
 #include <kernel/riscv.h>
+#include <kernel/trapframe.h>
 
 #include <spike_interface/spike_utils.h>
 #include <util/string.h>

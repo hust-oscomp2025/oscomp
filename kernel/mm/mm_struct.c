@@ -99,7 +99,7 @@ void user_mm_free(struct mm_struct *mm) {
       if (vma->pages) {
         for (int i = 0; i < vma->page_count; i++) {
           if (vma->pages[i]) {
-            page_free(vma->pages[i]);
+            free_page(vma->pages[i]);
           }
         }
         kfree(vma->pages);
@@ -248,7 +248,7 @@ uint64 do_mmap(struct task_struct *proc, uint64 addr, size_t length, int prot,
 /**
  * 取消映射内存区域
  */
-int do_munmap(process *proc, uint64 addr, size_t length) {
+int do_munmap(struct task_struct *proc, uint64 addr, size_t length) {
   if (!proc || !proc->mm || length == 0)
     return -1;
 
@@ -280,7 +280,7 @@ int do_munmap(process *proc, uint64 addr, size_t length) {
           pgt_unmap(mm->pagetable, page_va, PAGE_SIZE, 1);
 
           // 释放页
-          page_free(vma->pages[i]);
+          free_page(vma->pages[i]);
           vma->pages[i] = NULL;
         }
       }
@@ -363,7 +363,7 @@ void *mm_user_alloc_page(struct task_struct *proc, uaddr addr, int prot) {
 
   if (result != 0) {
     // 映射失败，释放页面
-    page_free(page);
+    free_page(page);
     return NULL;
   }
 
@@ -456,7 +456,7 @@ uint64 do_brk(struct task_struct *proc, int64 increment) {
         if (vma->pages[i]) {
           uint64 page_va = vma->vm_start + (i * PAGE_SIZE);
           pgt_unmap(mm->pagetable, page_va, PAGE_SIZE, 1);
-          page_free(vma->pages[i]);
+          free_page(vma->pages[i]);
           vma->pages[i] = NULL;
         }
       }

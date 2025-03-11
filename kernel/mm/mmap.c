@@ -200,7 +200,7 @@ int proc_alloc_map_page(struct task_struct *proc, uaddr vaddr, int prot) {
     int result = proc_map_page(proc, vaddr, page, prot);
     if (result != 0) {
         // 映射失败，释放页
-        page_free(page);
+        free_page(page);
         return result;
     }
 
@@ -232,7 +232,7 @@ int proc_unmap_free_page(struct task_struct *proc, uaddr vaddr) {
 
     // 释放物理页
     if (page)
-        page_free(page);
+        free_page(page);
     
     return 0;
 }

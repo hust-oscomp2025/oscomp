@@ -81,7 +81,7 @@ smode_trap_vector:
 # return from Supervisor mode to User mode, transition is made by using a trapframe,
 # which stores the context of a user application.
 # return_to_user() takes one parameter, i.e., the pointer (a0 register) pointing to a
-# trapframe (defined in kernel/process.h) of the process.
+# trapframe (defined in kernel/trapframe.h) of the process.
 #
 .globl return_to_user
 return_to_user:
