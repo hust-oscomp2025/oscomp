@@ -1,17 +1,14 @@
 #ifndef _USER_MEM_H
 #define _USER_MEM_H
 
-#include <kernel/mm/page.h>
 #include <kernel/mm/mmap.h>
+#include <kernel/mm/page.h>
 #include <kernel/mm/pagetable.h>
 #include <kernel/process.h>
 #include <kernel/riscv.h>
 #include <kernel/types.h>
 #include <util/list.h>
 #include <util/spinlock.h>
-
-
-
 
 /**
  * 虚拟内存区域 (Virtual Memory Area)
@@ -51,13 +48,13 @@ typedef uint64 *pagetable_t; // 512 PTEs
  * 仿照 mm_struct，管理进程的整个地址空间
  */
 struct mm_struct {
-  //struct maple_tree mm_mt;
+  // struct maple_tree mm_mt;
 
   // 页表
   pagetable_t pagetable; // 页表
   // VMA链表
   struct list_head vma_list; // VMA链表头
-  int map_count;         // VMA数量
+  int map_count;             // VMA数量
 
   // 地址空间边界
   uaddr start_code;
@@ -78,32 +75,18 @@ struct mm_struct {
   atomic_t mm_count;  // 引用计数
 };
 
-
 // 初始化内核mm结构
 void create_init_mm();
 
-
-/**
- * 将用户虚拟地址转换为物理地址
- *
- * @param mm 内存管理结构体
- * @param user_va 用户空间虚拟地址
- * @return 物理地址，失败返回NULL
- */
-inline uint64 mm_lookuppa(struct mm_struct *mm, uaddr user_va) {
-  if (!mm || !mm->pagetable) {
-    return 0;
-  }
-  return pgt_lookuppa(mm->pagetable, user_va);
-}
+struct mm_struct *alloc_mm(void);
+void free_mm(struct mm_struct *mm);
 
 
-struct mm_struct* mm_alloc(void);
+uint64 mm_alloc_pages(struct mm_struct *mm, uaddr va, size_t npages, int perm);
 
-/**
- * 释放用户内存布局
- */
-void user_mm_free(struct mm_struct *mm);
+int protect_pages(struct mm_struct *mm, uaddr vaddr, int perm);
+uint64 prot_to_type(int prot, int user);
+
 
 /**
  * 创建新的VMA
@@ -140,8 +123,8 @@ struct vm_area_struct *find_vma_intersection(struct mm_struct *mm, uint64 start,
  * @param flags VMA标志
  * @return 成功返回映射的起始地址，失败返回-1
  */
-uint64 mm_map_pages(struct mm_struct *mm, uint64 va, uint64 pa, size_t length, int prot,
-               enum vma_type type, uint64 flags);
+uint64 map_pages(struct mm_struct *mm, uint64 va, uint64 pa, size_t length,
+                    int prot, enum vma_type type, uint64 flags);
 
 /**
  * 取消映射内存区域
@@ -153,15 +136,6 @@ uint64 mm_map_pages(struct mm_struct *mm, uint64 va, uint64 pa, size_t length, i
 int mm_unmap(struct mm_struct *mm, uint64 addr, size_t length);
 
 /**
- * 分配一个页并映射到指定地址
- * @param proc 目标进程
- * @param addr 虚拟地址
- * @param prot 保护标志
- * @return 成功返回映射的地址，失败返回NULL
- */
-void *mm_alloc_page(struct mm_struct *proc, uaddr addr, int prot);
-
-/**
  * 扩展堆
  * @param proc 目标进程
  * @param increment 增加或减少的字节数
@@ -169,16 +143,6 @@ void *mm_alloc_page(struct mm_struct *proc, uaddr addr, int prot);
  */
 uint64 mm_brk(struct mm_struct *mm, int64 increment);
 
-/**
- * 分配特定数量的页到用户空间
- * @param proc 目标进程
- * @param nr_pages 页数量
- * @param addr 请求的起始地址（如果为0则自动分配）
- * @param prot 保护标志
- * @return 成功返回分配的起始地址，失败返回NULL
- */
-void *mm_alloc_pages(struct mm_struct *mm, int nr_pages, uint64 addr,
-                       int prot);
 
 /**
  * 从用户空间释放页
@@ -198,7 +162,7 @@ int mm_free_pages(struct mm_struct *proc, uint64 addr, int nr_pages);
  * @return 成功复制的字节数，失败返回-1
  */
 ssize_t mm_copy_to_user(struct mm_struct *proc, void *dst, const void *src,
-                     size_t len);
+                        size_t len);
 
 /**
  * 安全地从用户空间复制数据
@@ -209,8 +173,6 @@ ssize_t mm_copy_to_user(struct mm_struct *proc, void *dst, const void *src,
  * @return 成功复制的字节数，失败返回-1
  */
 ssize_t mm_copy_from_user(struct mm_struct *proc, void *dst, const void *src,
-                       size_t len);
-
-
+                          size_t len);
 
 #endif /* _USER_MEM_H */

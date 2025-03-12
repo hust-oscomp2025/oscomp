@@ -77,8 +77,8 @@ int pgt_map_pages(pagetable_t pagetable, uaddr va, uint64 pa, uint64 size,  int 
 
 int pgt_unmap(pagetable_t pagetable, uaddr va, uint64 size, int free_phys);
 
-pte_t *pgt_walk(pagetable_t pagetable, uaddr va, int alloc);
-uint64 pgt_lookuppa(pagetable_t pagetable, uaddr va);
+pte_t *page_walk(pagetable_t pagetable, uaddr va, int alloc);
+void* lookup_pa(pagetable_t pagetable, uaddr va);
 
 /**
  * @brief 复制页表结构(可选择是否复制映射)

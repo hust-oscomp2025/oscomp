@@ -63,67 +63,6 @@ enum vma_type {
 #define PROT_WRITE     0x2         /* 页可写 */
 #define PROT_EXEC      0x4         /* 页可执行 */
 
-/**
- * 进程内存映射 - 将物理页映射到进程的虚拟地址空间
- * @param proc      目标进程
- * @param vaddr     虚拟地址
- * @param page      物理页
- * @param prot      保护标志
- * @return          成功返回0，失败返回错误码
- */
-int proc_map_page(struct task_struct  *proc, uaddr vaddr, struct page *page, int prot);
 
-/**
- * 取消进程的内存映射
- * @param proc      目标进程
- * @param vaddr     虚拟地址
- * @return          成功返回0，失败返回错误码
- */
-int proc_unmap_page(struct task_struct *proc, uaddr vaddr);
-
-/**
- * 修改进程内存映射的保护属性
- * @param proc      目标进程
- * @param vaddr     虚拟地址
- * @param prot      新的保护标志
- * @return          成功返回0，失败返回错误码
- */
-int proc_protect_page(struct task_struct *proc, uaddr vaddr, int prot);
-
-/**
- * 查询进程内存映射状态
- * @param proc      目标进程
- * @param addr      虚拟地址
- * @param page_out  如果非NULL，返回映射的物理页结构
- * @param prot_out  如果非NULL，返回当前保护标志
- * @return          成功返回0，失败返回错误码
- */
-int proc_query_mapping(struct task_struct *proc, uaddr addr, 
-                     struct page **page_out, int *prot_out);
-
-/**
- * 分配物理页并映射到进程的虚拟地址空间
- * @param proc      目标进程
- * @param vaddr     虚拟地址
- * @param prot      保护标志
- * @return          成功返回0，失败返回错误码
- */
-int proc_alloc_map_page(struct task_struct *proc, uaddr vaddr, int prot);
-
-/**
- * 取消进程内存映射并释放对应的物理页
- * @param proc      目标进程
- * @param vaddr     虚拟地址
- * @return          成功返回0，失败返回错误码
- */
-int proc_unmap_free_page(struct task_struct *proc, uaddr vaddr);
-
-/**
- * 将保护标志(PROT_*)转换为页表项标志
- * @param prot      保护标志
- * @param user      是否为用户页(1是，0否)
- * @return          页表项标志
- */
-uint64 prot_to_type(int prot, int user);
 
 #endif /* _LINUX_MM_H */

@@ -25,7 +25,9 @@ struct page {
   size_t kmalloc_size;           // kmalloc 分配的实际大小
   unsigned int kmalloc_pages;    // 多页分配时的页数
 
-  void *virtual_address;         // 页在内核空间中的虚拟地址
+  void *virtual_address;         
+	// 页在内核空间中的虚拟地址
+	// 事实上就是物理地址的直接映射
   struct list_head lru;          // LRU链表节点
   spinlock_t page_lock;          // 页锁，用于同步访问
 };

@@ -23,10 +23,10 @@
  * 用于保存加载过程中的必要数据
  */
 typedef struct elf_context {
-  int fd;             // 文件描述符
-  struct task_struct *proc;      // 目标进程
-  elf_header ehdr;    // ELF头部
-  uint64 entry_point; // 入口点
+  int fd;                   // 文件描述符
+  struct task_struct *proc; // 目标进程
+  elf_header ehdr;          // ELF头部
+  uint64 entry_point;       // 入口点
 } elf_context;
 
 /**
@@ -121,8 +121,7 @@ static int load_segment(elf_context *ctx, elf_prog_header *ph) {
   sprint("Loading segment: vaddr=0x%lx, size=0x%lx, flags=0x%x\n", ph->vaddr,
          ph->memsz, ph->flags);
 
-  // 计算所需页数（向上取整）
-  uint64 num_pages = (ph->memsz + PAGE_SIZE - 1) / PAGE_SIZE;
+
 
   // 确定VMA类型和权限
   enum vma_type vma_type;
@@ -130,10 +129,14 @@ static int load_segment(elf_context *ctx, elf_prog_header *ph) {
   uint64 vma_flags = 0;
 
   // 设置权限和段类型
-  if (ph->flags & SEGMENT_READABLE)
+  if (ph->flags & SEGMENT_READABLE) {
     prot |= PROT_READ;
-  if (ph->flags & SEGMENT_WRITABLE)
+    vma_flags |= VM_READ;
+  }
+  if (ph->flags & SEGMENT_WRITABLE) {
     prot |= PROT_WRITE;
+    vma_flags |= VM_WRITE;
+  }
   if (ph->flags & SEGMENT_EXECUTABLE) {
     prot |= PROT_EXEC;
     vma_type = VMA_TEXT;
@@ -144,7 +147,7 @@ static int load_segment(elf_context *ctx, elf_prog_header *ph) {
       mm->start_code = ph->vaddr;
     if (ph->vaddr + ph->memsz > mm->end_code)
       mm->end_code = ph->vaddr + ph->memsz;
-  } else {
+  } else { // 数据段
     vma_type = VMA_DATA;
 
     // 更新数据段范围
@@ -154,29 +157,25 @@ static int load_segment(elf_context *ctx, elf_prog_header *ph) {
       mm->end_data = ph->vaddr + ph->memsz;
   }
 
-  // 设置VMA标志
-  if (ph->flags & SEGMENT_WRITABLE)
-    vma_flags |= VM_WRITE;
-  if (ph->flags & SEGMENT_READABLE)
-    vma_flags |= VM_READ;
-
   // 创建VMA以管理该段
   struct vm_area_struct *vma = create_vma(mm, ph->vaddr, ph->vaddr + ph->memsz,
                                           prot, vma_type, vma_flags);
-  if (!vma) {
+  if (unlikely(!vma)) {
     sprint("Failed to create VMA for segment\n");
     return -1;
   }
 
-  // 为段分配物理内存并映射
+  // 计算所需页数（向上取整）
+  uint64 num_pages = (ph->memsz + PAGE_SIZE - 1) / PAGE_SIZE;
+
   for (uint64 i = 0; i < num_pages; i++) {
     uint64 vaddr = ph->vaddr + i * PAGE_SIZE;
-    void *page = mm_alloc_page(proc->mm, vaddr, prot);
-    if (!page) {
+    if (unlikely(mm_alloc_pages(proc->mm, vaddr, 1, prot) == -1)) {
       sprint("Failed to allocate page for segment\n");
       return -1;
     }
-
+		// 内核实际读elf的物理地址
+		void* pa = lookup_pa(proc->mm->pagetable, vaddr);
     // 计算这一页需要从文件中加载的字节数
     uint64 page_offset = i * PAGE_SIZE;
     uint64 file_offset = ph->off + page_offset;
@@ -187,18 +186,18 @@ static int load_segment(elf_context *ctx, elf_prog_header *ph) {
       bytes_to_copy = MIN(PAGE_SIZE, ph->filesz - page_offset);
 
       // 从文件读取数据到分配的物理页
-      if (elf_read_at(ctx, page, bytes_to_copy, file_offset) != bytes_to_copy) {
+      if (elf_read_at(ctx, (void*)pa, bytes_to_copy, file_offset) != bytes_to_copy) {
         sprint("Failed to read segment data\n");
         return -1;
       }
 
       // 如果此页有剩余部分，需要清零（.bss段的一部分）
       if (bytes_to_copy < PAGE_SIZE) {
-        memset((char *)page + bytes_to_copy, 0, PAGE_SIZE - bytes_to_copy);
+        memset((char *)pa + bytes_to_copy, 0, PAGE_SIZE - bytes_to_copy);
       }
     } else {
       // 这一页完全是bss段，清零整个页
-      memset(page, 0, PAGE_SIZE);
+      memset(pa, 0, PAGE_SIZE);
     }
   }
 
@@ -270,7 +269,8 @@ static void setup_global_pointer(elf_context *ctx) {
  * @param proc 目标进程
  * @return 0表示成功，非0表示失败
  */
-static int init_elf_context(elf_context *ctx, int fd, struct task_struct *proc) {
+static int init_elf_context(elf_context *ctx, int fd,
+                            struct task_struct *proc) {
   memset(ctx, 0, sizeof(elf_context));
   ctx->fd = fd;
   ctx->proc = proc;
@@ -355,17 +355,17 @@ void load_elf_from_file(struct task_struct *proc, char *filename) {
   if (fd < 0) {
     panic("Failed to open application file: %s (error %d)\n", filename, fd);
   }
-	sprint("load_elf_from_file: do_open ended.\n");
+  sprint("load_elf_from_file: do_open ended.\n");
 
   // 确保进程有有效的内存布局
   if (unlikely(!proc->mm)) {
-		proc->mm = mm_alloc();
+    proc->mm = alloc_mm();
     if (!proc->mm) {
       do_close(fd);
       panic("Failed to create memory layout for process\n");
     }
   }
-	sprint("load_elf_from_file: process has mm_struct.\n");
+  sprint("load_elf_from_file: process has mm_struct.\n");
 
   // 初始化ELF上下文
   if (init_elf_context(&ctx, fd, proc) != 0) {
@@ -381,7 +381,7 @@ void load_elf_from_file(struct task_struct *proc, char *filename) {
 
   // 如果需要，加载调试信息
   load_debug_information(&ctx);
-	sprint("load_elf_from_file: load debug information\n");
+  sprint("load_elf_from_file: load debug information\n");
   // 关闭文件
   do_close(fd);
 

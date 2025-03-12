@@ -19,8 +19,8 @@ static LIST_HEAD(page_lru_list);
 static spinlock_t page_lru_lock = SPINLOCK_INIT;
 
 // 物理内存布局
-static uint64 mem_base_addr;
-static uint64 mem_size;
+uint64 mem_base_addr;
+uint64 mem_size;
 
 // 空闲页链表相关
 typedef struct node {
@@ -203,11 +203,11 @@ void free_page(struct page *page) {
 
 // 分配多个连续页，返回第一个页的page结构
 // 目前简单实现，未实现真正的buddy系统
-struct page *alloc_pages(int order) {
-  if (order < 0)
+struct page *alloc_pages(int n) {
+  if (n <= 0)
     return NULL;
 
-  if (order == 0)
+  if (n == 1)
     return alloc_page(); // 单页分配
 
   // 目前不支持多页连续分配，可以在后续扩展中实现buddy系统

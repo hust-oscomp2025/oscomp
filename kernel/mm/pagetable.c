@@ -93,7 +93,7 @@ void free_pagetable(pagetable_t pagetable) {
 /**
  * 在页表中查找页表项
  */
-pte_t *pgt_walk(pagetable_t pagetable, uaddr va, int alloc) {
+pte_t *page_walk(pagetable_t pagetable, uaddr va, int alloc) {
 	if(va == 0x87ffd000){
 		sprint("0x87ffd000\n");
 	}
@@ -174,7 +174,7 @@ int pgt_map_page(pagetable_t pagetable, uaddr va, uint64 pa, int perm) {
   long flags = spinlock_lock_irqsave(&pagetable_lock);
 
   // 查找页表项，必要时分配页表
-  pte_t *pte = pgt_walk(pagetable, aligned_va, 1);
+  pte_t *pte = page_walk(pagetable, aligned_va, 1);
   if (pte == NULL) {
     spinlock_unlock_irqrestore(&pagetable_lock, flags);
     return -1;
@@ -240,7 +240,7 @@ int pgt_unmap(pagetable_t pagetable, uaddr va, uint64 size, int free_phys) {
   // 逐页取消映射
   for (uaddr va_page = start_va; va_page < end_va; va_page += PAGE_SIZE) {
     // 查找页表项，不分配新页表
-    pte_t *pte = pgt_walk(pagetable, va_page, 0);
+    pte_t *pte = page_walk(pagetable, va_page, 0);
     if (pte == NULL) {
       // 页表不存在，跳过
       continue;
@@ -271,9 +271,9 @@ int pgt_unmap(pagetable_t pagetable, uaddr va, uint64 size, int free_phys) {
 /**
  * 查找虚拟地址对应的物理地址
  */
-uint64 pgt_lookuppa(pagetable_t pagetable, uaddr va) {
+void* lookup_pa(pagetable_t pagetable, uaddr va) {
   // 查找页表项
-  pte_t *pte = pgt_walk(pagetable, va, 0);
+  pte_t *pte = page_walk(pagetable, va, 0);
   if (pte == NULL || !(*pte & PTE_V)) {
     return 0; // 映射不存在
   }
@@ -282,7 +282,7 @@ uint64 pgt_lookuppa(pagetable_t pagetable, uaddr va) {
   uint64 offset = va & (PAGE_SIZE - 1);
 
   // 返回物理地址
-  return PTE2PA(*pte) | offset;
+  return (void*)(PTE2PA(*pte) | offset);
 }
 
 void pagetable_activate(pagetable_t pagetable) {
@@ -331,7 +331,7 @@ pagetable_t pagetable_copy(pagetable_t src, uaddr start, uaddr end, int share) {
   // 逐页复制映射
   for (uaddr va = start; va < end; va += PAGE_SIZE) {
     // 查找源页表项
-    pte_t *src_pte = pgt_walk(src, va, 0);
+    pte_t *src_pte = page_walk(src, va, 0);
     if (src_pte == NULL || !(*src_pte & PTE_V)) {
       // 源页表中没有映射，跳过
       continue;
@@ -356,7 +356,7 @@ pagetable_t pagetable_copy(pagetable_t src, uaddr start, uaddr end, int share) {
       memcpy(new_page, (void *)pa, PAGE_SIZE);
 
       // 在新页表中创建映射
-      pte_t *dst_pte = pgt_walk(dst, va, 1);
+      pte_t *dst_pte = page_walk(dst, va, 1);
       if (dst_pte == NULL) {
         free_page((virt_to_page(new_page)));
 
@@ -370,7 +370,7 @@ pagetable_t pagetable_copy(pagetable_t src, uaddr start, uaddr end, int share) {
 
     } else if (share == 1) {
       // 共享物理页: 直接映射到同一物理页
-      pte_t *dst_pte = pgt_walk(dst, va, 1);
+      pte_t *dst_pte = page_walk(dst, va, 1);
       if (dst_pte == NULL) {
         spinlock_unlock_irqrestore(&pagetable_lock, flags);
         free_pagetable(dst);
@@ -384,7 +384,7 @@ pagetable_t pagetable_copy(pagetable_t src, uaddr start, uaddr end, int share) {
       // 写时复制: 共享物理页，但移除写权限
 
       // 在新页表中创建映射，但标记为只读
-      pte_t *dst_pte = pgt_walk(dst, va, 1);
+      pte_t *dst_pte = page_walk(dst, va, 1);
       if (dst_pte == NULL) {
         spinlock_unlock_irqrestore(&pagetable_lock, flags);
         free_pagetable(dst);

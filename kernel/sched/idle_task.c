@@ -20,6 +20,27 @@
 extern void schedule(void);
 extern void scheduler_register_task(struct task_struct *tsk);
 
+
+static inline void halt_cpu(void) {
+	__asm__ volatile ("wfi" ::: "memory");
+}
+
+/*
+ * idle_loop - Idle 进程的主循环
+ *
+ * 当系统中没有其他可运行的进程时，idle_loop 将被调度执行，
+ * 它会不断调用 schedule() 尝试切换到其他任务，
+ * 若无任务可运行，则调用 halt_cpu() 让 CPU 进入低功耗等待状态。
+ */
+void idle_loop(void) {
+  while (1) {
+    schedule(); // 尝试切换到更高优先级任务
+    halt_cpu(); // 没有任务时进入低功耗等待（如 HLT 指令）
+  }
+}
+
+
+
 /* 内核全局内存管理结构和内核页表（假设已在其他地方初始化） */
 //extern pgd_t swapper_pg_dir[]; // 内核页目录
 
@@ -74,23 +95,7 @@ void init_idle_task(void) {
 
 
 
-static inline void halt_cpu(void) {
-	__asm__ volatile ("wfi" ::: "memory");
-}
 
 
 
-/*
- * idle_loop - Idle 进程的主循环
- *
- * 当系统中没有其他可运行的进程时，idle_loop 将被调度执行，
- * 它会不断调用 schedule() 尝试切换到其他任务，
- * 若无任务可运行，则调用 halt_cpu() 让 CPU 进入低功耗等待状态。
- */
-void idle_loop(void) {
-  while (1) {
-    schedule(); // 尝试切换到更高优先级任务
-    halt_cpu(); // 没有任务时进入低功耗等待（如 HLT 指令）
-  }
-}
 

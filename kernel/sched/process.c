@@ -43,7 +43,7 @@ struct task_struct *alloc_process() {
   ps->kstack = (uint64)alloc_kernel_stack();
   ps->trapframe = (struct trapframe*)kmalloc(sizeof(struct trapframe));
 	ps->ktrapframe = NULL;
-	ps->mm = mm_alloc();
+	ps->mm = alloc_mm();
   ps->pfiles = alloc_pfm();
 	//ps->active_mm =ps->mm;
   // 分配内核栈

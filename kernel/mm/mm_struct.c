@@ -8,8 +8,26 @@
 #include <util/atomic.h>
 #include <util/string.h>
 
+/**
+ * 将保护标志(PROT_*)转换为页表项标志
+ */
+uint64 prot_to_type(int prot, int user) {
+  uint64 perm = 0;
+  if (prot & PROT_READ)
+    perm |= PTE_R | PTE_A;
+  if (prot & PROT_WRITE)
+    perm |= PTE_W | PTE_D;
+  if (prot & PROT_EXEC)
+    perm |= PTE_X | PTE_A;
+  if (perm == 0)
+    perm = PTE_R;
+  if (user)
+    perm |= PTE_U;
+  return perm;
+}
 
-struct mm_struct* mm_alloc(void){
+// alloc_mm
+struct mm_struct *alloc_mm(void) {
 
   // 创建mm结构
   struct mm_struct *mm = (struct mm_struct *)kmalloc(sizeof(struct mm_struct));
@@ -18,30 +36,42 @@ struct mm_struct* mm_alloc(void){
   memset(mm, 0, sizeof(struct mm_struct));
   INIT_LIST_HEAD(&mm->vma_list);
   mm->map_count = 0;
+
+  // 记录页表的内核虚拟地址
+  mm->pagetable = (pagetable_t)kmalloc(PAGE_SIZE);
+  if (unlikely(mm->pagetable == NULL)) {
+    sprint("alloc_mm: kmalloc failed\n");
+    return NULL;
+  }
+  memset(mm->pagetable, 0, PAGE_SIZE);
+
   spinlock_init(&mm->mm_lock);
   atomic_set(&mm->mm_users, 1);
   atomic_set(&mm->mm_count, 1);
 
   // 用户空间默认布局
-  mm->start_code = 0x00400000;                  // 代码段默认起始地址
-  mm->end_code = 0x00400000;                    // 初始时代码段为空
-  mm->start_data = 0x10000000;                  // 数据段默认起始地址
-  mm->end_data = 0x10000000;                    // 初始时数据段为空
-  mm->start_brk = USER_FREE_ADDRESS_START;      // 堆默认起始地址
-  mm->brk = USER_FREE_ADDRESS_START;            // 初始时堆为空
+  mm->start_code = 0x00400000;             // 代码段默认起始地址
+  mm->end_code = 0x00400000;               // 初始时代码段为空
+  mm->start_data = 0x10000000;             // 数据段默认起始地址
+  mm->end_data = 0x10000000;               // 初始时数据段为空
+  mm->start_brk = USER_FREE_ADDRESS_START; // 堆默认起始地址
+  mm->brk = USER_FREE_ADDRESS_START;       // 初始时堆为空
+
   mm->start_stack = USER_STACK_TOP - PAGE_SIZE; // 栈默认起始地址
   mm->end_stack = USER_STACK_TOP;               // 栈默认结束地址
-
-  mm->pagetable = (pagetable_t)kmalloc(PAGE_SIZE);
 
   // 创建初始栈区域VMA
   struct vm_area_struct *stack_vma =
       create_vma(mm, mm->start_stack, mm->end_stack, PROT_READ | PROT_WRITE,
-                 VMA_STACK, VM_GROWSDOWN | VM_PRIVATE);
+                    VMA_STACK, VM_GROWSDOWN | VM_PRIVATE);
+  // 有VM_GROWSDOWN flag，可以动态向下增长
 
   // 分配并映射初始栈页
-  void *page_addr =
-      mm_alloc_page(mm, mm->start_stack, PROT_READ | PROT_WRITE);
+  if (unlikely(mm_alloc_pages(mm, mm->start_stack, 1, PROT_READ | PROT_WRITE) ==
+               -1)) {
+    sprint("alloc_mm: failed to allocate initial stack page\n");
+    return NULL;
+  }
 
   return mm;
 }
@@ -49,7 +79,7 @@ struct mm_struct* mm_alloc(void){
 /**
  * 释放用户内存布局
  */
-void user_mm_free(struct mm_struct *mm) {
+void free_mm(struct mm_struct *mm) {
   if (!mm)
     return;
 
@@ -89,8 +119,8 @@ void user_mm_free(struct mm_struct *mm) {
  * 创建新的VMA
  */
 struct vm_area_struct *create_vma(struct mm_struct *mm, uint64 start,
-                                  uint64 end, int prot, enum vma_type type,
-                                  uint64 flags) {
+                                     uint64 end, int prot, enum vma_type type,
+                                     uint64 flags) {
   if (!mm || start >= end)
     return NULL;
 
@@ -173,10 +203,12 @@ struct vm_area_struct *find_vma_intersection(struct mm_struct *mm, uint64 start,
 /**
  * 映射内存区域
  */
-uint64 mm_map_pages(struct mm_struct *mm, uint64 va, uint64 pa, size_t length,
-                    int prot, enum vma_type type, uint64 flags) {
-  if (!mm || length == 0)
-    return -EINVAL;
+uint64 map_pages(struct mm_struct *mm, uint64 va, uint64 pa, size_t length,
+                 int prot, enum vma_type type, uint64 flags) {
+  if (!mm || length == 0) {
+    sprint("map_pages: EINVAL\n");
+    panic();
+  }
 
   // 对齐长度到页大小
   length = ROUNDUP(length, PAGE_SIZE);
@@ -203,14 +235,105 @@ uint64 mm_map_pages(struct mm_struct *mm, uint64 va, uint64 pa, size_t length,
     return -1;
 
   // 理论上来说，要实现懒分配（待实现）
-
   if (type != VMA_ANONYMOUS || (flags & MAP_POPULATE)) {
     for (uint64 off = 0; off < length; off += PAGE_SIZE) {
       pgt_map_page(mm->pagetable, va + off, pa + off, prot);
     }
   }
+  // 映射成功后，更新VMA信息（此处简化处理）
+  // 在实际实现中，可能需要更新或创建VMA
+  // 这里简化处理，仅刷新TLB
+  flush_tlb();
 
   // 可能会和错误码冲突
+  return va;
+}
+
+int protect_pages(struct mm_struct *mm, uaddr vaddr, int perm) {
+  if (unlikely(!mm || !mm->pagetable || (vaddr & (PAGE_SIZE - 1))))
+    return -EINVAL;
+  // 查找对应的页表项
+  pte_t *pte = page_walk(mm->pagetable, vaddr, 0);
+  if (unlikely(!pte || !(*pte & PTE_V)))
+    return -EFAULT; // 映射不存在
+
+  // 保留物理页地址，更新权限位
+  uint64 pa = PTE2PA(*pte);
+  *pte = PA2PPN(pa) | perm;
+
+  // 刷新TLB
+  flush_tlb();
+
+  return 0;
+}
+
+/**
+ * Allocate and map physical pages to a specified virtual address range
+ *
+ * @param mm The memory descriptor
+ * @param va The starting virtual address (0 for auto-allocation)
+ * @param npages Number of pages to allocate
+ * @param prot Memory protection flags
+ * @return The starting virtual address or 0 on error
+ */
+uint64 mm_alloc_pages(struct mm_struct *mm, uaddr va, size_t npages, int perm) {
+  if (!mm || npages == 0) {
+    sprint("mm_alloc_pages: EINVAL\n");
+    panic();
+  }
+
+  // Calculate total memory size needed
+  size_t length = npages * PAGE_SIZE;
+
+  // Start looking for free space from mm->brk if no address specified
+  if (va == 0) {
+    va = mm->brk;
+    while (find_vma_intersection(mm, va, va + length)) {
+      va += PAGE_SIZE;
+    }
+  } else {
+    // Verify the requested range is available
+    if (find_vma_intersection(mm, va, va + length)) {
+      sprint("mm_alloc_pages: memory range already in use\n");
+      panic();
+    }
+  }
+
+  // Find or create the VMA for this region
+  struct vm_area_struct *vma = mm_find_vma(mm, va);
+  if (!vma || vma->vm_start > va || vma->vm_end < va + length) {
+    sprint("mm_alloc_pages: no VMA exists for region\n");
+    return -1;
+  }
+
+  // Allocate and map each physical page
+  for (size_t i = 0; i < npages; i++) {
+    // Allocate a physical page
+    struct page *page = alloc_page();
+    if (unlikely(!page)) {
+      // Failed to allocate page, clean up and return error
+      mm_unmap(mm, va, i * PAGE_SIZE);
+      return -1;
+    }
+
+    // Get physical address
+    void *pa = page_to_virt(page);
+
+    // Map the page
+    if (unlikely(pgt_map_page(mm->pagetable, va + (i * PAGE_SIZE), (uint64)pa,
+                              perm) != 0)) {
+      free_page(page);
+      mm_unmap(mm, va, i * PAGE_SIZE);
+      return -1;
+    }
+
+    // Store page reference in the VMA
+    int page_idx = ((va + (i * PAGE_SIZE)) - vma->vm_start) / PAGE_SIZE;
+    if (page_idx >= 0 && page_idx < vma->page_count) {
+      vma->pages[page_idx] = page;
+    }
+  }
+
   return va;
 }
 
@@ -310,49 +433,6 @@ int mm_unmap(struct mm_struct *mm, uint64 addr, size_t length) {
 }
 
 /**
- * 分配一个页并映射到指定地址
- */
-void *mm_alloc_page(struct mm_struct *mm, uaddr addr, int prot) {
-  if (!mm || !mm->pagetable)
-    return NULL;
-
-  // 分配一个页结构体
-  struct page *page = alloc_page();
-  if (!page)
-    return NULL;
-
-  // 获取页结构对应的物理地址
-  void *pa = page_to_virt(page);
-
-  // 映射到用户虚拟地址空间
-  int result =
-      pgt_map_page(mm->pagetable, addr, (uint64)pa, prot_to_type(prot, 1));
-
-  if (result != 0) {
-    // 映射失败，释放页面
-    free_page(page);
-    return NULL;
-  }
-
-  // 记录映射关系
-  if (mm) {
-    struct vm_area_struct *vma = mm_find_vma(mm, addr);
-    if (vma) {
-      int page_idx = (addr - vma->vm_start) / PAGE_SIZE;
-      if (page_idx >= 0 && page_idx < vma->page_count) {
-        vma->pages[page_idx] = page;
-      }
-    }
-  }
-
-  // 设置页的相关属性
-  page->virtual_address = (void *)addr;
-
-  // 返回虚拟地址
-  return (void *)addr;
-}
-
-/**
  * 扩展堆
  */
 uint64 mm_brk(struct mm_struct *mm, int64 increment) {
@@ -378,8 +458,8 @@ uint64 mm_brk(struct mm_struct *mm, int64 increment) {
     vma = mm_find_vma(mm, mm->brk);
     if (!vma || vma->vm_type != VMA_HEAP) {
       // 需要创建新的堆VMA
-      vma = create_vma(mm, mm->brk, new_brk, PROT_READ | PROT_WRITE, VMA_HEAP,
-                       VM_GROWSUP | VM_PRIVATE);
+      vma = create_vma(mm, mm->brk, new_brk, PROT_READ | PROT_WRITE,
+                          VMA_HEAP, VM_GROWSUP | VM_PRIVATE);
       if (!vma)
         return -1;
     } else {
@@ -438,36 +518,6 @@ uint64 mm_brk(struct mm_struct *mm, int64 increment) {
 }
 
 /**
- * 分配特定数量的页到用户空间
- */
-void *mm_alloc_pages(struct mm_struct *mm, int nr_pages, uint64 addr,
-                     int prot) {
-  if (!mm || nr_pages <= 0)
-    return NULL;
-
-  // 计算所需空间大小
-  size_t length = nr_pages * PAGE_SIZE;
-
-  // 分配虚拟地址空间
-  uint64 mmap_addr =
-      mm_map_pages(mm, 0, addr, length, prot, VMA_ANONYMOUS, VM_PRIVATE);
-  if (mmap_addr == (uint64)-1)
-    return NULL;
-
-  // 预分配所有页并立即映射（不使用按需分页）
-  for (int i = 0; i < nr_pages; i++) {
-    void *page_addr = mm_alloc_page(mm, mmap_addr + (i * PAGE_SIZE), prot);
-    if (!page_addr) {
-      // 分配失败，释放已分配的页
-      mm_unmap(mm, mmap_addr, i * PAGE_SIZE);
-      return NULL;
-    }
-  }
-
-  return (void *)mmap_addr;
-}
-
-/**
  * 从用户空间释放页
  */
 int mm_free_pages(struct mm_struct *mm, uint64 addr, int nr_pages) {
@@ -517,7 +567,7 @@ ssize_t mm_copy_to_user(struct mm_struct *mm, void *dst, const void *src,
 
     // 确保页已分配
     if (!vma->pages[page_idx]) {
-      void *page_addr = mm_alloc_page(mm, page_va, vma->vm_prot);
+      uaddr page_addr = mm_alloc_pages(mm, page_va, 1, vma->vm_prot);
       if (!page_addr)
         return bytes_copied > 0 ? bytes_copied : -1;
     }
