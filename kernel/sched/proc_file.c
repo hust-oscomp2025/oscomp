@@ -3,12 +3,14 @@
  */
 
 #include <kernel/proc_file.h>
-#include <kernel/mm.h>
+#include <kernel/mm/kmalloc.h>
 #include <kernel/process.h>
-#include <riscv.h>
+#include <kernel/sched/sched.h>
+#include <kernel/riscv.h>
 #include "spike_interface/spike_file.h"
 #include <spike_interface/spike_utils.h>
-#include <kstdlib.h>
+
+#include <util/string.h>
 
 
 
@@ -17,14 +19,14 @@
 // return the pointer to the page containing the data structure.
 //
 proc_file_management *init_proc_file_management(void) {
-  proc_file_management *pfiles = (proc_file_management *)alloc_page();
+  proc_file_management *pfiles = (proc_file_management *)kmalloc(sizeof(proc_file_management));
   pfiles->cwd = vfs_root_dentry; // by default, cwd is the root
   pfiles->nfiles = 0;
 
   for (int fd = 0; fd < MAX_FILES; ++fd)
-    pfiles->opened_files[fd].status = FD_NONE;
+    pfiles->fd_table[fd] = NULL;
 
-  sprint("FS: created a file management struct for a process.\n");
+  sprint("init_proc_file_management: created a file management struct for a process.\n");
   return pfiles;
 }
 
@@ -32,8 +34,8 @@ proc_file_management *init_proc_file_management(void) {
 // reclaim the open-file management data structure of a process.
 // note: this function is not used as PKE does not actually reclaim a process.
 //
-void reclaim_proc_file_management(proc_file_management *pfiles) {
-  put_free_page(pfiles);
+void free_proc_file_management(proc_file_management *pfiles) {
+	kfree(pfiles);
   return;
 }
 
@@ -42,16 +44,12 @@ void reclaim_proc_file_management(proc_file_management *pfiles) {
 // return: the pointer to the opened file structure.
 //
 struct file *get_opened_file(int fd) {
-  struct file *pfile = NULL;
-
-  // browse opened file list to locate the fd
-  for (int i = 0; i < MAX_FILES; ++i) {
-    pfile = &(current->pfiles->opened_files[i]); // file entry
-    if (i == fd)
-      break;
-  }
-  if (pfile == NULL)
-    panic("do_read: invalid fd!\n");
+	if(fd < 0 || fd >= MAX_FILES){
+		panic("do_read: invalid fd!\n");
+	}
+  struct file *pfile = CURRENT->pfiles->fd_table[fd]; // file entry
+	if (pfile == NULL)
+		panic("do_read: no such opened file!\n");
   return pfile;
 }
 
@@ -60,26 +58,28 @@ struct file *get_opened_file(int fd) {
 // return: -1 on failure; non-zero file-descriptor on success.
 //
 int do_open(char *pathname, int flags) {
+	sprint("do_open: begin.\n");
   struct file *opened_file = NULL;
   if ((opened_file = vfs_open(pathname, flags)) == NULL)
     return -1;
 
-  int fd = 0;
-  if (current->pfiles->nfiles >= MAX_FILES) {
-    panic("do_open: no file entry for current process!\n");
-  }
-  struct file *pfile;
-  for (fd = 0; fd < MAX_FILES; ++fd) {
-    pfile = &(current->pfiles->opened_files[fd]);
-    if (pfile->status == FD_NONE)
-      break;
-  }
 
-  // initialize this file structure
-  memcpy(pfile, opened_file, sizeof(struct file));
+	sprint("do_open: allocating fd.\n");
 
-  ++current->pfiles->nfiles;
-  return fd;
+	// 从进程控制块中分配fd
+  for (int fd = 0; fd < MAX_FILES; ++fd) {
+    struct file *pfile = CURRENT->pfiles->fd_table[fd];
+    if (pfile == NULL) {
+			sprint("do_open: choosing fd=%d.\n",fd);
+
+      // initialize this file structure
+			pfile = (struct file *)kmalloc(sizeof(struct file));
+      memcpy(pfile, opened_file, sizeof(struct file));
+      CURRENT->pfiles->nfiles++;
+      return fd;
+    }
+  }
+  panic("do_open: no file entry for current process!\n");
 }
 
 //
@@ -89,7 +89,7 @@ int do_open(char *pathname, int flags) {
 int do_read(int fd, char *buf, uint64 count) {
   struct file *pfile = get_opened_file(fd);
 
-  if (pfile->readable == 0)
+  if ( (pfile->f_mode & FMODE_READ) == 0)
     panic("do_read: no readable file!\n");
 
   char buffer[count + 1];
@@ -106,7 +106,7 @@ int do_read(int fd, char *buf, uint64 count) {
 int do_write(int fd, char *buf, uint64 count) {
   struct file *pfile = get_opened_file(fd);
 
-  if (pfile->writable == 0)
+  if (!(pfile->f_mode & FMODE_WRITE)) 
     panic("do_write: cannot write file!\n");
 
   int len = vfs_write(pfile, buf, count);
@@ -124,7 +124,7 @@ int do_lseek(int fd, int offset, int whence) {
 //
 // read the vinode information
 //
-int do_stat(int fd, struct stat *istat) {
+int do_fstat(int fd, struct istat *istat) {
   struct file *pfile = get_opened_file(fd);
   return vfs_stat(pfile, istat);
 }
@@ -132,9 +132,16 @@ int do_stat(int fd, struct stat *istat) {
 //
 // read the inode information on the disk
 //
-int do_disk_stat(int fd, struct stat *istat) {
+int do_stat(int fd, struct istat *istat) {
+	
   struct file *pfile = get_opened_file(fd);
-  return vfs_disk_stat(pfile, istat);
+	if(pfile){
+		return vfs_disk_stat(pfile, istat);
+	}else{
+		sprint("empty fd\n");
+		return -1;
+	}
+  
 }
 
 //
@@ -143,7 +150,9 @@ int do_disk_stat(int fd, struct stat *istat) {
 int do_close(int fd) {
   struct file *pfile = get_opened_file(fd);
 	int ret = vfs_close(pfile);
-	pfile->status = FD_NONE;
+	kfree(pfile);
+	CURRENT->pfiles->fd_table[fd] = NULL;
+	CURRENT->pfiles->nfiles--;
   return ret;
 }
 
@@ -158,11 +167,12 @@ int do_opendir(char *pathname) {
 
 	// 从进程控制块中分配fd
   for (int fd = 0; fd < MAX_FILES; ++fd) {
-    struct file *pfile = &(current->pfiles->opened_files[fd]);
-    if (pfile->status == FD_NONE) {
+    struct file *pfile = CURRENT->pfiles->fd_table[fd];
+    if (pfile == NULL) {
       // initialize this file structure
+			pfile = (struct file *)kmalloc(sizeof(struct file));
       memcpy(pfile, opened_file, sizeof(struct file));
-      current->pfiles->nfiles++;
+      CURRENT->pfiles->nfiles++;
       return fd;
     }
   }
@@ -213,7 +223,7 @@ ssize_t do_rcwd(char* path) {
         return -1;  // Invalid buffer
     }
     
-    struct dentry* cwd = current->pfiles->cwd;
+    struct dentry* cwd = CURRENT->pfiles->cwd;
     if (!cwd) {
         return -1;  // No current working directory
     }
@@ -270,13 +280,13 @@ ssize_t do_ccwd(char* path) {
 	struct file* dir_file = vfs_opendir(path);
 	if (dir_file == NULL)
     return -1;
-	current->pfiles->cwd = dir_file->f_dentry;
+	CURRENT->pfiles->cwd = dir_file->f_dentry;
 	return 0;
 }
 
 static void release_proc_files(proc_file_management* pfiles) {
 	for (int i = 0; i < MAX_FILES; i++) {
-		if (pfiles->opened_files[i].status != FD_NONE) {
+		if (pfiles->fd_table[i]) {
 			do_close(i);
 		}
 	}

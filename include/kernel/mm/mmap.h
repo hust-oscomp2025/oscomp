@@ -7,6 +7,23 @@
 #include <kernel/process.h>
 #include <kernel/mm/page.h>
 
+/**
+ * 虚拟内存区域类型
+ */
+enum vma_type {
+  VMA_ANONYMOUS = 0, // 匿名映射（如堆）
+  VMA_PRIVATE,       // 私有映射
+  VMA_SHARED,        // 共享映射
+  VMA_FILE,          // 文件映射
+  VMA_STACK,         // 栈区域
+  VMA_HEAP,          // 堆区域
+  VMA_TEXT,          // 代码段
+  VMA_DATA,          // 数据段
+  VMA_BSS,           // BSS段
+  VMA_VDSO           // 虚拟动态共享对象
+};
+
+
 /* 页标志位定义 */
 #define VM_READ       (1UL << 0)  /* 可读 */
 #define VM_WRITE      (1UL << 1)  /* 可写 */
@@ -46,12 +63,6 @@
 #define PROT_WRITE     0x2         /* 页可写 */
 #define PROT_EXEC      0x4         /* 页可执行 */
 
-/* 错误码定义 */
-#define EINVAL 22 /* 无效参数 */
-#define ENOMEM 12 /* 内存不足 */
-#define EFAULT 14 /* 错误地址 */
-#define EEXIST 17 /* 已存在 */
-
 /**
  * 进程内存映射 - 将物理页映射到进程的虚拟地址空间
  * @param proc      目标进程
@@ -60,7 +71,7 @@
  * @param prot      保护标志
  * @return          成功返回0，失败返回错误码
  */
-int proc_map_page(process *proc, uaddr vaddr, struct page *page, int prot);
+int proc_map_page(struct task_struct  *proc, uaddr vaddr, struct page *page, int prot);
 
 /**
  * 取消进程的内存映射
@@ -68,7 +79,7 @@ int proc_map_page(process *proc, uaddr vaddr, struct page *page, int prot);
  * @param vaddr     虚拟地址
  * @return          成功返回0，失败返回错误码
  */
-int proc_unmap_page(process *proc, uaddr vaddr);
+int proc_unmap_page(struct task_struct *proc, uaddr vaddr);
 
 /**
  * 修改进程内存映射的保护属性
@@ -77,7 +88,7 @@ int proc_unmap_page(process *proc, uaddr vaddr);
  * @param prot      新的保护标志
  * @return          成功返回0，失败返回错误码
  */
-int proc_protect_page(process *proc, uaddr vaddr, int prot);
+int proc_protect_page(struct task_struct *proc, uaddr vaddr, int prot);
 
 /**
  * 查询进程内存映射状态
@@ -87,7 +98,7 @@ int proc_protect_page(process *proc, uaddr vaddr, int prot);
  * @param prot_out  如果非NULL，返回当前保护标志
  * @return          成功返回0，失败返回错误码
  */
-int proc_query_mapping(process *proc, uaddr addr, 
+int proc_query_mapping(struct task_struct *proc, uaddr addr, 
                      struct page **page_out, int *prot_out);
 
 /**
@@ -97,7 +108,7 @@ int proc_query_mapping(process *proc, uaddr addr,
  * @param prot      保护标志
  * @return          成功返回0，失败返回错误码
  */
-int proc_alloc_map_page(process *proc, uaddr vaddr, int prot);
+int proc_alloc_map_page(struct task_struct *proc, uaddr vaddr, int prot);
 
 /**
  * 取消进程内存映射并释放对应的物理页
@@ -105,7 +116,7 @@ int proc_alloc_map_page(process *proc, uaddr vaddr, int prot);
  * @param vaddr     虚拟地址
  * @return          成功返回0，失败返回错误码
  */
-int proc_unmap_free_page(process *proc, uaddr vaddr);
+int proc_unmap_free_page(struct task_struct *proc, uaddr vaddr);
 
 /**
  * 将保护标志(PROT_*)转换为页表项标志

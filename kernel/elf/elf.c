@@ -13,6 +13,7 @@
 #include <kernel/proc_file.h>
 #include <kernel/process.h>
 #include <kernel/riscv.h>
+#include <kernel/trapframe.h>
 
 #include <spike_interface/spike_utils.h>
 #include <util/string.h>
@@ -23,7 +24,7 @@
  */
 typedef struct elf_context {
   int fd;             // 文件描述符
-  process *proc;      // 目标进程
+  struct task_struct *proc;      // 目标进程
   elf_header ehdr;    // ELF头部
   uint64 entry_point; // 入口点
 } elf_context;
@@ -97,7 +98,7 @@ static int validate_elf_header(elf_header *ehdr) {
  * @return 0表示成功，非0表示失败
  */
 static int load_segment(elf_context *ctx, elf_prog_header *ph) {
-  process *proc = ctx->proc;
+  struct task_struct *proc = ctx->proc;
   struct mm_struct *mm = proc->mm;
 
   // 只加载可加载的段
@@ -170,7 +171,7 @@ static int load_segment(elf_context *ctx, elf_prog_header *ph) {
   // 为段分配物理内存并映射
   for (uint64 i = 0; i < num_pages; i++) {
     uint64 vaddr = ph->vaddr + i * PAGE_SIZE;
-    void *page = mm_user_alloc_page(proc, vaddr, prot);
+    void *page = mm_alloc_page(proc->mm, vaddr, prot);
     if (!page) {
       sprint("Failed to allocate page for segment\n");
       return -1;
@@ -269,7 +270,7 @@ static void setup_global_pointer(elf_context *ctx) {
  * @param proc 目标进程
  * @return 0表示成功，非0表示失败
  */
-static int init_elf_context(elf_context *ctx, int fd, process *proc) {
+static int init_elf_context(elf_context *ctx, int fd, struct task_struct *proc) {
   memset(ctx, 0, sizeof(elf_context));
   ctx->fd = fd;
   ctx->proc = proc;
@@ -344,7 +345,7 @@ static int load_debug_information(elf_context *ctx) {
  * @param proc 目标进程
  * @param filename ELF文件名
  */
-void load_elf_from_file(process *proc, char *filename) {
+void load_elf_from_file(struct task_struct *proc, char *filename) {
   elf_context ctx;
 
   sprint("load_elf_from_file: Loading application: %s\n", filename);
@@ -358,7 +359,7 @@ void load_elf_from_file(process *proc, char *filename) {
 
   // 确保进程有有效的内存布局
   if (unlikely(!proc->mm)) {
-		mm_init(proc);
+		proc->mm = mm_alloc();
     if (!proc->mm) {
       do_close(fd);
       panic("Failed to create memory layout for process\n");

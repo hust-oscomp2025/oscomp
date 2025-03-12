@@ -10,7 +10,7 @@
 
 #include <kernel/proc_file.h>
 #include <kernel/process.h>
-#include <kernel/sched.h>
+#include <kernel/sched/sched.h>
 
 #include <spike_interface/spike_utils.h>
 
@@ -46,7 +46,7 @@
 // ssize_t sys_user_exit(uint64 code) {
 //   int hartid = read_tp();
 //   sprint("User exit with code:%d.\n", code);
-//   CURRENT->status = ZOMBIE;
+//   CURRENT->state = ZOMBIE;
 //   sem_V(CURRENT->sem_index);
 //   if (CURRENT->parent != NULL)
 //     sem_V(CURRENT->parent->sem_index);
@@ -118,11 +118,11 @@
 // ssize_t sys_user_yield() {
 //   // TODO (lab3_2): implment the syscall of yield.
 //   // hint: the functionality of yield is to give up the processor. therefore,
-//   // we should set the status of currently running process to READY, insert it
+//   // we should set the state of currently running process to READY, insert it
 //   // in the rear of ready queue, and finally, schedule a READY process to run.
 //   // panic( "You need to implement the yield syscall in lab3_2.\n" );
 //   int hartid = read_tp();
-//   // current->status = READY;
+//   // current->state = READY;
 //   insert_to_ready_queue(CURRENT);
 //   schedule();
 //   return 0;

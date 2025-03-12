@@ -2,7 +2,7 @@
 
 
 
-#include <kernel/sched.h>
+#include <kernel/sched/sched.h>
 #include <spike_interface/spike_utils.h>
 //信号灯库
 semaphore sem_pool[NSEM];
@@ -31,45 +31,47 @@ void sem_free(int sem_index) {
 }
 
 int sem_P(int sem_index) {
-  //sprint("Received calling sem_P index = %d\n", sem_index);
-  if (sem_index < 0 || sem_index >= NSEM || !sem_pool[sem_index].isActive) {
-    panic("invalid sem_index!");
-  }
+  // //sprint("Received calling sem_P index = %d\n", sem_index);
+  // if (sem_index < 0 || sem_index >= NSEM || !sem_pool[sem_index].isActive) {
+  //   panic("invalid sem_index!");
+  // }
 
-  semaphore *sem = &sem_pool[sem_index];
-  if (sem->value > 0) {
-    return sem->value--;
-  } else {
-    // sprint("BLOCK!\n");
-    int hartid = read_tp();
-    process *cur = CURRENT;
-    cur->status = BLOCKED;
-    cur->queue_next = sem->wait_queue;
-    sem->wait_queue = cur;
+  // semaphore *sem = &sem_pool[sem_index];
+  // if (sem->value > 0) {
+  //   return sem->value--;
+  // } else {
+  //   // sprint("BLOCK!\n");
+  //   int hartid = read_tp();
+  //   struct task_struct *cur = CURRENT;
+  //   cur->state = TASK_INTERRUPTIBLE;
+  //   cur->queue_node = sem->wait_queue;
+  //   sem->wait_queue = cur;
 
-    schedule();
+  //   schedule();
 
-    // sprint("return from blocking!\n");
-    return 0;
-    // 直接嵌入保存内核上下文到process->ktrapframe的汇编代码
-  }
+  //   // sprint("return from blocking!\n");
+  //   return 0;
+  //   // 直接嵌入保存内核上下文到process->ktrapframe的汇编代码
+  // }
+	return 0;
 }
 
 // 我们这里为了实现简单，直接把信号队列当成信号栈使了。
 // 如果说有进程等待信号量，返回0，不然返回增加后的信号资源量sem->value
 int sem_V(int sem_index) {
-  if (sem_index < 0 || sem_index >= NSEM || !sem_pool[sem_index].isActive) {
-    panic("invalid sem_index!");
-  }
-  semaphore *sem = &sem_pool[sem_index];
+  // if (sem_index < 0 || sem_index >= NSEM || !sem_pool[sem_index].isActive) {
+  //   panic("invalid sem_index!");
+  // }
+  // semaphore *sem = &sem_pool[sem_index];
 
-  if (sem->value == 0 && sem->wait_queue != NULL) {
-    insert_to_ready_queue(sem->wait_queue);
-		//insert_to_ready_queue(current);
-    // sem->wait_queue->status = READY;
-    sem->wait_queue = sem->wait_queue->queue_next;
-    //schedule();
-    return 0;
-  }
-	return sem->value++;
+  // if (sem->value == 0 && sem->wait_queue != NULL) {
+  //   insert_to_ready_queue(sem->wait_queue);
+	// 	//insert_to_ready_queue(current);
+  //   // sem->wait_queue->state = READY;
+  //   sem->wait_queue = sem->wait_queue->queue_next;
+  //   //schedule();
+  //   return 0;
+  // }
+	// return sem->value++;
+	return 0;
 }

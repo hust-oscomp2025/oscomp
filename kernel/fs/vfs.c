@@ -27,26 +27,29 @@ struct file_system_type *fs_list[MAX_SUPPORTED_FS];
 //
 // initialize file system
 //
-void fs_init(void) {
-  sprint("fs_init: Initiating fs\n");
+void init_fs(void) {
+  sprint("init_fs: Initiating fs\n");
 
   // initialize the vfs
   vfs_init();
-
   // register hostfs and mount it as the root
   if (register_hostfs() < 0)
-    panic("fs_init: cannot register hostfs.\n");
+    panic("init_fs: cannot register hostfs.\n");
   struct device *hostdev = init_host_device("HOSTDEV");
   vfs_mount("HOSTDEV", MOUNT_AS_ROOT);
 
+
+
+
   // register and mount rfs
   if (register_ramfs() < 0)
-    panic("fs_init: cannot register ramfs.\n");
+    panic("init_fs: cannot register ramfs.\n");
   struct device *ramdisk0 = init_ramfs_device("RAMDISK0");
   ramfs_format_dev(ramdisk0);
   vfs_mount("RAMDISK0", MOUNT_DEFAULT);
 
-  sprint("fs_init: Fs initialized\n");
+
+  sprint("init_fs: Fs initialized\n");
 }
 
 //
@@ -228,6 +231,7 @@ struct file *vfs_open(const char *path, int flags) {
       sprint("vfs_open: hook_open failed!\n");
     }
   }
+	sprint("vfs_open: end\n");
 
   return file;
 }

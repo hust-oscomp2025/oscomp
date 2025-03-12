@@ -60,5 +60,9 @@
 	* @brief Print memory allocator statistics
 	*/
  void kmalloc_stats(void);
+
+
+
+ void* alloc_kernel_stack(void);
  
  #endif /* _KMALLOC_H */
