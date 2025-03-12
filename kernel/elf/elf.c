@@ -171,7 +171,7 @@ static int load_segment(elf_context *ctx, elf_prog_header *ph) {
   // 为段分配物理内存并映射
   for (uint64 i = 0; i < num_pages; i++) {
     uint64 vaddr = ph->vaddr + i * PAGE_SIZE;
-    void *page = mm_alloc_page(proc, vaddr, prot);
+    void *page = mm_alloc_page(proc->mm, vaddr, prot);
     if (!page) {
       sprint("Failed to allocate page for segment\n");
       return -1;
@@ -359,7 +359,7 @@ void load_elf_from_file(struct task_struct *proc, char *filename) {
 
   // 确保进程有有效的内存布局
   if (unlikely(!proc->mm)) {
-		mm_init(proc);
+		proc->mm = mm_alloc();
     if (!proc->mm) {
       do_close(fd);
       panic("Failed to create memory layout for process\n");

@@ -24,7 +24,6 @@
 #include <spike_interface/spike_utils.h>
 #include <util/string.h>
 
-static void* alloc_kernel_stack();
 static void free_kernel_stack(void* kstack);
 
 //
@@ -41,19 +40,26 @@ extern void return_to_user(struct trapframe *, uint64 satp);
 struct task_struct *alloc_process() {
   // locate the first usable process structure
   struct task_struct *ps = alloc_empty_process();
-	mm_init(ps);
-  // 分配内核栈
-  ps->kstack = alloc_kernel_stack();
-	ps->pid = pid_alloc();
-
+  ps->kstack = (uint64)alloc_kernel_stack();
   ps->trapframe = (struct trapframe*)kmalloc(sizeof(struct trapframe));
+	ps->ktrapframe = NULL;
+	ps->mm = mm_alloc();
+  ps->pfiles = init_proc_file_management();
+	//ps->active_mm =ps->mm;
+  // 分配内核栈
+	ps->pid = pid_alloc();
+	ps->state;
+	ps->flags;
+	ps->parent;
+	INIT_LIST_HEAD(&ps->children);
+	INIT_LIST_HEAD(&ps->sibling);
+	INIT_LIST_HEAD(&ps->queue_node);
+  ps->tick_count = 0;
 
   // 创建信号量和初始化文件管理
-  ps->sem_index = sem_new(0);
-  ps->ktrapframe = NULL;
-  ps->pfiles = init_proc_file_management();
+  ps->sem_index = sem_new(0);	//这个信号量需要重写
 
-  sprint("in alloc_proc. build proc_file_management successfully.\n");
+  sprint("alloc_process: end.\n");
   return ps;
 }
 
@@ -108,13 +114,10 @@ ssize_t do_wait(int pid) {
   return -1;
 }
 
-static void* alloc_kernel_stack(){
-	void* kstack = kmalloc(PAGE_SIZE);
-	return kstack + PAGE_SIZE - 16;
-}
+
 
 static void free_kernel_stack(void* kstack){
-	kfree(ROUNDDOWN((uint64)kstack,PAGE_SIZE));
+	kfree((void*)ROUNDDOWN((uint64)kstack,PAGE_SIZE));
 }
 
 

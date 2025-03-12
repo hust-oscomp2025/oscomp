@@ -3,33 +3,37 @@
  */
 
 #include <kernel/mm/kmalloc.h>
+#include <kernel/mm/mm_struct.h>
+#include <kernel/sched/pid.h>
 #include <kernel/sched/sched.h>
 #include <kernel/trapframe.h>
 #include <spike_interface/spike_utils.h>
+#include <util/list.h>
+#include <util/string.h>
 
-struct task_struct *ready_queue = NULL;
-struct task_struct* procs[NPROC];
-struct task_struct* current_percpu[NCPU];
+struct list_head ready_queue;
+struct task_struct *procs[NPROC];
+struct task_struct *current_percpu[NCPU];
 
 //
 // initialize process pool (the procs[] array). added @lab3_1
 //
 void init_scheduler() {
-	pid_init();
-  memset(procs, 0, sizeof(struct task_struct*) * NPROC);
+  INIT_LIST_HEAD(&ready_queue);
+  pid_init();
+  memset(procs, 0, sizeof(struct task_struct *) * NPROC);
 
   for (int i = 0; i < NPROC; ++i) {
     procs[i] = NULL;
   }
-	sprint("Scheduler initiated\n");
-
+  sprint("Scheduler initiated\n");
 }
 
 struct task_struct *alloc_empty_process() {
   for (int i = 0; i < NPROC; i++) {
     if (procs[i] == NULL) {
-			procs[i] = (struct task_struct*)kmalloc(sizeof(struct task_struct));
-			memset(procs[i],0,sizeof(struct task_struct));
+      procs[i] = (struct task_struct *)kmalloc(sizeof(struct task_struct));
+      memset(procs[i], 0, sizeof(struct task_struct));
       return procs[i];
     }
   }
@@ -40,29 +44,8 @@ struct task_struct *alloc_empty_process() {
 //
 void insert_to_ready_queue(struct task_struct *proc) {
   sprint("going to insert process %d to ready queue.\n", proc->pid);
-  // if the queue is empty in the beginning
-  if (ready_queue == NULL) {
-    // sprint("ready_queue is empty\n");
-    proc->queue_next = NULL;
-    ready_queue = proc;
-    return;
-  }
-  // ready queue is not empty
-  struct task_struct *p;
-  // browse the ready queue to see if proc is already in-queue
-  for (p = ready_queue; p->queue_next != NULL; p = p->queue_next)
-    if (p == proc)
-      return; // already in queue
-  // p points to the last element of the ready queue
-  if (p == proc)
-    return;
-  p->queue_next = proc;
-  proc->queue_next = NULL;
-  return;
+  list_add(&ready_queue, &proc->queue_node);
 }
-
-
-
 
 //
 // choose a proc from the ready queue, and put it to run.
@@ -76,15 +59,14 @@ void schedule() {
   struct task_struct *cur = CURRENT;
   // sprint("debug\n");
   if (cur &&
-      (cur->state == TASK_INTERRUPTIBLE |
-       cur->state == TASK_UNINTERRUPTIBLE) &&
+      ((cur->state == TASK_INTERRUPTIBLE) |
+       (cur->state == TASK_UNINTERRUPTIBLE)) &&
       cur->ktrapframe == NULL) {
     cur->ktrapframe = (struct trapframe *)kmalloc(sizeof(struct trapframe));
     store_all_registers(cur->ktrapframe);
     // sprint("cur->ktrapframe->regs.ra=0x%x\n",cur->ktrapframe->regs.ra);
   }
-
-  if (!ready_queue) {
+  if (list_empty(&ready_queue)) {
     // by default, if there are no ready process, and all processes are in the
     // state of FREE and ZOMBIE, we should shutdown the emulated RISC-V
     // machine.
@@ -117,20 +99,20 @@ void schedule() {
     }
   }
 
-  cur = ready_queue;
-  ready_queue = ready_queue->queue_next;
-  CURRENT = cur;
+  CURRENT = container_of(ready_queue.next, struct task_struct, queue_node);
+  list_del_init(ready_queue.next);
   if (cur->ktrapframe != NULL) {
+    sprint("going to schedule process %d to run in s-mode.\n", CURRENT->pid);
+
     restore_all_registers(cur->ktrapframe);
     kfree(cur->ktrapframe);
     cur->ktrapframe = NULL;
     return;
+  } else {
+    sprint("going to schedule process %d to run in u-mode.\n", CURRENT->pid);
+    switch_to(cur);
   }
-
-  sprint("going to schedule process %d to run.\n", cur->pid);
-  switch_to(cur);
 }
-
 
 void switch_to(struct task_struct *proc) {
 
@@ -143,6 +125,9 @@ void switch_to(struct task_struct *proc) {
   // need when the process next re-enters the kernel.
   proc->trapframe->kernel_sp = proc->kstack;     // process's kernel stack
   proc->trapframe->kernel_satp = read_csr(satp); // kernel page table
+
+
+	extern char  smode_trap_handler[];
   proc->trapframe->kernel_trap = (uint64)smode_trap_handler;
   proc->trapframe->kernel_schedule = (uint64)schedule;
 
@@ -155,6 +140,8 @@ void switch_to(struct task_struct *proc) {
   // set S Exception Program Counter (sepc register) to the elf entry pc.
   write_csr(sepc, proc->trapframe->epc);
   sprint("return to user\n");
+
+
+	extern void return_to_user(struct trapframe*, uint64);
   return_to_user(proc->trapframe, MAKE_SATP(proc->mm->pagetable));
 }
-

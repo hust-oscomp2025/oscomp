@@ -8,6 +8,7 @@
 
 #include <kernel/process.h>
 #include <util/string.h>
+#include <errno.h>
 
 /**
  * 将保护标志(PROT_*)转换为页表项标志

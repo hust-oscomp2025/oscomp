@@ -4,6 +4,7 @@
 #include <kernel/riscv.h>
 #include <kernel/proc_file.h>
 #include <kernel/trapframe.h>
+#include <util/list.h>
 
 /* Linux内核进程flags定义表 */
 
@@ -107,10 +108,9 @@ struct task_struct {
 	struct trapframe* ktrapframe;
 
   struct mm_struct *mm;
-	struct mm_struct *active_mm;
+	//struct mm_struct *active_mm;
+	// 我们不需要使用复杂的active_mm特性
   proc_file_management *pfiles;
-  // heap management
-  // process_heap_manager user_heap;
 
   // process id
   pid_t pid;
@@ -119,8 +119,10 @@ struct task_struct {
 	unsigned int flags;
   // parent process
   struct task_struct *parent;
-  struct list_head *children;
-	struct list_head* sibling;
+  struct list_head children;
+	struct list_head sibling;
+	// ready queue
+	struct list_head queue_node;
 
   // accounting. added @lab3_3
   int tick_count;
@@ -128,15 +130,15 @@ struct task_struct {
 	int sem_index;
 
 	/* The signal sent when the parent dies: */
-	int				exit_state;
-	int				exit_code;
-	int				exit_signal;
+	int	exit_state;
+	int	exit_code;
+	int	exit_signal;
 
-	uid_t uid;
-	uid_t euid;
-	gid_t gid;
-	gid_t egid;
-
+	// uid_t uid;
+	// uid_t euid;
+	// gid_t gid;
+	// gid_t egid;
+	// 目前还用不上这些字段
 
 };
 struct task_struct* alloc_init_task();

@@ -16,7 +16,7 @@ struct pid_manager {
 };
 
 // 初始化PID管理器（需检查返回值）
-int pid_init();
+void pid_init();
 
 // 分配PID（返回错误码，pid通过指针输出）
 pid_t pid_alloc(void);

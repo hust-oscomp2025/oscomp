@@ -5,8 +5,17 @@
 #include <kernel/types.h>
 #include <kernel/fs/vfs.h>
 
+// data structure that manages all openned files in a PCB
+typedef struct proc_file_management_t {
+  struct dentry *cwd;  // vfs dentry of current_percpu working directory
+  struct file* fd_table[MAX_FILES];  // opened files array
+  int nfiles;  // the number of files opened by a process
+} proc_file_management;
+
 
 proc_file_management *init_proc_file_management(void);
+void free_proc_file_management(proc_file_management *pfiles);
+
 
 //
 // file operations
@@ -30,21 +39,5 @@ int do_unlink(char *path);
 ssize_t do_rcwd(char* path);
 ssize_t do_ccwd(char* path);
 
-
-
-
-
-
-
-
-// data structure that manages all openned files in a PCB
-typedef struct proc_file_management_t {
-  struct dentry *cwd;  // vfs dentry of current_percpu working directory
-  struct file* fd_table[MAX_FILES];  // opened files array
-  int nfiles;  // the number of files opened by a process
-} proc_file_management;
-
-
-void free_proc_file_management(proc_file_management *pfiles);
 
 #endif

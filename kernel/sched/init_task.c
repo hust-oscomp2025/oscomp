@@ -1,5 +1,7 @@
 #include <kernel/process.h>
 #include <kernel/proc_file.h>
+#include <kernel/sched/sched.h>
+#include <kernel/mm/kmalloc.h>
 
 
 
@@ -10,10 +12,10 @@ struct task_struct* alloc_init_task(){
 	// .prio        = MIN_PRIO,          // 通常是最低优先级
 	// .static_prio = MIN_PRIO,
 	task->flags = PF_KTHREAD;
-  task->kstack = alloc_kernel_stack();
+  task->kstack = (uint64)alloc_kernel_stack();
   task->mm = NULL;
   task->pfiles = init_proc_file_management();
-
+	return task;
 }
 
 

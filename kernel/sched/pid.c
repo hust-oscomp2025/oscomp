@@ -1,7 +1,6 @@
 #include <kernel/sched/pid.h>
-#include <stdio.h> // 调试输出
-#include <stdlib.h>
-#include <string.h>
+#include <util/string.h>
+#include <spike_interface/spike_utils.h>
 
 struct pid_manager manager;
 
@@ -40,8 +39,8 @@ pid_t pid_alloc(void) {
 
 // PID释放
 void pid_free(pid_t pid) {
-  if (!pid <= 0 || pid >= PID_MAX)
-    return (-EINVAL);
+  if (pid <= 0 || pid >= PID_MAX)
+    panic("pid_free: wrong pid\n");
 
   long irq_flags = spinlock_lock_irqsave(&manager.lock);
 

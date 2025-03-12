@@ -32,15 +32,15 @@ extern char _edata[];
 static void kernel_vm_init(void) {
   extern struct mm_struct init_mm;
 	// 映射内核代码段和只读段
-  mm_map_pages(&init_mm, _ftext, _ftext, _etext - _ftext,
+  mm_map_pages(&init_mm, (uint64)_ftext, (uint64)_ftext,(uint64)(_etext - _ftext),
                prot_to_type(PROT_READ | PROT_EXEC, 0), VMA_TEXT, MAP_POPULATE);
 
 	// 映射内核HTIF段
-  mm_map_pages(&init_mm, _ftext, _ftext, _etext - _ftext,
+  mm_map_pages(&init_mm, (uint64)_ftext, (uint64)_ftext, (uint64)(_etext - _ftext),
                prot_to_type(PROT_READ | PROT_WRITE, 0), VMA_DATA, MAP_POPULATE);
 
 	// 映射内核数据段
-  mm_map_pages(&init_mm, _fdata, _fdata, _edata - _fdata,
+  mm_map_pages(&init_mm, (uint64)_fdata, (uint64)_fdata, (uint64)(_edata - _fdata),
 		prot_to_type(PROT_READ | PROT_WRITE, 0), VMA_DATA, MAP_POPULATE);
 
   // pagetable_dump(g_kernel_pagetable);
@@ -59,7 +59,7 @@ static void kernel_vm_init(void) {
 //
 // 初始化1号进程
 //
-static int load_init_process() {
+static struct task_struct* load_init_process() {
   struct task_struct *task = alloc_init_task();
 
   task->mm = alloc_init_mm();
@@ -69,7 +69,7 @@ static int load_init_process() {
 	task->pfiles = init_proc_file_management();
   // 8. 初始化标准文件描述符(stdin, stdout, stderr)
   // 这些会指向/dev/console或null设备
-  setup_std_fds(task->pfiles);
+  // setup_std_fds(task->pfiles);
 
   // 9. 初始化信号处理
   // task->sighand = alloc_sighand_struct();
@@ -86,6 +86,8 @@ static int load_init_process() {
 
   // 11. 初始化子进程列表
   INIT_LIST_HEAD(&task->children);
+  INIT_LIST_HEAD(&task->sibling);
+  INIT_LIST_HEAD(&task->queue_node);
 
   // // 12. 初始化CPU亲和性(初始进程可以在任何CPU上运行)
   // for (int i = 0; i < NR_CPUS; i++) {
@@ -93,10 +95,10 @@ static int load_init_process() {
   // }
 
   // 13. 初始化进程凭证(通常是root权限)
-  task->uid = 0;
-  task->gid = 0;
-  task->euid = 0;
-  task->egid = 0;
+  // task->uid = 0;
+  // task->gid = 0;
+  // task->euid = 0;
+  // task->egid = 0;
 
   // 14. 初始化进程命名空间(如果支持)
   // init_task_namespaces(task);

@@ -8,29 +8,11 @@
 #include <util/atomic.h>
 #include <util/string.h>
 
-/**
- * 初始化用户内存管理子系统
- */
-void user_mem_init(void) {
-  // 初始化可能的全局资源
-  sprint("User memory management subsystem initialized\n");
-}
 
-/**
- * 为进程分配和初始化mm_struct
- * 这是主要的接口函数，类似Linux中的mm_alloc
- *
- * @param proc 目标进程
- * @return 成功返回0，失败返回负值
- */
-int mm_init(struct task_struct *proc) {
-  if (!proc)
-    return -1;
+struct mm_struct* mm_alloc(void){
 
   // 创建mm结构
   struct mm_struct *mm = (struct mm_struct *)kmalloc(sizeof(struct mm_struct));
-  if (!mm)
-    return -1;
 
   // 初始化mm结构
   memset(mm, 0, sizeof(struct mm_struct));
@@ -50,36 +32,18 @@ int mm_init(struct task_struct *proc) {
   mm->start_stack = USER_STACK_TOP - PAGE_SIZE; // 栈默认起始地址
   mm->end_stack = USER_STACK_TOP;               // 栈默认结束地址
 
-  // 分配页表
-  struct page *page = alloc_page();
-  if (!page) {
-    kfree(mm);
-    return -1;
-  }
-
-  mm->pagetable = page->virtual_address;
-  proc->mm = mm;
+  mm->pagetable = (pagetable_t)kmalloc(PAGE_SIZE);
 
   // 创建初始栈区域VMA
   struct vm_area_struct *stack_vma =
       create_vma(mm, mm->start_stack, mm->end_stack, PROT_READ | PROT_WRITE,
                  VMA_STACK, VM_GROWSDOWN | VM_PRIVATE);
-  if (!stack_vma) {
-    user_mm_free(mm);
-    proc->mm = NULL;
-    return -1;
-  }
 
   // 分配并映射初始栈页
   void *page_addr =
-      mm_alloc_page(proc, mm->start_stack, PROT_READ | PROT_WRITE);
-  if (!page_addr) {
-    user_mm_free(mm);
-    proc->mm = NULL;
-    return -1;
-  }
+      mm_alloc_page(mm, mm->start_stack, PROT_READ | PROT_WRITE);
 
-  return 0;
+  return mm;
 }
 
 /**
@@ -253,11 +217,9 @@ uint64 mm_map_pages(struct mm_struct *mm, uint64 va, uint64 pa, size_t length,
 /**
  * 取消映射内存区域
  */
-int mm_unmap(struct task_struct *proc, uint64 addr, size_t length) {
-  if (!proc || !proc->mm || length == 0)
+int mm_unmap(struct mm_struct *mm, uint64 addr, size_t length) {
+  if (!mm || length == 0)
     return -1;
-
-  struct mm_struct *mm = proc->mm;
 
   // 对齐到页大小
   addr = ROUNDDOWN(addr, PAGE_SIZE);
@@ -481,7 +443,7 @@ uint64 mm_brk(struct mm_struct *mm, int64 increment) {
 void *mm_alloc_pages(struct mm_struct *mm, int nr_pages, uint64 addr,
                      int prot) {
   if (!mm || nr_pages <= 0)
-    return -EINVAL;
+    return NULL;
 
   // 计算所需空间大小
   size_t length = nr_pages * PAGE_SIZE;

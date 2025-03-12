@@ -5,3 +5,6 @@
 - [ ] 在user_stack创建和销毁的时候，需要对栈顶-16
 - [x] 需要实现pid的分配
 - [ ] 在task_struct和scheduler中加入进程cpu亲和性
+- [ ] 重写进程信号量
+- [ ] 为每个cpu准备一个idle task
+- [ ] 信号量的队列需要用list重写

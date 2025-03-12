@@ -13,10 +13,11 @@
 //#include <linux/init.h>         // __init 宏
 #include <util/spinlock.h>      // 锁相关函数
 #include <kernel/mm/kmalloc.h>
+#include <util/string.h>
+#include <util/list.h>
 
 /* 外部声明 */
 extern void schedule(void);
-extern void halt_cpu(void);
 extern void scheduler_register_task(struct task_struct *tsk);
 
 /* 内核全局内存管理结构和内核页表（假设已在其他地方初始化） */
@@ -28,18 +29,7 @@ extern struct mm_struct init_mm;
  * 注意：为了简单起见，只展示了关键字段的初始化，
  * 实际实现中还会有更多字段和 CPU 上下文信息。
  */
-struct task_struct idle_task = {
-    .pid = 0,
-    .state = TASK_RUNNING, // Idle 进程始终处于可运行状态
-    //.prio = MIN_PRIO,      // 设定最低优先级
-    //.static_prio = MIN_PRIO,
-    .flags = PF_KTHREAD,   // 标识为内核线程
-    .mm = NULL,            // 内核线程无独立用户空间
-		.trapframe = NULL,			// 无用户态
-    .active_mm = &init_mm, // 共享全局内核内存管理结构
-                           //.pgd = swapper_pg_dir, // 指向内核页表根
-                           // 其他字段可根据需要补充初始化...
-};
+struct task_struct idle_task = {};
 
 
 static inline void halt_cpu(void) {
@@ -71,20 +61,30 @@ void idle_loop(void) {
  * 
  */
 void init_idle_task(void) {
+	idle_task.kstack = (uint64)alloc_kernel_stack();
+	idle_task.trapframe = NULL;
+
 	idle_task.ktrapframe = kmalloc(sizeof(struct trapframe));
 	memset(&idle_task.ktrapframe,0,sizeof(struct trapframe));
-  /*
-   * 设置 idle 进程的 CPU 上下文，使得进程入口指向 idle_loop。
-   * 这里假设 cpu_context 是一个保存寄存器和指令指针的结构，
-   * 实际实现会依据具体平台定义不同。
-   */
   idle_task.ktrapframe->epc = (unsigned long)idle_loop;
-  // 可在此处补充其他 CPU 上下文的初始化操作
+
+	idle_task.mm = &init_mm;
+  idle_task.pfiles = init_proc_file_management();
+
+	idle_task.pid = 0;
+
+	idle_task.state = TASK_RUNNING; // Idle 进程始终处于可运行状态
+	idle_task.flags = PF_KTHREAD;
+	idle_task.parent;
+	INIT_LIST_HEAD(&idle_task.children);
+	INIT_LIST_HEAD(&idle_task.sibling);
+	INIT_LIST_HEAD(&idle_task.queue_node);
+  idle_task.tick_count = 0;
+
+  //ps->sem_index = sem_new(0);	//这个信号量需要重写
 
   /* 将 idle 进程注册到调度器中 */
   insert_to_ready_queue(&idle_task);
 
   sprint("Idle process (PID 0) initialized and registered.\n");
 }
-
-

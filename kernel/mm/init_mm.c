@@ -1,6 +1,7 @@
 #include <kernel/mm/kmalloc.h>
 #include <kernel/mm/mm_struct.h>
 #include <kernel/mm/pagetable.h>
+#include <util/string.h>
 
 struct mm_struct* init_mm;
 

@@ -80,7 +80,7 @@ struct mm_struct {
 
 
 // 初始化内核虚拟空间
-void create_init_mm();
+struct mm_struct* alloc_init_mm();
 
 
 /**
@@ -97,19 +97,8 @@ inline uint64 mm_lookuppa(struct mm_struct *mm, uaddr user_va) {
   return pgt_lookuppa(mm->pagetable, user_va);
 }
 
-/**
- * 初始化用户内存管理子系统
- */
-void user_mem_init(void);
 
-/**
- * 为进程分配和初始化mm_struct
- * 这是主要的接口函数，类似Linux中的mm_alloc
- *
- * @param proc 目标进程
- * @return 成功返回0，失败返回负值
- */
-int mm_init(struct task_struct *proc);
+struct mm_struct* mm_alloc(void);
 
 /**
  * 释放用户内存布局
@@ -161,7 +150,7 @@ uint64 mm_map_pages(struct mm_struct *mm, uint64 va, uint64 pa, size_t length, i
  * @param length 长度
  * @return 成功返回0，失败返回-1
  */
-int mm_unmap(struct task_struct *proc, uint64 addr, size_t length);
+int mm_unmap(struct mm_struct *mm, uint64 addr, size_t length);
 
 /**
  * 分配一个页并映射到指定地址
