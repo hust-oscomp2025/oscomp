@@ -77,7 +77,7 @@ void user_mm_free(struct mm_struct *mm) {
 
     // 释放页表
     if (mm->pagetable) {
-      pagetable_free(mm->pagetable);
+      free_pagetable(mm->pagetable);
     }
 
     // 释放mm结构

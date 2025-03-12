@@ -3,8 +3,8 @@
  */
 
 #include <kernel/elf.h>
-#include <kernel/process.h>
 #include <kernel/proc_file.h>
+#include <kernel/process.h>
 #include <kernel/riscv.h>
 
 #include <kernel/sched/sched.h>
@@ -28,27 +28,45 @@ extern char _etext[];
 extern char _fdata[];
 extern char _edata[];
 
+extern char _fbss[];
+extern char _end[];
 
 static void kernel_vm_init(void) {
+  sprint("kernel_vm_init: start\n");
   extern struct mm_struct init_mm;
-	// 映射内核代码段和只读段
-  mm_map_pages(&init_mm, (uint64)_ftext, (uint64)_ftext,(uint64)(_etext - _ftext),
-               prot_to_type(PROT_READ | PROT_EXEC, 0), VMA_TEXT, MAP_POPULATE);
+  // 映射内核代码段和只读段
+	sprint("_etext=%lx,_ftext=%lx\n",_etext,_ftext);
 
-	// 映射内核HTIF段
-  mm_map_pages(&init_mm, (uint64)_ftext, (uint64)_ftext, (uint64)(_etext - _ftext),
-               prot_to_type(PROT_READ | PROT_WRITE, 0), VMA_DATA, MAP_POPULATE);
+  pgt_map_pages(init_mm.pagetable, (uint64)_ftext, (uint64)_ftext,
+                (uint64)(_etext - _ftext),
+                prot_to_type(PROT_READ | PROT_EXEC, 0));
 
-	// 映射内核数据段
-  mm_map_pages(&init_mm, (uint64)_fdata, (uint64)_fdata, (uint64)(_edata - _fdata),
-		prot_to_type(PROT_READ | PROT_WRITE, 0), VMA_DATA, MAP_POPULATE);
+  // 映射内核HTIF段
+  pgt_map_pages(init_mm.pagetable, (uint64)_etext, (uint64)_etext,
+                (uint64)(_fdata - _etext),
+                prot_to_type(PROT_READ | PROT_WRITE, 0));
+
+  // 映射内核数据段
+	sprint("_edata=%lx,_end=%lx\n",_edata,_end);
+  pgt_map_pages(init_mm.pagetable, (uint64)_fdata, (uint64)_fdata,
+                (uint64)(_end - _fdata),
+                prot_to_type(PROT_READ | PROT_WRITE, 0));
+
+  pgt_map_pages(init_mm.pagetable, (uint64)init_mm.pagetable,
+                (uint64)init_mm.pagetable, PAGE_SIZE,
+                prot_to_type(PROT_READ | PROT_WRITE, 0));
+
+
+
+	// 映射内核栈
+	//pgt_map_pages(init_mm.pagetable, (uint64)init_mm.pagetable, )
 
   // pagetable_dump(g_kernel_pagetable);
 
   // // 6. 映射MMIO区域（如果有需要）
   // // 例如UART、PLIC等外设的内存映射IO区域
 
-  // sprint("kern_vm_init: complete\n");
+  sprint("kern_vm_init: complete\n");
 }
 
 // typedef union {
@@ -59,14 +77,13 @@ static void kernel_vm_init(void) {
 //
 // 初始化1号进程
 //
-static struct task_struct* load_init_process() {
+static struct task_struct *load_init_process() {
   struct task_struct *task = alloc_init_task();
-
-  task->mm = alloc_init_mm();
-  kernel_vm_init();
+  extern struct mm_struct init_mm;
+  task->mm = &init_mm;
 
   // 7. 设置文件描述符表
-	task->pfiles = init_proc_file_management();
+  task->pfiles = init_proc_file_management();
   // 8. 初始化标准文件描述符(stdin, stdout, stderr)
   // 这些会指向/dev/console或null设备
   // setup_std_fds(task->pfiles);
@@ -110,12 +127,6 @@ static struct task_struct* load_init_process() {
   return task;
 }
 
-static void memory_init() {
-  init_page_manager();
-  kernel_vm_init();
-  slab_init();
-}
-
 //
 // s_start: S-mode entry point of riscv-pke OS kernel.
 //
@@ -127,11 +138,18 @@ int s_start(void) {
 
   int hartid = read_tp();
   if (hartid == 0) {
-    memory_init();
+		init_page_manager();
+		create_init_mm();
+		kernel_vm_init();
+		pagetable_activate(g_kernel_pagetable);
+		slab_init();
+		init_scheduler();
+		init_fs();
     sig = 0;
   } else {
     while (sig) {
     }
+		pagetable_activate(g_kernel_pagetable);
   }
 
   // sync_barrier(&sync_counter, NCPU);
@@ -139,10 +157,7 @@ int s_start(void) {
   //  写入satp寄存器并刷新tlb缓存
   //    从这里开始，所有内存访问都通过MMU进行虚实转换
 
-  pagetable_activate(g_kernel_pagetable);
-  init_scheduler();
 
-  init_fs();
 
   sprint("Switch to user mode...\n");
   // the application code (elf) is first loaded into memory, and then put into

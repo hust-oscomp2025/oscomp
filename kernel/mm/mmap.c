@@ -14,22 +14,18 @@
  * 将保护标志(PROT_*)转换为页表项标志
  */
 uint64 prot_to_type(int prot, int user) {
-    uint64 type = 0;
-    if (prot & PROT_READ)
-        type |= _PAGE_READ;
-    if (prot & PROT_WRITE)
-        type |= _PAGE_WRITE;
-    if (prot & PROT_EXEC)
-        type |= _PAGE_EXEC;
-    
-    // 始终设置页面存在标志
-    type |= _PAGE_PRESENT;
-    
-    // 设置用户访问权限
-    if (user)
-        type |= _PAGE_USER;
-    
-    return type;
+  uint64 perm = 0;
+  if (prot & PROT_READ)
+    perm |= PTE_R | PTE_A;
+  if (prot & PROT_WRITE)
+    perm |= PTE_W | PTE_D;
+  if (prot & PROT_EXEC)
+    perm |= PTE_X | PTE_A;
+  if (perm == 0)
+    perm = PTE_R;
+  if (user)
+    perm |= PTE_U;
+  return perm;
 }
 
 /**
@@ -154,11 +150,11 @@ int proc_query_mapping(struct task_struct *proc, uaddr addr,
     // 如果请求返回保护标志
     if (prot_out) {
         int prot = 0;
-        if (*pte & _PAGE_READ)
+        if (*pte & PTE_R)
             prot |= PROT_READ;
-        if (*pte & _PAGE_WRITE)
+        if (*pte & PTE_W)
             prot |= PROT_WRITE;
-        if (*pte & _PAGE_EXEC)
+        if (*pte & PTE_X)
             prot |= PROT_EXEC;
         *prot_out = prot;
     }

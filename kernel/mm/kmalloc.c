@@ -68,6 +68,7 @@
 	* @brief Allocate kernel memory
 	*/
  void *kmalloc(size_t size) {
+	sprint("kmalloc: start\n");
 	 if (size == 0)
 		 return NULL;
  
@@ -100,6 +101,7 @@
 			 mem = page_to_virt(page);
 		 }
 	 }
+	 sprint("kmalloc: end\n");
  
 	 return mem;
  }

@@ -8,7 +8,6 @@
 
 #include <spike_interface/spike_utils.h>
 
-
 #include <util/spinlock.h>
 #include <util/string.h>
 
@@ -18,7 +17,6 @@ pagetable_t g_kernel_pagetable;
 static spinlock_t pagetable_lock = SPINLOCK_INIT;
 // 全局页表统计信息
 pagetable_stats_t pt_stats;
-
 
 #define VIRTUAL_TO_PHYSICAL(vaddr) ((uint64)(vaddr))
 #define PHYSICAL_TO_VIRTUAL(paddr) ((uint64)(paddr))
@@ -35,7 +33,7 @@ void pagetable_init(void) {
 /**
  * 创建一个新的空页表
  */
-pagetable_t pagetable_create(void) {
+pagetable_t create_pagetable(void) {
   // 分配一个物理页作为根页表
   pagetable_t pagetable = (pagetable_t)alloc_page()->virtual_address;
   if (pagetable == NULL) {
@@ -69,7 +67,7 @@ static void _pagetable_free_level(pagetable_t pagetable, int level) {
     if (pte & PTE_V) {
       pagetable_t next_pt = (pagetable_t)PTE2PA(pte);
       _pagetable_free_level(next_pt, level + 1);
-			free_page((virt_to_page(next_pt)));
+      free_page((virt_to_page(next_pt)));
       // 释放下一级页表页
       atomic_dec(&pt_stats.page_tables);
     }
@@ -79,7 +77,7 @@ static void _pagetable_free_level(pagetable_t pagetable, int level) {
 /**
  * 释放整个页表结构
  */
-void pagetable_free(pagetable_t pagetable) {
+void free_pagetable(pagetable_t pagetable) {
   if (pagetable == NULL) {
     return;
   }
@@ -88,7 +86,7 @@ void pagetable_free(pagetable_t pagetable) {
   _pagetable_free_level(pagetable, 0);
 
   // 释放根页表
-	free_page((virt_to_page(pagetable)));
+  free_page((virt_to_page(pagetable)));
 
   atomic_dec(&pt_stats.page_tables);
 }
@@ -97,40 +95,53 @@ void pagetable_free(pagetable_t pagetable) {
  * 在页表中查找页表项
  */
 pte_t *pgt_walk(pagetable_t pagetable, uaddr va, int alloc) {
+	if(va == 0x87ffd000){
+		sprint("0x87ffd000\n");
+	}
   if (pagetable == NULL) {
     return NULL;
   }
 
   // 检查虚拟地址是否有效
   if (va >= MAXVA) {
+
     return NULL;
   }
 
   // starting from the page directory
   pagetable_t pt = pagetable;
 
-  // traverse from page directory to page table.
-  // as we use risc-v sv39 paging scheme, there will be 3 layers: page dir,
-  // page medium dir, and page table.
   for (int level = 2; level > 0; level--) {
-    // macro "PX" gets the PTE index in page table of current level
-    // "pte" points to the entry of current level
+
     pte_t *pte = pt + PX(level, va);
 
-    // now, we need to know if above pte is valid (established mapping to a
-    // phyiscal page) or not.
-    if (*pte & PTE_V) { // PTE valid
-      // phisical address of pagetable of next level
+		if((uint64)pte == 0x0000000087ffcfe8){
+			sprint("L3 debug\n");
+			
+		}
+
+    if (*pte & PTE_V) {
+
       pt = (pagetable_t)PTE2PA(*pte);
-    } else { // PTE invalid (not exist).
-      // allocate a page (to be the new pagetable), if alloc == 1
+    } else {
+			
       if (alloc && ((pt = (pte_t *)alloc_page()->virtual_address) != 0)) {
         memset(pt, 0, PAGE_SIZE);
         // writes the physical address of newly allocated page to pte, to
         // establish the page table tree.
+
         *pte = PA2PPN(pt) | PTE_V;
-      } else // returns NULL, if alloc == 0, or no more physical page remains
+				if(*pte == 0x0000000021fff801){
+					sprint("L1 debug\n");
+				}else if(*pte == 0x0000000021fff001){
+					sprint("L2 debug\n");
+				}
+      } else {
+        sprint("pgt_walk: invalid pte! va = %lx\n", va);
+
         return 0;
+
+      } // returns NULL, if alloc == 0, or no more physical page remains
     }
   }
 
@@ -150,7 +161,7 @@ int pgt_map_page(pagetable_t pagetable, uaddr va, uint64 pa, int perm) {
   if (pagetable == NULL) {
     return -1;
   }
-	//sprint("debug\n");
+  // sprint("debug\n");
   // 将地址对齐到页边界
   uaddr aligned_va = ROUNDDOWN(va, PAGE_SIZE);
   uint64 aligned_pa = ROUNDDOWN(pa, PAGE_SIZE);
@@ -190,6 +201,23 @@ int pgt_map_page(pagetable_t pagetable, uaddr va, uint64 pa, int perm) {
   spinlock_unlock_irqrestore(&pagetable_lock, flags);
   return 0;
 }
+
+int pgt_map_pages(pagetable_t pagetable, uaddr va, uint64 pa, uint64 size,
+                  int perm) {
+  if (size < 0) {
+    sprint("pgt_map_pages: wrong size %d\n", size);
+    panic();
+  }
+  size = ROUNDUP(size, PAGE_SIZE);
+  sprint("pgt_map_pages: start\n");
+  for (uint64 off = 0; off < size; off+= PAGE_SIZE) {
+    pgt_map_page(pagetable, va + off, pa + off, perm);
+  }
+  sprint("pgt_map_pages: complete\n");
+
+  return 0;
+}
+
 /**
  * 解除页表中一块虚拟地址区域的映射
  */
@@ -224,8 +252,7 @@ int pgt_unmap(pagetable_t pagetable, uaddr va, uint64 size, int free_phys) {
       // 如果需要，释放物理页
       if (free_phys) {
         void *pa = (void *)PTE2PA(*pte);
-				free_page((virt_to_page(pa)));
-
+        free_page((virt_to_page(pa)));
       }
 
       // 清除页表项
@@ -260,11 +287,12 @@ uint64 pgt_lookuppa(pagetable_t pagetable, uaddr va) {
 }
 
 void pagetable_activate(pagetable_t pagetable) {
+  sprint("pagetable_activate: start.\n");
+  pagetable_dump(pagetable);
   // 确保所有映射都已完成
   write_csr(satp, MAKE_SATP(pagetable));
   flush_tlb(); // 刷新TLB
-  sprint("Global pagetable activate.\n");
-
+  sprint("pagetable_activate: complete.\n");
 }
 
 pagetable_t pagetable_current(void) {
@@ -293,7 +321,7 @@ pagetable_t pagetable_copy(pagetable_t src, uaddr start, uaddr end, int share) {
   end = ROUNDUP(end, PAGE_SIZE);
 
   // 创建新的页表
-  pagetable_t dst = pagetable_create();
+  pagetable_t dst = create_pagetable();
   if (dst == NULL) {
     return NULL;
   }
@@ -321,7 +349,7 @@ pagetable_t pagetable_copy(pagetable_t src, uaddr start, uaddr end, int share) {
       if (new_page == NULL) {
         // 内存不足，释放已分配内容并返回
         spinlock_unlock_irqrestore(&pagetable_lock, flags);
-        pagetable_free(dst);
+        free_pagetable(dst);
         return NULL;
       }
 
@@ -331,10 +359,10 @@ pagetable_t pagetable_copy(pagetable_t src, uaddr start, uaddr end, int share) {
       // 在新页表中创建映射
       pte_t *dst_pte = pgt_walk(dst, va, 1);
       if (dst_pte == NULL) {
-				free_page((virt_to_page(new_page)));
+        free_page((virt_to_page(new_page)));
 
         spinlock_unlock_irqrestore(&pagetable_lock, flags);
-        pagetable_free(dst);
+        free_pagetable(dst);
         return NULL;
       }
 
@@ -346,7 +374,7 @@ pagetable_t pagetable_copy(pagetable_t src, uaddr start, uaddr end, int share) {
       pte_t *dst_pte = pgt_walk(dst, va, 1);
       if (dst_pte == NULL) {
         spinlock_unlock_irqrestore(&pagetable_lock, flags);
-        pagetable_free(dst);
+        free_pagetable(dst);
         return NULL;
       }
 
@@ -360,7 +388,7 @@ pagetable_t pagetable_copy(pagetable_t src, uaddr start, uaddr end, int share) {
       pte_t *dst_pte = pgt_walk(dst, va, 1);
       if (dst_pte == NULL) {
         spinlock_unlock_irqrestore(&pagetable_lock, flags);
-        pagetable_free(dst);
+        free_pagetable(dst);
         return NULL;
       }
 
@@ -460,10 +488,10 @@ void check_address_mapping(pagetable_t pagetable, uint64 va) {
   vpn[2] = (va >> 30) & 0x1FF;
   vpn[1] = (va >> 21) & 0x1FF;
   vpn[0] = (va >> 12) & 0x1FF;
-  
-  sprint("Checking mapping for address 0x%lx (vpn: %d,%d,%d)\n", 
-         va, vpn[2], vpn[1], vpn[0]);
-  
+
+  sprint("Checking mapping for address 0x%lx (vpn: %d,%d,%d)\n", va, vpn[2],
+         vpn[1], vpn[0]);
+
   // 检查第一级
   pte_t *pte1 = &pagetable[vpn[2]];
   sprint("L1 PTE at 0x%lx: 0x%lx\n", (uint64)pte1, *pte1);
@@ -471,7 +499,7 @@ void check_address_mapping(pagetable_t pagetable, uint64 va) {
     sprint("  Invalid L1 entry!\n");
     return;
   }
-  
+
   // 检查第二级
   pagetable_t pt2 = (pagetable_t)PTE2PA(*pte1);
   // 转换为虚拟地址以便访问
@@ -482,7 +510,7 @@ void check_address_mapping(pagetable_t pagetable, uint64 va) {
     sprint("  Invalid L2 entry!\n");
     return;
   }
-  
+
   // 检查第三级
   pagetable_t pt3 = (pagetable_t)PTE2PA(*pte2);
   pt3 = (pagetable_t)PHYSICAL_TO_VIRTUAL((uint64)pt3);
@@ -492,15 +520,11 @@ void check_address_mapping(pagetable_t pagetable, uint64 va) {
     sprint("  Invalid L3 entry!\n");
     return;
   }
-  
+
   // 分析最终PTE的权限
   sprint("  Physical addr: 0x%lx\n", PTE2PA(*pte3));
-  sprint("  Permissions: %s%s%s%s%s%s%s\n",
-         (*pte3 & PTE_R) ? "R" : "-",
-         (*pte3 & PTE_W) ? "W" : "-",
-         (*pte3 & PTE_X) ? "X" : "-",
-         (*pte3 & PTE_U) ? "U" : "-",
-         (*pte3 & PTE_G) ? "G" : "-",
-         (*pte3 & PTE_A) ? "A" : "-",
-         (*pte3 & PTE_D) ? "D" : "-");
+  sprint("  Permissions: %s%s%s%s%s%s%s\n", (*pte3 & PTE_R) ? "R" : "-",
+         (*pte3 & PTE_W) ? "W" : "-", (*pte3 & PTE_X) ? "X" : "-",
+         (*pte3 & PTE_U) ? "U" : "-", (*pte3 & PTE_G) ? "G" : "-",
+         (*pte3 & PTE_A) ? "A" : "-", (*pte3 & PTE_D) ? "D" : "-");
 }

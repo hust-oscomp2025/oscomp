@@ -79,8 +79,8 @@ struct mm_struct {
 };
 
 
-// 初始化内核虚拟空间
-struct mm_struct* alloc_init_mm();
+// 初始化内核mm结构
+void create_init_mm();
 
 
 /**

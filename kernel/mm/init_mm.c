@@ -1,38 +1,41 @@
-#include <kernel/mm/kmalloc.h>
+#include <kernel/mm/page.h>
 #include <kernel/mm/mm_struct.h>
 #include <kernel/mm/pagetable.h>
 #include <util/string.h>
+#include <spike_interface/spike_utils.h>
 
-struct mm_struct* init_mm;
+struct mm_struct init_mm;
 
-struct mm_struct* alloc_init_mm() {
-	init_mm = kmalloc(sizeof(struct mm_struct));
-  memset(init_mm, 0, sizeof(init_mm));
+void create_init_mm() {
+	sprint("create_init_mm: start\n");
+  memset(&init_mm, 0, sizeof(init_mm));
 
-  init_mm->pagetable = kmalloc(PAGE_SIZE);
-  memset(init_mm->pagetable, 0, PAGE_SIZE);
+  init_mm.pagetable = alloc_page()->virtual_address;
+	g_kernel_pagetable = init_mm.pagetable;
+	// 之后它会被加入内核的虚拟空间，先临时用一个页
+  memset(init_mm.pagetable, 0, PAGE_SIZE);
 
-  INIT_LIST_HEAD(&init_mm->vma_list);
-  init_mm->map_count = 0;
+  INIT_LIST_HEAD(&init_mm.vma_list);
+  init_mm.map_count = 0;
+
 
   // 地址空间边界
-  init_mm->start_code;
-  init_mm->end_code; // 代码段范围
+  init_mm.start_code;
+  init_mm.end_code; // 代码段范围
 
-  init_mm->start_data;
-  init_mm->end_data; // 数据段范围
+  init_mm.start_data;
+  init_mm.end_data; // 数据段范围
 
-  init_mm->start_brk;
-  init_mm->brk; 					// 内核mm中的brk字段，在形式上用来设置do_mmap的起始地址
+  init_mm.start_brk;
+  init_mm.brk; 					// 内核mm中的brk字段，在形式上用来设置do_mmap的起始地址
 
-  init_mm->start_stack;
-  init_mm->end_stack; 	// 栈范围，内核mm不需要使用这个字段。
+  init_mm.start_stack;
+  init_mm.end_stack; 	// 栈范围，内核mm不需要使用这个字段。
 
-	spinlock_init(&init_mm->mm_lock);
-	atomic_set(&init_mm->mm_users,0);
-	atomic_set(&init_mm->mm_count,0);
-
-	return init_mm;
+	spinlock_init(&init_mm.mm_lock);
+	atomic_set(&init_mm.mm_users,0);
+	atomic_set(&init_mm.mm_count,0);
+	sprint("create_init_mm: complete.\n");
 }
 
 // /*
