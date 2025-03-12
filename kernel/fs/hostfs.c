@@ -35,6 +35,8 @@ const struct inode_operations hostfs_i_ops = {
 // append hostfs to the fs list.
 //
 int register_hostfs() {
+	sprint("register_hostfs: begin\n");
+
   struct file_system_type *fs_type = kmalloc(sizeof(struct file_system_type));
   fs_type->type_num = HOSTFS_TYPE;
   fs_type->get_superblock = hostfs_get_superblock;
@@ -42,6 +44,8 @@ int register_hostfs() {
   for (int i = 0; i < MAX_SUPPORTED_FS; i++) {
     if (fs_list[i] == NULL) {
       fs_list[i] = fs_type;
+			sprint("register_hostfs: end\n");
+
       return 0;
     }
   }
@@ -119,6 +123,8 @@ int hostfs_write_back_vinode(struct inode *vinode) { return 0; }
 // populate the vfs inode of an hostfs file, according to its stats.
 //
 int hostfs_update_vinode(struct inode *vinode) {
+	sprint("hostfs_update_vinode: called\n");
+
   spike_file_t *f = vinode->i_private;
   if ((int64)f < 0) {  // is a direntry
     vinode->i_mode = S_IFDIR;
@@ -134,9 +140,12 @@ int hostfs_update_vinode(struct inode *vinode) {
   vinode->blocks = stat.st_blocks;
 
   if (S_ISDIR(stat.st_mode)) {
+		sprint("hostfs_update_vinode: vinode is dir\n");
     vinode->i_mode = S_IFDIR;
   } else if (S_ISREG(stat.st_mode)) {
     vinode->i_mode = S_IFREG;
+		sprint("hostfs_update_vinode: vinode is file\n");
+
   } else {
     sprint("hostfs_lookup:unknown file type!");
     return -1;
@@ -182,14 +191,18 @@ ssize_t hostfs_write(struct inode *f_inode, const char *w_buf, ssize_t len,
 // lookup a hostfs file, and establish its vfs inode in PKE vfs.
 //
 struct inode *hostfs_lookup(struct inode *parent, struct dentry *sub_dentry) {
+	sprint("hostfs_lookup: called.\n");
   // get complete path string
   char path[MAX_PATH_LEN];
   get_path_string(path, sub_dentry);
+	sprint("hostfs_lookup: hostfs path is %s\n",path);
 
   spike_file_t *f = spike_file_open(path, O_RDWR, 0);
 
   struct inode *child_inode = hostfs_alloc_vinode(parent->sb);
   child_inode->i_private = f;
+	child_inode->i_mode = S_IFREG;
+	sprint("hostfs_lookup: child_inode->i_private = %lx\n",f);
   hostfs_update_vinode(child_inode);
 	atomic_set(&(child_inode->i_count), 0);
   return child_inode;

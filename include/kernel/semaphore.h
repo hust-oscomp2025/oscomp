@@ -8,7 +8,7 @@
 typedef struct semaphore_t {
   int isActive;
   int value;
-  process *wait_queue;
+  struct task_struct *wait_queue;
   int pid; // 系统信号量为-1
 } semaphore;
 

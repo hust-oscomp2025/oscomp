@@ -210,7 +210,7 @@
 						 
 						 // Free the page
 						 struct page *page = free_slab->page;
-						 page_free(page);
+						 free_page(page);
 				 }
 		 }
  }

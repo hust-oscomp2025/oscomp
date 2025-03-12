@@ -160,3 +160,31 @@ char *safestrcpy(char *s, const char *t, int n) {
   *s = 0;
   return os;
 }
+
+
+/**
+ * strncpy - 将源字符串的前n个字符复制到目标字符串
+ * @dest: 目标字符串
+ * @src: 源字符串
+ * @n: 最多复制的字符数
+ *
+ * 如果src的长度小于n，则用'\0'填充剩余空间
+ * 如果src的长度大于等于n，则不会自动添加'\0'
+ *
+ * 返回值: 目标字符串指针
+ */
+char *strncpy(char *dest, const char *src, size_t n) {
+	size_t i;
+	
+	// 复制最多n个字符
+	for (i = 0; i < n && src[i] != '\0'; i++) {
+			dest[i] = src[i];
+	}
+	
+	// 如果源字符串长度小于n，用'\0'填充剩余空间
+	for (; i < n; i++) {
+			dest[i] = '\0';
+	}
+	
+	return dest;
+}

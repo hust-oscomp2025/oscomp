@@ -6,18 +6,17 @@
 
 #include <kernel/elf.h>
 
+#include <kernel/fs/vfs.h>
+#include <kernel/mm/kmalloc.h>
+#include <kernel/mm/mm_struct.h>
+#include <kernel/mm/mmap.h>
 #include <kernel/proc_file.h>
 #include <kernel/process.h>
 #include <kernel/riscv.h>
-#include <kernel/mm/mm_struct.h>
-#include <kernel/fs/vfs.h>
-#include <kernel/mm/kmalloc.h>
-#include <kernel/mm/mmap.h>
+#include <kernel/trapframe.h>
 
-
-#include <util/string.h>
 #include <spike_interface/spike_utils.h>
-
+#include <util/string.h>
 
 /**
  * ELF加载器的上下文信息
@@ -25,7 +24,7 @@
  */
 typedef struct elf_context {
   int fd;             // 文件描述符
-  process *proc;      // 目标进程
+  struct task_struct *proc;      // 目标进程
   elf_header ehdr;    // ELF头部
   uint64 entry_point; // 入口点
 } elf_context;
@@ -99,7 +98,7 @@ static int validate_elf_header(elf_header *ehdr) {
  * @return 0表示成功，非0表示失败
  */
 static int load_segment(elf_context *ctx, elf_prog_header *ph) {
-  process *proc = ctx->proc;
+  struct task_struct *proc = ctx->proc;
   struct mm_struct *mm = proc->mm;
 
   // 只加载可加载的段
@@ -172,7 +171,7 @@ static int load_segment(elf_context *ctx, elf_prog_header *ph) {
   // 为段分配物理内存并映射
   for (uint64 i = 0; i < num_pages; i++) {
     uint64 vaddr = ph->vaddr + i * PAGE_SIZE;
-    void *page = mm_user_alloc_page(proc, vaddr, prot);
+    void *page = mm_alloc_page(proc->mm, vaddr, prot);
     if (!page) {
       sprint("Failed to allocate page for segment\n");
       return -1;
@@ -271,7 +270,7 @@ static void setup_global_pointer(elf_context *ctx) {
  * @param proc 目标进程
  * @return 0表示成功，非0表示失败
  */
-static int init_elf_context(elf_context *ctx, int fd, process *proc) {
+static int init_elf_context(elf_context *ctx, int fd, struct task_struct *proc) {
   memset(ctx, 0, sizeof(elf_context));
   ctx->fd = fd;
   ctx->proc = proc;
@@ -346,25 +345,27 @@ static int load_debug_information(elf_context *ctx) {
  * @param proc 目标进程
  * @param filename ELF文件名
  */
-void load_elf_from_file(process *proc, char *filename) {
+void load_elf_from_file(struct task_struct *proc, char *filename) {
   elf_context ctx;
 
-  sprint("Loading application: %s\n", filename);
+  sprint("load_elf_from_file: Loading application: %s\n", filename);
 
   // 使用内核标准文件接口打开ELF文件
   int fd = do_open(filename, O_RDONLY);
   if (fd < 0) {
     panic("Failed to open application file: %s (error %d)\n", filename, fd);
   }
+	sprint("load_elf_from_file: do_open ended.\n");
 
   // 确保进程有有效的内存布局
-  if (!proc->mm) {
-    proc->mm = user_mm_create();
+  if (unlikely(!proc->mm)) {
+		proc->mm = mm_alloc();
     if (!proc->mm) {
       do_close(fd);
       panic("Failed to create memory layout for process\n");
     }
   }
+	sprint("load_elf_from_file: process has mm_struct.\n");
 
   // 初始化ELF上下文
   if (init_elf_context(&ctx, fd, proc) != 0) {
@@ -380,7 +381,7 @@ void load_elf_from_file(process *proc, char *filename) {
 
   // 如果需要，加载调试信息
   load_debug_information(&ctx);
-
+	sprint("load_elf_from_file: load debug information\n");
   // 关闭文件
   do_close(fd);
 

@@ -15,7 +15,7 @@
 #define MAX_SUPPORTED_FS 10       // the maximum number of supported file systems
 
 
-
+void init_fs(void);
 /**** vfs initialization function ****/
 int vfs_init();
 

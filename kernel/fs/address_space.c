@@ -434,5 +434,5 @@ void *alloc_page_buffer(void) {
 
 // 释放页缓存使用的物理页
 void free_page_buffer(void *addr) {
-    put_free_page(addr);  // 使用现有的物理页释放函数
+	free_page((virt_to_page(addr)));
 }
