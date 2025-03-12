@@ -15,45 +15,42 @@
 #include <kernel/mm/mm_struct.h>
 #include <kernel/mm/mmap.h>
 #include <kernel/mm/pagetable.h>
-#include <kernel/mm/slab.h>
+#include <kernel/mm/kmalloc.h>
 
 #include <util/spinlock.h>
 #include <util/string.h>
 
 #include <spike_interface/spike_utils.h>
 
-extern char _ftext[];
-extern char _etext[];
-
-extern char _fdata[];
-extern char _edata[];
-
-extern char _fbss[];
-extern char _end[];
-
 static void kernel_vm_init(void) {
   sprint("kernel_vm_init: start\n");
-  extern struct mm_struct init_mm;
+  //extern struct mm_struct init_mm;
   // 映射内核代码段和只读段
+  g_kernel_pagetable = alloc_page()->virtual_address;
+  //init_mm.pagetable = g_kernel_pagetable;
+	// 之后它会被加入内核的虚拟空间，先临时用一个页
+  memset(g_kernel_pagetable, 0, PAGE_SIZE);
+
+	extern char _ftext[], _etext[], _fdata[], _end[];
 	sprint("_etext=%lx,_ftext=%lx\n",_etext,_ftext);
 
-  pgt_map_pages(init_mm.pagetable, (uint64)_ftext, (uint64)_ftext,
+  pgt_map_pages(g_kernel_pagetable, (uint64)_ftext, (uint64)_ftext,
                 (uint64)(_etext - _ftext),
                 prot_to_type(PROT_READ | PROT_EXEC, 0));
 
   // 映射内核HTIF段
-  pgt_map_pages(init_mm.pagetable, (uint64)_etext, (uint64)_etext,
+  pgt_map_pages(g_kernel_pagetable, (uint64)_etext, (uint64)_etext,
                 (uint64)(_fdata - _etext),
                 prot_to_type(PROT_READ | PROT_WRITE, 0));
 
   // 映射内核数据段
-	sprint("_edata=%lx,_end=%lx\n",_edata,_end);
-  pgt_map_pages(init_mm.pagetable, (uint64)_fdata, (uint64)_fdata,
+  pgt_map_pages(g_kernel_pagetable, (uint64)_fdata, (uint64)_fdata,
                 (uint64)(_end - _fdata),
                 prot_to_type(PROT_READ | PROT_WRITE, 0));
 
-  pgt_map_pages(init_mm.pagetable, (uint64)init_mm.pagetable,
-                (uint64)init_mm.pagetable, PAGE_SIZE,
+	// satp不通过这层映射找g_kernel_pagetable，但是为了维护它，也需要做一个映射
+  pgt_map_pages(g_kernel_pagetable, (uint64)g_kernel_pagetable,
+                (uint64)g_kernel_pagetable, PAGE_SIZE,
                 prot_to_type(PROT_READ | PROT_WRITE, 0));
 
 
@@ -83,7 +80,7 @@ static struct task_struct *load_init_process() {
   task->mm = &init_mm;
 
   // 7. 设置文件描述符表
-  task->pfiles = init_proc_file_management();
+  task->pfiles = alloc_pfm();
   // 8. 初始化标准文件描述符(stdin, stdout, stderr)
   // 这些会指向/dev/console或null设备
   // setup_std_fds(task->pfiles);
@@ -139,10 +136,17 @@ int s_start(void) {
   int hartid = read_tp();
   if (hartid == 0) {
 		init_page_manager();
-		create_init_mm();
 		kernel_vm_init();
 		pagetable_activate(g_kernel_pagetable);
-		slab_init();
+		create_init_mm();
+		init_idle_task();
+		// kmalloc在形式上需要使用0号进程idle_task的“用户虚拟空间分配器”
+		// 所以我们在启用kmalloc之前，需要先初始化0号进程
+		kmem_init();
+
+
+
+
 		init_scheduler();
 		init_fs();
     sig = 0;

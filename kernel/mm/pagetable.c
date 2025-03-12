@@ -21,10 +21,9 @@ pagetable_stats_t pt_stats;
 #define VIRTUAL_TO_PHYSICAL(vaddr) ((uint64)(vaddr))
 #define PHYSICAL_TO_VIRTUAL(paddr) ((uint64)(paddr))
 
-/**
- * 初始化页表子系统
- */
-void pagetable_init(void) {
+// 全局页表模块初始化（同时记录内核页表+所有用户页表的元数据）
+// 在kmem_init()中被调用
+void pagetable_server_init(void) {
   // 初始化页表统计信息
   atomic_set(&pt_stats.mapped_pages, 0);
   atomic_set(&pt_stats.page_tables, 0);

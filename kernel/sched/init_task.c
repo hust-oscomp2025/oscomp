@@ -14,7 +14,7 @@ struct task_struct* alloc_init_task(){
 	task->flags = PF_KTHREAD;
   task->kstack = (uint64)alloc_kernel_stack();
   task->mm = NULL;
-  task->pfiles = init_proc_file_management();
+  task->pfiles = alloc_pfm();
 	return task;
 }
 

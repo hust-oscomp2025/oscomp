@@ -6,31 +6,38 @@
 
 struct mm_struct init_mm;
 
+
+// 在s_start中调用
 void create_init_mm() {
 	sprint("create_init_mm: start\n");
   memset(&init_mm, 0, sizeof(init_mm));
 
-  init_mm.pagetable = alloc_page()->virtual_address;
-	g_kernel_pagetable = init_mm.pagetable;
-	// 之后它会被加入内核的虚拟空间，先临时用一个页
-  memset(init_mm.pagetable, 0, PAGE_SIZE);
+  //init_mm.pagetable = alloc_page()->virtual_address;
+  init_mm.pagetable = g_kernel_pagetable;
 
   INIT_LIST_HEAD(&init_mm.vma_list);
   init_mm.map_count = 0;
 
-
-  // 地址空间边界
+	// 因为实际sv39地址空间很大，所以说内核的虚拟地址可以都在物理地址区间之后分配。
+	// 这样就不会有地址映射上的冲突了，直接把物理内存当做“内核vma”设定。
   init_mm.start_code;
   init_mm.end_code; // 代码段范围
 
   init_mm.start_data;
   init_mm.end_data; // 数据段范围
 
-  init_mm.start_brk;
-  init_mm.brk; 					// 内核mm中的brk字段，在形式上用来设置do_mmap的起始地址
+
+	extern uint64 mem_size;
+  init_mm.start_brk = DRAM_BASE;
+  init_mm.brk = DRAM_BASE + mem_size; 					
+	// 内核mm中的brk字段，在形式上用来设置do_mmap的起始地址
 
   init_mm.start_stack;
   init_mm.end_stack; 	// 栈范围，内核mm不需要使用这个字段。
+
+	INIT_LIST_HEAD(&init_mm.vma_list);
+  init_mm.map_count = 0;
+
 
 	spinlock_init(&init_mm.mm_lock);
 	atomic_set(&init_mm.mm_users,0);

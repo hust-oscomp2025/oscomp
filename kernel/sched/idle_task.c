@@ -21,15 +21,57 @@ extern void schedule(void);
 extern void scheduler_register_task(struct task_struct *tsk);
 
 /* 内核全局内存管理结构和内核页表（假设已在其他地方初始化） */
-extern struct mm_struct init_mm;
 //extern pgd_t swapper_pg_dir[]; // 内核页目录
 
 /*
  * 静态定义 idle_task，全局唯一的 idle 进程。
  * 注意：为了简单起见，只展示了关键字段的初始化，
  * 实际实现中还会有更多字段和 CPU 上下文信息。
+ * 这里特指0号idle_task
  */
-struct task_struct idle_task = {};
+struct task_struct idle_task;
+//struct proc_file_management kernel_file_management;
+/*
+ * init_idle_task - 初始化并注册 idle 进程
+ *
+ * 在内核启动过程中，此函数将被调用来完成 idle 进程的 CPU 上下文初始化，
+ * 并将 idle 进程注册到调度器中，使其在必要时被调度执行。
+ * 每个cpu都需要自己的idle任务
+ * 
+ */
+void init_idle_task(void) {
+	idle_task.kstack = (uint64)alloc_kernel_stack();
+	idle_task.trapframe = NULL;
+
+	idle_task.ktrapframe = kmalloc(sizeof(struct trapframe));
+	memset(&idle_task.ktrapframe,0,sizeof(struct trapframe));
+  idle_task.ktrapframe->epc = (unsigned long)idle_loop;
+
+	extern struct mm_struct init_mm;
+	idle_task.mm = &init_mm;
+  idle_task.pfiles = NULL;
+
+
+
+
+	idle_task.pid = 0;
+
+	idle_task.state = TASK_RUNNING; // Idle 进程始终处于可运行状态
+	idle_task.flags = PF_KTHREAD;
+	idle_task.parent;
+	INIT_LIST_HEAD(&idle_task.children);
+	INIT_LIST_HEAD(&idle_task.sibling);
+	INIT_LIST_HEAD(&idle_task.queue_node);
+  idle_task.tick_count = 0;
+
+  //ps->sem_index = sem_new(0);	//这个信号量需要重写
+
+  /* 将 idle 进程注册到调度器中 */
+  insert_to_ready_queue(&idle_task);
+
+  sprint("Idle process (PID 0) initialized and registered.\n");
+}
+
 
 
 static inline void halt_cpu(void) {
@@ -52,39 +94,3 @@ void idle_loop(void) {
   }
 }
 
-/*
- * init_idle_task - 初始化并注册 idle 进程
- *
- * 在内核启动过程中，此函数将被调用来完成 idle 进程的 CPU 上下文初始化，
- * 并将 idle 进程注册到调度器中，使其在必要时被调度执行。
- * 每个cpu都需要自己的idle任务
- * 
- */
-void init_idle_task(void) {
-	idle_task.kstack = (uint64)alloc_kernel_stack();
-	idle_task.trapframe = NULL;
-
-	idle_task.ktrapframe = kmalloc(sizeof(struct trapframe));
-	memset(&idle_task.ktrapframe,0,sizeof(struct trapframe));
-  idle_task.ktrapframe->epc = (unsigned long)idle_loop;
-
-	idle_task.mm = &init_mm;
-  idle_task.pfiles = init_proc_file_management();
-
-	idle_task.pid = 0;
-
-	idle_task.state = TASK_RUNNING; // Idle 进程始终处于可运行状态
-	idle_task.flags = PF_KTHREAD;
-	idle_task.parent;
-	INIT_LIST_HEAD(&idle_task.children);
-	INIT_LIST_HEAD(&idle_task.sibling);
-	INIT_LIST_HEAD(&idle_task.queue_node);
-  idle_task.tick_count = 0;
-
-  //ps->sem_index = sem_new(0);	//这个信号量需要重写
-
-  /* 将 idle 进程注册到调度器中 */
-  insert_to_ready_queue(&idle_task);
-
-  sprint("Idle process (PID 0) initialized and registered.\n");
-}

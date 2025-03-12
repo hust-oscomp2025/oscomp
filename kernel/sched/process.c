@@ -44,7 +44,7 @@ struct task_struct *alloc_process() {
   ps->trapframe = (struct trapframe*)kmalloc(sizeof(struct trapframe));
 	ps->ktrapframe = NULL;
 	ps->mm = mm_alloc();
-  ps->pfiles = init_proc_file_management();
+  ps->pfiles = alloc_pfm();
 	//ps->active_mm =ps->mm;
   // 分配内核栈
 	ps->pid = pid_alloc();

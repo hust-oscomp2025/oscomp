@@ -9,6 +9,7 @@
 
  #include <kernel/mm/kmalloc.h>
  #include <kernel/mm/page.h>
+ #include <kernel/mm/pagetable.h>
  #include <kernel/mm/slab.h>
  
  #include <spike_interface/spike_utils.h>
@@ -28,25 +29,21 @@
  
  // Magic value to detect corruption
  #define KMALLOC_MAGIC 0xA110C8ED
- 
- // Size of the allocation header
  #define HEADER_SIZE sizeof(struct kmalloc_header)
  
- // Spinlock for memory allocator
  static spinlock_t kmalloc_lock = SPINLOCK_INIT;
  
- /**
-	* @brief Initialize kernel memory allocator
-	*/
+// 在kernel初始化中被调用
  void kmem_init(void) {
 	 sprint("Initializing kernel memory allocator...\n");
  
 	 // Initialize spinlock
 	 spinlock_init(&kmalloc_lock);
  
-	 // Initialize slab allocator
 	 slab_init();
- 
+	 pagetable_server_init();
+
+
 	 sprint("Kernel memory allocator initialized\n");
  }
  
@@ -90,7 +87,7 @@
 		 }
 	 } else {
 		 // For large allocations, use page allocator without headers
-		 unsigned int pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
+		 unsigned int pages = ROUNDUP(size,PAGE_SIZE) / PAGE_SIZE;
 		 struct page *page = alloc_pages(pages - 1); // Convert order to pages
 		 
 		 if (page) {

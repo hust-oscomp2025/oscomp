@@ -162,25 +162,13 @@ int proc_query_mapping(struct task_struct *proc, uaddr addr,
     return 0;
 }
 
-/**
- * 分配物理页并映射到进程的虚拟地址空间
- */
 int proc_alloc_map_page(struct task_struct *proc, uaddr vaddr, int prot) {
     // 参数检查
-    if (!proc || !proc->mm)
-        return -EINVAL;
-
-    // 确保地址页对齐
-    if (vaddr & (PAGE_SIZE - 1))
-        return -EINVAL;
-
-    // 获取进程页表
-    pagetable_t pagetable = proc->mm->pagetable;
-    if (!pagetable)
+    if (!proc || !proc->mm || !proc->mm->pagetable|| (vaddr & (PAGE_SIZE - 1))  )
         return -EINVAL;
 
     // 检查地址是否已经映射
-    pte_t *pte = pgt_walk(pagetable, vaddr, 0);
+    pte_t *pte = pgt_walk(proc->mm->pagetable, vaddr, 0);
     if (pte && (*pte & PTE_V))
         return -EEXIST; // 已存在映射
 
@@ -203,6 +191,11 @@ int proc_alloc_map_page(struct task_struct *proc, uaddr vaddr, int prot) {
 
     return 0;
 }
+
+
+
+
+
 
 /**
  * 取消进程内存映射并释放对应的物理页

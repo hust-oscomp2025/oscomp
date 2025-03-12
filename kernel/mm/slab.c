@@ -222,9 +222,7 @@ static void slab_free_obj(struct kmem_cache *cache, struct slab_header *slab,
   }
 }
 
-/**
- * @brief Initialize slab allocator
- */
+// 在kmem_init中调用
 void slab_init(void) {
   // Initialize all slab caches
   for (int i = 0; i < SLAB_SIZES_COUNT; i++) {

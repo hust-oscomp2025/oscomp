@@ -18,7 +18,7 @@
 // initialize a proc_file_management data structure for a process.
 // return the pointer to the page containing the data structure.
 //
-proc_file_management *init_proc_file_management(void) {
+proc_file_management *alloc_pfm(void) {
   proc_file_management *pfiles = (proc_file_management *)kmalloc(sizeof(proc_file_management));
   pfiles->cwd = vfs_root_dentry; // by default, cwd is the root
   pfiles->nfiles = 0;
@@ -26,7 +26,7 @@ proc_file_management *init_proc_file_management(void) {
   for (int fd = 0; fd < MAX_FILES; ++fd)
     pfiles->fd_table[fd] = NULL;
 
-  sprint("init_proc_file_management: created a file management struct for a process.\n");
+  sprint("alloc_pfm: created a file management struct for a process.\n");
   return pfiles;
 }
 

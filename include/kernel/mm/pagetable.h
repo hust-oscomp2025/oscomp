@@ -66,7 +66,7 @@ typedef struct {
   atomic_t page_tables;  // 页表数量
 } pagetable_stats_t;
 
-void pagetable_init(void);
+void pagetable_server_init(void);
 
 
 pagetable_t create_pagetable(void);
