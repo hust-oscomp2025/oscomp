@@ -92,7 +92,7 @@ static struct slab_header *slab_header_init(size_t obj_size) {
     return NULL;
 
   // Use beginning of page for slab header
-  struct slab_header *slab = page_to_virt(page);
+  struct slab_header *slab = (kptr_t)page->paddr;
 
   // Calculate bitmap size and number of objects
   // Make sure objects are aligned to 8 bytes
@@ -121,11 +121,14 @@ static struct slab_header *slab_header_init(size_t obj_size) {
  * @brief Allocate object from slab
  */
 static void *slab_alloc_obj(struct kmem_cache *cache) {
+  //sprint("slab_alloc_obj: start\n");
   // Check for partial slabs
   if (list_empty(&cache->slabs_partial)) {
     // If no partial slabs, check free slabs
     if (list_empty(&cache->slabs_free)) {
       // Need to create a new slab
+      //sprint("slab_alloc_obj: creating a new slab\n");
+
       struct slab_header *slab = slab_header_init(cache->obj_size);
       if (!slab)
         return NULL; // Out of memory
@@ -217,13 +220,14 @@ static void slab_free_obj(struct kmem_cache *cache, struct slab_header *slab,
 
       // Free the page
       struct page *page = free_slab->page;
-      free_page(page);
+      put_page(page);
     }
   }
 }
 
 // 在kmem_init中调用
 void slab_init(void) {
+	sprint("slab_init: start\n");
   // Initialize all slab caches
   for (int i = 0; i < SLAB_SIZES_COUNT; i++) {
     struct kmem_cache *cache = &slab_caches[i];
@@ -243,11 +247,14 @@ void slab_init(void) {
  * @brief Get cache for a specific size
  */
 struct kmem_cache *slab_cache_for_size(size_t size) {
+  //sprint("slab_cache_for_size: start, size = %d\n", size);
   // Round up size to next multiple of 8 bytes for alignment
   size = (size + 7) & ~7;
 
   for (int i = 0; i < SLAB_SIZES_COUNT; i++) {
     if (size <= slab_sizes[i]) {
+      //sprint("slab_cache_for_size: i = %d, &slab_caches[i]=%lx\n", i,&slab_caches[i]);
+
       return &slab_caches[i];
     }
   }
@@ -261,6 +268,7 @@ struct kmem_cache *slab_cache_for_size(size_t size) {
  * @brief Allocate object from slab allocator
  */
 void *slab_alloc(size_t size) {
+  //sprint("slab_alloc: start, size = %d\n", size);
   // Verify size is within our slab allocator range
   if (size > 2048) {
     return NULL; // Too large for slab allocator
@@ -268,13 +276,17 @@ void *slab_alloc(size_t size) {
 
   struct kmem_cache *cache = slab_cache_for_size(size);
   if (!cache) {
+    //sprint("slab_alloc: failed to find cache for size %d\n", size);
     // Should not happen if size <= 2048
-    panic("slab_alloc: failed to find cache for size %d\n", size);
+    panic();
   }
 
   spinlock_lock(&cache->lock);
+  //sprint("slab_alloc: get cache\n");
+
   void *ptr = slab_alloc_obj(cache);
   spinlock_unlock(&cache->lock);
+  //sprint("slab_alloc: complete\n");
 
   return ptr;
 }

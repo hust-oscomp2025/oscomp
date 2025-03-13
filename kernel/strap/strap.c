@@ -102,8 +102,8 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 					// 				if (!new_page) goto error;
 									
 					// 				// 复制页内容
-					// 				uint64 old_pa = page_to_virt(old_page);
-					// 				uint64 new_pa = page_to_virt(new_page);
+					// 				uint64 old_pa = page_to_addr(old_page);
+					// 				uint64 new_pa = page_to_addr(new_page);
 					// 				memcpy(new_pa, old_pa, PAGE_SIZE);
 									
 					// 				// 更新映射
@@ -113,13 +113,13 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 									
 					// 				// 更新页结构
 					// 				vma->pages[page_idx] = new_page;
-					// 				new_page->virtual_address = (uint64)page_va;
+					// 				new_page->paddr = (uint64)page_va;
 					// 				put_page(old_page);
 									
 					// 				return;
 					// 		} else {
 					// 				// 页已分配但可能未映射，确保映射正确
-					// 				uint64 pa = page_to_virt(vma->pages[page_idx]);
+					// 				uint64 pa = page_to_addr(vma->pages[page_idx]);
 					// 				user_vm_map(proc->pagetable, page_va, PAGE_SIZE, (uint64)pa,
 					// 									prot_to_type(vma->vm_prot, 1));
 					// 				return;

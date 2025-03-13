@@ -241,7 +241,7 @@ struct page *find_or_create_page(struct address_space *mapping, uint64 index) {
     struct page *old_page = radix_tree_lookup(mapping->page_tree, index);
     if (old_page) {
         spinlock_unlock(&mapping->tree_lock);
-        free_page_buffer(page->virtual_address);
+        free_page_buffer(page->paddr);
         kfree(page);
         get_page(old_page);
         return old_page;
@@ -250,7 +250,7 @@ struct page *find_or_create_page(struct address_space *mapping, uint64 index) {
     // 插入新页
     if (radix_tree_insert(&mapping->page_tree, index, page) != 0) {
         spinlock_unlock(&mapping->tree_lock);
-        free_page_buffer(page->virtual_address);
+        free_page_buffer(page->paddr);
         kfree(page);
         return NULL;
     }
@@ -284,7 +284,7 @@ struct page *find_or_create_page(struct address_space *mapping, uint64 index) {
             }
             
             // 释放页
-            free_page_buffer(lru_page->virtual_address);
+            free_page_buffer(lru_page->paddr);
             kfree(lru_page);
         }
     }
@@ -313,7 +313,7 @@ int write_page(struct page *page) {
 
 // 将数据从用户空间复制到页
 ssize_t copy_to_page(struct page *page, const char *buf, size_t count, loff_t offset) {
-    if (!page || !page->virtual_address || offset >= PAGE_SIZE)
+    if (!page || !page->paddr || offset >= PAGE_SIZE)
         return -1;
     
     // 确保不超出页大小
@@ -321,7 +321,7 @@ ssize_t copy_to_page(struct page *page, const char *buf, size_t count, loff_t of
         count = PAGE_SIZE - offset;
     
     // 复制数据
-    memcpy((char *)page->virtual_address + offset, buf, count);
+    memcpy((char *)page->paddr + offset, buf, count);
     
     // 标记页为脏
     set_page_dirty(page);
@@ -331,7 +331,7 @@ ssize_t copy_to_page(struct page *page, const char *buf, size_t count, loff_t of
 
 // 将数据从页复制到用户空间
 ssize_t copy_from_page(struct page *page, char *buf, size_t count, loff_t offset) {
-    if (!page || !page->virtual_address || offset >= PAGE_SIZE)
+    if (!page || !page->paddr || offset >= PAGE_SIZE)
         return -1;
     
     // 确保不超出页大小
@@ -339,7 +339,7 @@ ssize_t copy_from_page(struct page *page, char *buf, size_t count, loff_t offset
         count = PAGE_SIZE - offset;
     
     // 复制数据
-    memcpy(buf, (char *)page->virtual_address + offset, count);
+    memcpy(buf, (char *)page->paddr + offset, count);
     
     return count;
 }
@@ -415,7 +415,7 @@ void invalidate_inode_pages(struct address_space *mapping) {
                 mapping->a_ops->releasepage(page);
             
             // 释放页
-            free_page_buffer(page->virtual_address);
+            free_page_buffer(page->paddr);
             kfree(page);
         }
     }
@@ -427,12 +427,7 @@ void invalidate_inode_pages(struct address_space *mapping) {
     spinlock_unlock(&mapping->tree_lock);
 }
 
-// 分配物理页并返回虚拟地址
-void* alloc_page_buffer(void) {
-    return kmalloc(PAGE_SIZE);  // 使用现有的物理页分配函数
-}
-
 // 释放页缓存使用的物理页
-void free_page_buffer(void* addr) {
-	free_page((virt_to_page(addr)));
+void free_page_buffer(paddr_t addr) {
+	put_page((addr_to_page(addr)));
 }

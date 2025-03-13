@@ -77,10 +77,8 @@ int write_inode_pages(struct address_space *mapping);
 // 清除address_space中的页缓存
 void invalidate_inode_pages(struct address_space *mapping);
 
-// 分配物理页并返回虚拟地址
-void* alloc_page_buffer(void);
 
 // 释放页缓存使用的物理页
-void free_page_buffer(void* addr);
+void free_page_buffer(paddr_t addr);
 
 #endif /* _ADDRESS_SPACE_H */

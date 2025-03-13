@@ -140,7 +140,7 @@
 		 for (int i = 0; i < MAX_SUPPORTED_FS; i++) {
 				 if (fs_list[i] == NULL) {
 						 fs_list[i] = fs_type;
-						 sprint("register_ramfs: registered successfully.\n");
+						 //sprint("register_ramfs: registered successfully.\n");
 						 return 0;
 				 }
 		 }
@@ -317,15 +317,15 @@
  
  /* 读取页内容 */
  static int ramfs_readpage(struct address_space *mapping, struct page *page) {
-		 /* 在内存文件系统中，页面可能是首次访问，需要分配并初始化 */
-		 if (!page->virtual_address) {
-				 page->virtual_address = alloc_page_buffer();
-				 if (!page->virtual_address)
-						 return -1;
+		//  /* 在内存文件系统中，页面可能是首次访问，需要分配并初始化 */
+		//  if (!page->paddr) {
+		// 		 page->paddr = alloc_page_buffer();
+		// 		 if (!page->paddr)
+		// 				 return -1;
 				 
-				 /* 新页面初始化为0 */
-				 memset(page->virtual_address, 0, PAGE_SIZE);
-		 }
+		// 		 /* 新页面初始化为0 */
+		// 		 memset(page->paddr, 0, PAGE_SIZE);
+		//  }
 		 
 		 /* 标记页为最新 */
 		 set_page_uptodate(page);
@@ -361,9 +361,8 @@
 				 return 0;
 		 
 		 /* 释放页 */
-		 if (page->virtual_address) {
-				 free_page_buffer(page->virtual_address);
-				 page->virtual_address = NULL;
+		 if (page->paddr) {
+				 free_page_buffer(page->paddr);
 		 }
 		 return 1;
  }
@@ -419,7 +418,7 @@
 				 /* 确保页内容是最新的 */
 				 if (!page_uptodate(page)) {
 						 if (ramfs_readpage(mapping, page) != 0) {
-								 put_page(page);
+							put_page(page);
 								 return read_bytes ? read_bytes : -1;
 						 }
 				 }
@@ -463,7 +462,7 @@
 				 /* 确保页内容是最新的 */
 				 if (!page_uptodate(page)) {
 						 if (ramfs_readpage(mapping, page) != 0) {
-								 put_page(page);
+							put_page(page);
 								 return written_bytes ? written_bytes : -1;
 						 }
 				 }

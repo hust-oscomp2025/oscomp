@@ -67,7 +67,7 @@ void kmem_init(void) {
  * @brief Allocate kernel memory
  */
  void *kmalloc(size_t size) {
-  sprint("kmalloc: start\n");
+  //sprint("kmalloc: start\n");
   if (size == 0)
     return NULL;
 
@@ -81,7 +81,7 @@ void kmem_init(void) {
 
   // For small allocations (up to 2048 bytes), use slab allocator
   if (total_size <= 2048) {
-    sprint("kmalloc: small\n");
+    //sprint("kmalloc: small\n");
 
     struct kmalloc_header *header = slab_alloc(total_size);
     if (header) {
@@ -90,20 +90,20 @@ void kmem_init(void) {
       mem = header_to_ptr(header);
     }
   } else {
-    sprint("kmalloc: large\n");
+    //sprint("kmalloc: large\n");
     // For large allocations, use page allocator without headers
-    uint64 ret = do_mmap(&init_mm, 0, size, PROT_READ | PROT_WRITE,
+    paddr_t ret = do_mmap(&init_mm, 0, size, PROT_READ | PROT_WRITE,
                         MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, NULL, 0);
 
-    struct page *page = virt_to_page( (void*)ret);
+    struct page *page = addr_to_page(ret);
 
     if (page) {
       page->kmalloc_size = size;
       // Store the actual requested size in the page's mapping field
-      mem = (void*)page_to_virt(page);
+      mem = (void*)page->paddr;
     }
   }
-  sprint("kmalloc: end\n");
+  //sprint("kmalloc: end\n");
 
   return mem;
 }
@@ -111,7 +111,7 @@ void kmem_init(void) {
 /**
  * @brief Free kernel memory
  */
- void kfree(void *ptr) {
+ void kfree(kptr_t ptr) {
   if (!ptr)
     return;
 
@@ -120,7 +120,7 @@ void kmem_init(void) {
   // Check if this is a page allocation (page-aligned pointer)
   if (((uint64)ptr & (PAGE_SIZE - 1)) == 0) {
     // This is a page allocation
-    struct page *page = virt_to_page((void*)ptr);
+    struct page *page = addr_to_page((paddr_t)ptr);
     if (unlikely(!page)) {
       panic("kfree: invalid pointer 0x%lx\n", (uint64)ptr);
     }
@@ -164,7 +164,7 @@ void kmem_init(void) {
   // Check if this is a page allocation (page-aligned pointer)
   if (((uint64)ptr & (PAGE_SIZE - 1)) == 0) {
     // This is a page allocation
-    struct page *page = virt_to_page((void*)ptr);
+    struct page *page = addr_to_page((paddr_t)ptr);
     if (!page) {
       return 0;
     }

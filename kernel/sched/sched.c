@@ -19,6 +19,7 @@ struct task_struct *current_percpu[NCPU];
 // initialize process pool (the procs[] array). added @lab3_1
 //
 void init_scheduler() {
+	//sprint("init_scheduler: start\n");
   INIT_LIST_HEAD(&ready_queue);
   pid_init();
   memset(procs, 0, sizeof(struct task_struct *) * NPROC);
@@ -44,7 +45,7 @@ struct task_struct *alloc_empty_process() {
 //
 void insert_to_ready_queue(struct task_struct *proc) {
   sprint("going to insert process %d to ready queue.\n", proc->pid);
-  list_add(&ready_queue, &proc->queue_node);
+  list_add(&proc->queue_node, &ready_queue);
 }
 
 //

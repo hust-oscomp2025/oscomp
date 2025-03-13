@@ -26,13 +26,13 @@ static void kernel_vm_init(void) {
   sprint("kernel_vm_init: start\n");
   // extern struct mm_struct init_mm;
   //  映射内核代码段和只读段
-  g_kernel_pagetable = alloc_page()->virtual_address;
+  g_kernel_pagetable = (pagetable_t)alloc_page()->paddr;
   // init_mm.pagetable = g_kernel_pagetable;
   //  之后它会被加入内核的虚拟空间，先临时用一个页
   memset(g_kernel_pagetable, 0, PAGE_SIZE);
 
   extern char _ftext[], _etext[], _fdata[], _end[];
-  sprint("_etext=%lx,_ftext=%lx\n", _etext, _ftext);
+  //sprint("_etext=%lx,_ftext=%lx\n", _etext, _ftext);
 
   pgt_map_pages(g_kernel_pagetable, (uint64)_ftext, (uint64)_ftext,
                 (uint64)(_etext - _ftext),
@@ -87,7 +87,7 @@ static struct task_struct *load_init_process() {
   task->mm = &init_mm;
 
   // 7. 设置文件描述符表
-  task->pfiles = alloc_pfm();
+  //task->pfiles = alloc_pfm();
   // 8. 初始化标准文件描述符(stdin, stdout, stderr)
   // 这些会指向/dev/console或null设备
   // setup_std_fds(task->pfiles);
@@ -147,11 +147,12 @@ int s_start(void) {
     kernel_vm_init();
     pagetable_activate(g_kernel_pagetable);
     create_init_mm();
+    kmem_init();
+		init_scheduler();
 
     init_idle_task();
-    // kmalloc在形式上需要使用0号进程idle_task的“用户虚拟空间分配器”
+    // kmalloc在形式上需要使用init_mm的“用户虚拟空间分配器”
     // 所以我们在启用kmalloc之前，需要先初始化0号进程
-    kmem_init();
 
     init_scheduler();
     init_fs();

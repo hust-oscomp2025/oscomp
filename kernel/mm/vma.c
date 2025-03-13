@@ -12,7 +12,7 @@ void free_vma(struct vm_area_struct *vma) {
   if (vma->pages) {
     for (int i = 0; i < vma->page_count; i++) {
       if (vma->pages[i]) {
-        free_page(vma->pages[i]);
+        put_page(vma->pages[i]);
       }
     }
     kfree(vma->pages);
@@ -84,7 +84,7 @@ struct vm_area_struct *vm_area_setup(struct mm_struct *mm, uint64 addr,
  * Populate a VMA with physical pages (used with MAP_POPULATE)
  * 也可以只填充vma的部分页
  */
-int populate_vma(struct vm_area_struct *vma, uint64 addr, size_t length,
+int populate_vma(struct vm_area_struct *vma, vaddr_t va, size_t length,
                  int prot) {
   for (size_t offset = 0, page_idx = offset / PAGE_SIZE; offset < length;
        offset += PAGE_SIZE, page_idx++) {
@@ -93,17 +93,16 @@ int populate_vma(struct vm_area_struct *vma, uint64 addr, size_t length,
     }
     struct page *page = alloc_page();
     if (unlikely(!page)) {
-      do_unmap(vma->vm_mm, addr, offset);
+      do_unmap(vma->vm_mm, va, offset);
       return -ENOMEM;
     }
     vma->pages[page_idx] = page;
 
-    void* pa = page_to_virt(page);
-    int ret = pgt_map_page(vma->vm_mm->pagetable, addr + offset, (uint64)pa,
+    int ret = pgt_map_page(vma->vm_mm->pagetable, va + offset, page->paddr,
                            prot_to_type(prot, vma->vm_flags & VM_USER));
     if (unlikely(ret)) {
-      free_page(page);
-      do_unmap(vma->vm_mm, addr, offset);
+      put_page(page);
+      do_unmap(vma->vm_mm, va, offset);
       return -ENOMEM;
     }
   }

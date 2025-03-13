@@ -9,10 +9,10 @@ struct mm_struct init_mm;
 
 // 在s_start中调用
 void create_init_mm() {
-	sprint("create_init_mm: start\n");
+	//sprint("create_init_mm: start\n");
   memset(&init_mm, 0, sizeof(init_mm));
 	init_mm.is_kernel_mm = 1;
-  //init_mm.pagetable = alloc_page()->virtual_address;
+  //init_mm.pagetable = alloc_page()->paddr;
   init_mm.pagetable = g_kernel_pagetable;
 
   INIT_LIST_HEAD(&init_mm.vma_list);

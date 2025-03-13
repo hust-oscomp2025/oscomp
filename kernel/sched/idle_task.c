@@ -61,11 +61,13 @@ struct task_struct idle_task;
  * 
  */
 void init_idle_task(void) {
+	sprint("Initializing idle process (PID 0)...\n");
 	idle_task.kstack = (uint64)alloc_kernel_stack();
 	idle_task.trapframe = NULL;
 
 	idle_task.ktrapframe = kmalloc(sizeof(struct trapframe));
-	memset(&idle_task.ktrapframe,0,sizeof(struct trapframe));
+	sprint("idle_task.ktrapframe: %p\n",idle_task.ktrapframe);
+	memset(idle_task.ktrapframe,0,sizeof(struct trapframe));
   idle_task.ktrapframe->epc = (unsigned long)idle_loop;
 
 	extern struct mm_struct init_mm;

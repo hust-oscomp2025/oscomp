@@ -285,11 +285,11 @@ static int load_segment(elf_context *ctx, elf_prog_header *ph) {
   // 计算所需页数（向上取整）
   uint64 num_pages = (ph->memsz + PAGE_SIZE - 1) / PAGE_SIZE;
   for (uint64 i = 0; i < num_pages; i++) {
-    uint64 vaddr = ph->vaddr + i * PAGE_SIZE;
+    vaddr_t vaddr = ph->vaddr + i * PAGE_SIZE;
     // 内核实际读elf的物理地址
-		void* pa = lookup_pa(proc->mm->pagetable, vaddr);
+		paddr_t pa = lookup_pa(proc->mm->pagetable, vaddr);
     // 计算这一页需要从文件中加载的字节数
-    uint64 page_offset = i * PAGE_SIZE;
+    size_t page_offset = i * PAGE_SIZE;
     uint64 file_offset = ph->off + page_offset;
     uint64 bytes_to_copy = 0;
 
@@ -309,7 +309,7 @@ static int load_segment(elf_context *ctx, elf_prog_header *ph) {
       }
     } else {
       // 这一页完全是bss段，清零整个页
-      memset(pa, 0, PAGE_SIZE);
+      memset((void*)pa, 0, PAGE_SIZE);
     }
   }
 

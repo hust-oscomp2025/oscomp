@@ -323,7 +323,7 @@ int do_unmap(struct mm_struct *mm, uint64 start, size_t len) {
       if (vma->pages[i]) {
         uint64 page_va = vma->vm_start + (i * PAGE_SIZE);
         pgt_unmap(mm->pagetable, page_va, PAGE_SIZE, 1);
-        free_page(vma->pages[i]);
+        put_page(vma->pages[i]);
         vma->pages[i] = NULL;
       }
     }
@@ -440,7 +440,7 @@ uint64 do_brk(struct mm_struct *mm, uint64 new_brk) {
 							if (page_idx >= 0 && page_idx < vma->page_count && vma->pages[page_idx]) {
 									// Unmap and free this page
 									pgt_unmap(mm->pagetable, addr, page_size, 1);
-									free_page(vma->pages[page_idx]);
+									put_page(vma->pages[page_idx]);
 									vma->pages[page_idx] = NULL;
 							}
 					}

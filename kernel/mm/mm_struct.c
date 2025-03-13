@@ -77,7 +77,7 @@ void free_mm(struct mm_struct *mm) {
       if (vma->pages) {
         for (int i = 0; i < vma->page_count; i++) {
           if (vma->pages[i]) {
-            free_page(vma->pages[i]);
+            put_page(vma->pages[i]);
           }
         }
         kfree(vma->pages);
@@ -177,13 +177,8 @@ ssize_t mm_copy_to_user(struct mm_struct *mm, uint64 dst, const void* src,
       populate_vma(vma, page_va, PAGE_SIZE, vma->vm_prot);
     }
 
-    // Get physical address
-    uint64 pa = (uint64)page_to_virt(vma->pages[page_idx]);
-    if (!pa)
-      return bytes_copied > 0 ? bytes_copied : -EFAULT;
-
     // Calculate target address (kernel view)
-    char *target = (char *)pa + page_offset;
+    char *target = (char *)vma->pages[page_idx]->paddr + page_offset;
 
     // Copy data
     memcpy(target, src_ptr + bytes_copied, page_bytes);
@@ -233,13 +228,8 @@ ssize_t mm_copy_from_user(struct mm_struct *mm, uint64 dst, const void* src,
       return bytes_copied > 0 ? bytes_copied : -1;
     }
 
-    // 获取页的物理地址
-    uint64 pa = (uint64)page_to_virt(vma->pages[page_idx]);
-    if (!pa)
-      return bytes_copied > 0 ? bytes_copied : -1;
-
     // 计算实际源地址（内核视角）
-    const char *source = (const char *)pa + page_offset;
+    const char *source = (const char *)vma->pages[page_idx]->paddr + page_offset;
 
     // 复制数据
     memcpy(dst_ptr + bytes_copied, source, page_bytes);

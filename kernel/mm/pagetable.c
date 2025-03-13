@@ -34,7 +34,7 @@ void pagetable_server_init(void) {
  */
 pagetable_t create_pagetable(void) {
   // 分配一个物理页作为根页表
-  pagetable_t pagetable = (pagetable_t)alloc_page()->virtual_address;
+  pagetable_t pagetable = (pagetable_t)alloc_page()->paddr;
   if (pagetable == NULL) {
     return NULL;
   }
@@ -66,7 +66,7 @@ static void _pagetable_free_level(pagetable_t pagetable, int level) {
     if (pte & PTE_V) {
       pagetable_t next_pt = (pagetable_t)PTE2PA(pte);
       _pagetable_free_level(next_pt, level + 1);
-      free_page((virt_to_page(next_pt)));
+      put_page((addr_to_page((paddr_t)next_pt)));
       // 释放下一级页表页
       atomic_dec(&pt_stats.page_tables);
     }
@@ -85,7 +85,7 @@ void free_pagetable(pagetable_t pagetable) {
   _pagetable_free_level(pagetable, 0);
 
   // 释放根页表
-  free_page((virt_to_page(pagetable)));
+  put_page((addr_to_page((paddr_t)pagetable)));
 
   atomic_dec(&pt_stats.page_tables);
 }
@@ -117,7 +117,7 @@ pte_t *page_walk(pagetable_t pagetable, uint64 va, int alloc) {
       pt = (pagetable_t)PTE2PA(*pte);
     } else {
 
-      if (alloc && ((pt = (pte_t *)alloc_page()->virtual_address) != 0)) {
+      if (alloc && ((pt = (pte_t *)alloc_page()->paddr) != 0)) {
         memset(pt, 0, PAGE_SIZE);
         // writes the physical address of newly allocated page to pte, to
         // establish the page table tree.
@@ -144,7 +144,7 @@ pte_t *page_walk(pagetable_t pagetable, uint64 va, int alloc) {
  * @param perm 页权限标志
  * @return 成功返回0，失败返回-1
  */
-int pgt_map_page(pagetable_t pagetable, uint64 va, uint64 pa, int perm) {
+int pgt_map_page(pagetable_t pagetable, vaddr_t va, paddr_t pa, int perm) {
   if (pagetable == NULL) {
     return -1;
   }
@@ -205,11 +205,11 @@ int pgt_map_pages(pagetable_t pagetable, uint64 va, uint64 pa, uint64 size,
   }
 	// size可以不对齐
   size = ROUNDUP(size, PAGE_SIZE);
-  sprint("pgt_map_pages: start\n");
+  //sprint("pgt_map_pages: start\n");
   for (uint64 off = 0; off < size; off += PAGE_SIZE) {
     pgt_map_page(pagetable, va + off, pa + off, perm);
   }
-  sprint("pgt_map_pages: complete\n");
+  //sprint("pgt_map_pages: complete\n");
 
   return 0;
 }
@@ -247,8 +247,8 @@ int pgt_unmap(pagetable_t pagetable, uint64 va, uint64 size, int free_phys) {
     if (*pte & PTE_V) {
       // 如果需要，释放物理页
       if (free_phys) {
-        uint64 pa = (uint64 )PTE2PA(*pte);
-        free_page((virt_to_page((void*)pa)));
+        paddr_t pa = PTE2PA(*pte);
+        put_page((addr_to_page(pa)));
       }
 
       // 清除页表项
@@ -268,7 +268,7 @@ int pgt_unmap(pagetable_t pagetable, uint64 va, uint64 size, int free_phys) {
 /**
  * 查找虚拟地址对应的物理地址
  */
-void* lookup_pa(pagetable_t pagetable, uint64 va) {
+paddr_t lookup_pa(pagetable_t pagetable, vaddr_t va) {
   // 查找页表项
   pte_t *pte = page_walk(pagetable, va, 0);
   if (pte == NULL || !(*pte & PTE_V)) {
@@ -279,7 +279,7 @@ void* lookup_pa(pagetable_t pagetable, uint64 va) {
   uint64 offset = va & (PAGE_SIZE - 1);
 
   // 返回物理地址
-  return (void*)(PTE2PA(*pte) | offset);
+  return PTE2PA(*pte) | offset;
 }
 
 void pagetable_activate(pagetable_t pagetable) {
@@ -309,6 +309,8 @@ pagetable_t pagetable_current(void) {
  *   0: 复制物理页(每个映射的地址都有一个新的物理页副本)
  *   1: 共享物理页(仅复制页表结构，物理页共享)
  *   2: 写时复制(COW，复制页表结构并将源和目标页表项标记为只读)
+ *   这个复制页表的函数有问题，以后再修
+ * 
  */
 pagetable_t pagetable_copy(pagetable_t src, uint64 start, uint64 end, int share) {
   if (src == NULL) {
@@ -344,8 +346,9 @@ pagetable_t pagetable_copy(pagetable_t src, uint64 start, uint64 end, int share)
     // 根据共享模式处理
     if (share == 0) {
       // 完全复制: 分配新物理页并复制内容
-      void *new_page = alloc_page()->virtual_address;
-      if (new_page == NULL) {
+			//struct page* new_page = alloc_page();
+      paddr_t new_page_base = alloc_page()->paddr;
+      if (new_page_base == 0) {
         // 内存不足，释放已分配内容并返回
         spinlock_unlock_irqrestore(&pagetable_lock, flags);
         free_pagetable(dst);
@@ -353,19 +356,19 @@ pagetable_t pagetable_copy(pagetable_t src, uint64 start, uint64 end, int share)
       }
 
       // 复制页内容
-      memcpy(new_page, (void *)pa, PAGE_SIZE);
+      memcpy((kptr_t)new_page_base, (void *)pa, PAGE_SIZE);
 
       // 在新页表中创建映射
       pte_t *dst_pte = page_walk(dst, va, 1);
       if (dst_pte == NULL) {
-        free_page((virt_to_page(new_page)));
+        put_page((addr_to_page(new_page_base)));
 
         spinlock_unlock_irqrestore(&pagetable_lock, flags);
         free_pagetable(dst);
         return NULL;
       }
 
-      *dst_pte = PA2PPN(new_page) | perm | PTE_V;
+      *dst_pte = PA2PPN(new_page_base) | perm | PTE_V;
       atomic_inc(&pt_stats.mapped_pages);
 
     } else if (share == 1) {
