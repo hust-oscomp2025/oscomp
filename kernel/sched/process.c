@@ -25,7 +25,7 @@
 #include <spike_interface/spike_utils.h>
 #include <util/string.h>
 
-static void free_kernel_stack(uint64 kstack);
+static void free_kernel_stack(void* kstack);
 
 //
 // switch to a user-mode process
@@ -119,8 +119,8 @@ ssize_t do_wait(int pid) {
 
 
 
-static void free_kernel_stack(uint64 kstack){
-	kfree((uint64)ROUNDDOWN((uint64)kstack,PAGE_SIZE));
+static void free_kernel_stack(void* kstack){
+	kfree((void*)(ROUNDDOWN((uint64)kstack,PAGE_SIZE)));
 }
 
 

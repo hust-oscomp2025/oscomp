@@ -4,8 +4,8 @@
 
 #include <kernel/elf.h>
 #include <kernel/proc_file.h>
-#include <kernel/process.h>
 #include <kernel/riscv.h>
+#include <kernel/sched/process.h>
 
 #include <kernel/sched/sched.h>
 
@@ -136,8 +136,7 @@ static struct task_struct *load_init_process() {
 //
 volatile static int sig = 1;
 int s_start(void) {
-	extern void init_idle_task(void);
-
+  extern void init_idle_task(void);
 
   sprint("Enter supervisor mode...\n");
   write_csr(satp, 0);

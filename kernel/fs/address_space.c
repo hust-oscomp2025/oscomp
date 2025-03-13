@@ -428,11 +428,11 @@ void invalidate_inode_pages(struct address_space *mapping) {
 }
 
 // 分配物理页并返回虚拟地址
-void *alloc_page_buffer(void) {
-    return alloc_page();  // 使用现有的物理页分配函数
+void* alloc_page_buffer(void) {
+    return kmalloc(PAGE_SIZE);  // 使用现有的物理页分配函数
 }
 
 // 释放页缓存使用的物理页
-void free_page_buffer(void *addr) {
-	free_page((virt_to_page(addr)));
+void free_page_buffer(void* addr) {
+	free_page((virt_to_page(g_kernel_pagetable, addr)));
 }

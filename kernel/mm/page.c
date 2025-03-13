@@ -143,8 +143,9 @@ struct page *pfn_to_page(uint64 pfn) {
 }
 
 // 根据物理地址获取页结构
-struct page *virt_to_page(void *addr) {
-  uint64 pfn = get_pfn(addr);
+struct page *virt_to_page(pagetable_t pgt ,void *addr) {
+	void* pa = lookup_pa(pgt,(uint64)addr);
+  uint64 pfn = get_pfn(pa);
   // sprint("virt_to_page: pfn=%lx\n",pfn);
   return pfn_to_page(pfn);
 }
@@ -173,7 +174,7 @@ struct page *alloc_page(void) {
     return NULL;
 
   memset(pa, 0, PAGE_SIZE);
-  struct page *page = virt_to_page(pa);
+  struct page *page = virt_to_page(g_kernel_pagetable,pa);
   // sprint("alloc_page: page=%lx\n",page);
   if (page) {
     init_page_struct(page);
@@ -312,11 +313,3 @@ void copy_page(struct page *dest, struct page *src) {
 // 获取当前空闲页数量
 int get_free_page_count(void) { return free_page_counter; }
 
-
-// 根据内核虚拟地址获取页结构
-struct page *virt_to_page(pagetable_t pgt,uint64 addr) {
-	uint64 pa = lookup_pa(pgt,addr);
-  uint64 pfn = get_pfn(pa);
-  // sprint("virt_to_page: pfn=%lx\n",pfn);
-  return pfn_to_page(pfn);
-}

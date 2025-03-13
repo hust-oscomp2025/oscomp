@@ -34,6 +34,7 @@ typedef signed long long int64;
 // 用来标记用户的虚拟内存地址
 typedef uint64 uaddr;
 
+// fs相关
 #define MOUNT_DEFAULT 0
 #define MOUNT_AS_ROOT 1
 

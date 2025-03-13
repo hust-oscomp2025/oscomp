@@ -15,7 +15,7 @@ static inline void pagefault_enable(void);
  * Returns number of bytes that could not be copied.
  * On success, this will be zero. On partial success, this will be non-zero.
  */
-unsigned long copy_to_user(void* to, const void* from, unsigned long n)
+unsigned long copy_to_user(uint64 to, const void* from, unsigned long n)
 {
     struct mm_struct *mm = CURRENT->mm;
     ssize_t ret;

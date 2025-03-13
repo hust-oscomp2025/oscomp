@@ -11,7 +11,7 @@ struct mm_struct init_mm;
 void create_init_mm() {
 	sprint("create_init_mm: start\n");
   memset(&init_mm, 0, sizeof(init_mm));
-
+	init_mm.is_kernel_mm = 1;
   //init_mm.pagetable = alloc_page()->virtual_address;
   init_mm.pagetable = g_kernel_pagetable;
 
@@ -72,8 +72,8 @@ void create_init_mm() {
 // #endif
 //     INIT_MM_CONTEXT(init_mm)};
 
-// void setup_initial_init_mm(void *start_code, void *end_code,
-// 			   void *end_data, void *brk)
+// void setup_initial_init_mm(uint64 start_code, uint64 end_code,
+// 			   uint64 end_data, uint64 brk)
 // {
 // 	init_mm.start_code = (unsigned long)start_code;
 // 	init_mm.end_code = (unsigned long)end_code;

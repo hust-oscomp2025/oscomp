@@ -1,4 +1,6 @@
 #include <kernel/mm/vma.h>
+#include <kernel/mm/kmalloc.h>
+#include <util/string.h>
 
 static int insert_vm_struct(struct mm_struct *mm, struct vm_area_struct *vma);
 static int vma_alloc_page_array(struct vm_area_struct *vma);
@@ -96,7 +98,7 @@ int populate_vma(struct vm_area_struct *vma, uint64 addr, size_t length,
     }
     vma->pages[page_idx] = page;
 
-    uint64 pa = page_to_virt(page);
+    void* pa = page_to_virt(page);
     int ret = pgt_map_page(vma->vm_mm->pagetable, addr + offset, (uint64)pa,
                            prot_to_type(prot, vma->vm_flags & VM_USER));
     if (unlikely(ret)) {

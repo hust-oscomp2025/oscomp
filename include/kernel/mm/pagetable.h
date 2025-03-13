@@ -72,13 +72,14 @@ void pagetable_server_init(void);
 pagetable_t create_pagetable(void);
 void free_pagetable(pagetable_t pagetable);
 
-int pgt_map_page(pagetable_t pagetable, uaddr va, uint64 pa, int perm);
-int pgt_map_pages(pagetable_t pagetable, uaddr va, uint64 pa, uint64 size,  int perm);
+int pgt_map_page(pagetable_t pagetable, uint64 va, uint64 pa, int perm);
+int pgt_map_pages(pagetable_t pagetable, uint64 va, uint64 pa, uint64 size,  int perm);
 
-int pgt_unmap(pagetable_t pagetable, uaddr va, uint64 size, int free_phys);
+int pgt_unmap(pagetable_t pagetable, uint64 va, uint64 size, int free_phys);
 
-pte_t *page_walk(pagetable_t pagetable, uaddr va, int alloc);
-void* lookup_pa(pagetable_t pagetable, uaddr va);
+pte_t *page_walk(pagetable_t pagetable, uint64 va, int alloc);
+void* lookup_pa(pagetable_t pagetable, uint64 va);
+
 
 /**
  * @brief 复制页表结构(可选择是否复制映射)
@@ -89,7 +90,7 @@ void* lookup_pa(pagetable_t pagetable, uaddr va);
  * @param share 映射类型: 0=复制物理页, 1=共享物理页, 2=写时复制
  * @return pagetable_t 复制的页表，失败返回NULL
  */
-pagetable_t pagetable_copy(pagetable_t src, uaddr start, uaddr end, int share);
+pagetable_t pagetable_copy(pagetable_t src, uint64 start, uint64 end, int share);
 
 /**
  * @brief 打印页表内容(用于调试)

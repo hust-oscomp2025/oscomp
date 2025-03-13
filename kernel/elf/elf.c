@@ -10,9 +10,10 @@
 #include <kernel/mm/kmalloc.h>
 #include <kernel/mm/mm_struct.h>
 #include <kernel/mm/mmap.h>
+#include <kernel/mm/vma.h>
 #include <kernel/proc_file.h>
-#include <kernel/process.h>
 #include <kernel/riscv.h>
+#include <kernel/sched/process.h>
 #include <kernel/trapframe.h>
 
 #include <spike_interface/spike_utils.h>
@@ -28,6 +29,163 @@ typedef struct elf_context {
   elf_header ehdr;          // ELF头部
   uint64 entry_point;       // 入口点
 } elf_context;
+
+static int init_elf_context(elf_context *ctx, int fd, struct task_struct *proc);
+static void setup_global_pointer(elf_context *ctx);
+
+static int load_segment(elf_context *ctx, elf_prog_header *ph);
+
+static int validate_elf_header(elf_header *ehdr);
+static int elf_setup_vma(struct mm_struct *mm, uint64 ph_vaddr, uint64 ph_memsz,
+                         uint32 ph_flags);
+static ssize_t elf_read_at(elf_context *ctx, void* dest, size_t size,
+                           off_t offset);
+static int load_debug_information(elf_context *ctx);
+static int load_elf_binary(elf_context *ctx);
+
+
+
+/**
+ * 从文件加载ELF可执行文件到进程
+ * 对外的主要接口函数
+ *
+ * @param proc 目标进程
+ * @param filename ELF文件名
+ */
+void load_elf_from_file(struct task_struct *proc, char *filename) {
+  elf_context ctx;
+
+  sprint("load_elf_from_file: Loading application: %s\n", filename);
+
+  // 使用内核标准文件接口打开ELF文件
+  int fd = do_open(filename, O_RDONLY);
+  if (fd < 0) {
+    panic("Failed to open application file: %s (error %d)\n", filename, fd);
+  }
+  sprint("load_elf_from_file: do_open ended.\n");
+
+  // 确保进程有有效的内存布局
+  if (unlikely(!proc->mm)) {
+    proc->mm = user_alloc_mm();
+    if (!proc->mm) {
+      do_close(fd);
+      panic("Failed to create memory layout for process\n");
+    }
+  }
+  sprint("load_elf_from_file: process has mm_struct.\n");
+
+  // 初始化ELF上下文
+  if (init_elf_context(&ctx, fd, proc) != 0) {
+    do_close(fd);
+    panic("Failed to initialize ELF context\n");
+  }
+
+  // 加载ELF二进制文件
+  if (load_elf_binary(&ctx) != 0) {
+    do_close(fd);
+    panic("Failed to load ELF binary\n");
+  }
+
+  // 如果需要，加载调试信息
+  load_debug_information(&ctx);
+  sprint("load_elf_from_file: load debug information\n");
+  // 关闭文件
+  do_close(fd);
+
+  sprint(
+      "Application loaded successfully, entry point (virtual address): 0x%lx\n",
+      proc->trapframe->epc);
+}
+
+/**
+ * 加载ELF文件的符号表
+ * 用于调试和错误回溯
+ *
+ * @param filename ELF文件名
+ * @return 0表示成功，非0表示失败
+ */
+int load_elf_symbols(char *filename) {
+  int fd = do_open(filename, O_RDONLY);
+  if (fd < 0) {
+    sprint("Failed to open file for symbols: %s (error %d)\n", filename, fd);
+    return -1;
+  }
+
+  elf_context ctx;
+  memset(&ctx, 0, sizeof(ctx));
+  ctx.fd = fd;
+
+  // 读取ELF头
+  if (elf_read_at(&ctx, &ctx.ehdr, sizeof(elf_header), 0) !=
+      sizeof(elf_header)) {
+    sprint("Failed to read ELF header for symbols\n");
+    do_close(fd);
+    return -1;
+  }
+
+  if (validate_elf_header(&ctx.ehdr) != 0) {
+    do_close(fd);
+    return -1;
+  }
+
+  // 此处可以实现符号表加载逻辑
+  // ...
+
+  do_close(fd);
+  return 0;
+}
+
+/**
+ * 根据程序计数器值查找函数名
+ * 用于调试和错误回溯
+ *
+ * @param epc 程序计数器值（函数地址）
+ * @return 函数名，如果未找到则返回NULL
+ */
+char *locate_function_name(uint64 epc) {
+  // 默认实现 - 直接返回占位符
+  // 实际实现需要搜索已加载的符号表
+  static char unknown[] = "unknown_function";
+  return unknown;
+}
+
+static int elf_setup_vma(struct mm_struct *mm, uint64 ph_vaddr, uint64 ph_memsz,
+                         uint32 ph_flags) {
+  // 确定VMA类型和权限
+  enum vma_type vma_type;
+  int prot = 0;
+  uint64 vma_flags = 0;
+  // 设置权限和段类型
+  if (ph_flags & SEGMENT_READABLE) {
+    prot |= PROT_READ;
+    vma_flags |= VM_READ;
+  }
+  if (ph_flags & SEGMENT_WRITABLE) {
+    prot |= PROT_WRITE;
+    vma_flags |= VM_WRITE;
+  }
+  if (ph_flags & SEGMENT_EXECUTABLE) {
+    prot |= PROT_EXEC;
+    vma_type = VMA_TEXT;
+    vma_flags |= VM_EXEC;
+  } else { // 数据段
+    vma_type = VMA_DATA;
+  }
+
+  // 手动创建VMA以管理该段
+  struct vm_area_struct *vma =
+      vm_area_setup(mm, ph_vaddr, ph_memsz, vma_type, prot, vma_flags);
+  if (unlikely(!vma)) {
+    sprint("Failed to create VMA for segment\n");
+    return -1;
+  }
+  int ret = populate_vma(vma, ph_vaddr, ph_memsz, prot);
+  if (ret != 0) {
+    sprint("Failed to populate VMA: errno = %d\n", ret);
+    return ret;
+  }
+  return 0;
+}
 
 /**
  * 从文件的指定偏移读取数据
@@ -100,81 +258,35 @@ static int validate_elf_header(elf_header *ehdr) {
 static int load_segment(elf_context *ctx, elf_prog_header *ph) {
   struct task_struct *proc = ctx->proc;
   struct mm_struct *mm = proc->mm;
+  int ret;
 
   // 只加载可加载的段
   if (ph->type != ELF_PROG_LOAD) {
     return 0;
   }
-
   // 验证段信息
   if (ph->memsz < ph->filesz) {
     sprint("Invalid segment: memory size < file size\n");
     return -1;
   }
-
   // 检查地址溢出
   if (ph->vaddr + ph->memsz < ph->vaddr) {
     sprint("Segment address overflow\n");
     return -1;
   }
-
   sprint("Loading segment: vaddr=0x%lx, size=0x%lx, flags=0x%x\n", ph->vaddr,
          ph->memsz, ph->flags);
-
-
-
-  // 确定VMA类型和权限
-  enum vma_type vma_type;
-  int prot = 0;
-  uint64 vma_flags = 0;
-
-  // 设置权限和段类型
-  if (ph->flags & SEGMENT_READABLE) {
-    prot |= PROT_READ;
-    vma_flags |= VM_READ;
-  }
-  if (ph->flags & SEGMENT_WRITABLE) {
-    prot |= PROT_WRITE;
-    vma_flags |= VM_WRITE;
-  }
-  if (ph->flags & SEGMENT_EXECUTABLE) {
-    prot |= PROT_EXEC;
-    vma_type = VMA_TEXT;
-    vma_flags |= VM_EXEC;
-
-    // 更新代码段范围
-    if (mm->start_code == 0 || ph->vaddr < mm->start_code)
-      mm->start_code = ph->vaddr;
-    if (ph->vaddr + ph->memsz > mm->end_code)
-      mm->end_code = ph->vaddr + ph->memsz;
-  } else { // 数据段
-    vma_type = VMA_DATA;
-
-    // 更新数据段范围
-    if (mm->start_data == 0 || ph->vaddr < mm->start_data)
-      mm->start_data = ph->vaddr;
-    if (ph->vaddr + ph->memsz > mm->end_data)
-      mm->end_data = ph->vaddr + ph->memsz;
-  }
-
-  // 创建VMA以管理该段
-  struct vm_area_struct *vma = create_vma(mm, ph->vaddr, ph->vaddr + ph->memsz,
-                                          prot, vma_type, vma_flags);
-  if (unlikely(!vma)) {
-    sprint("Failed to create VMA for segment\n");
-    return -1;
+  ret = elf_setup_vma(mm, ph->vaddr, ph->memsz, ph->flags);
+  if (ret != 0) {
+    sprint("Failed to setup VMA for segment\n");
+    return ret;
   }
 
   // 计算所需页数（向上取整）
   uint64 num_pages = (ph->memsz + PAGE_SIZE - 1) / PAGE_SIZE;
-
   for (uint64 i = 0; i < num_pages; i++) {
     uint64 vaddr = ph->vaddr + i * PAGE_SIZE;
-    if (unlikely(mm_alloc_pages(proc->mm, vaddr, 1, prot) == NULL)) {
-      sprint("Failed to allocate page for segment\n");
-      return -1;
-    }
-		// 内核实际读elf的物理地址
+    // 内核实际读elf的物理地址
 		void* pa = lookup_pa(proc->mm->pagetable, vaddr);
     // 计算这一页需要从文件中加载的字节数
     uint64 page_offset = i * PAGE_SIZE;
@@ -291,6 +403,18 @@ static int init_elf_context(elf_context *ctx, int fd,
 }
 
 /**
+ * 加载调试信息（若需要）
+ *
+ * @param ctx ELF上下文
+ * @return 0表示成功，非0表示失败
+ */
+static int load_debug_information(elf_context *ctx) {
+  // 这里可以实现加载调试信息的功能
+  return 0;
+}
+
+
+/**
  * 加载ELF文件到进程
  *
  * @param ctx ELF上下文
@@ -325,119 +449,4 @@ static int load_elf_binary(elf_context *ctx) {
 
   sprint("ELF loaded successfully, entry point: 0x%lx\n", ctx->entry_point);
   return 0;
-}
-
-/**
- * 加载调试信息（若需要）
- *
- * @param ctx ELF上下文
- * @return 0表示成功，非0表示失败
- */
-static int load_debug_information(elf_context *ctx) {
-  // 这里可以实现加载调试信息的功能
-  return 0;
-}
-
-/**
- * 从文件加载ELF可执行文件到进程
- * 对外的主要接口函数
- *
- * @param proc 目标进程
- * @param filename ELF文件名
- */
-void load_elf_from_file(struct task_struct *proc, char *filename) {
-  elf_context ctx;
-
-  sprint("load_elf_from_file: Loading application: %s\n", filename);
-
-  // 使用内核标准文件接口打开ELF文件
-  int fd = do_open(filename, O_RDONLY);
-  if (fd < 0) {
-    panic("Failed to open application file: %s (error %d)\n", filename, fd);
-  }
-  sprint("load_elf_from_file: do_open ended.\n");
-
-  // 确保进程有有效的内存布局
-  if (unlikely(!proc->mm)) {
-    proc->mm = alloc_mm();
-    if (!proc->mm) {
-      do_close(fd);
-      panic("Failed to create memory layout for process\n");
-    }
-  }
-  sprint("load_elf_from_file: process has mm_struct.\n");
-
-  // 初始化ELF上下文
-  if (init_elf_context(&ctx, fd, proc) != 0) {
-    do_close(fd);
-    panic("Failed to initialize ELF context\n");
-  }
-
-  // 加载ELF二进制文件
-  if (load_elf_binary(&ctx) != 0) {
-    do_close(fd);
-    panic("Failed to load ELF binary\n");
-  }
-
-  // 如果需要，加载调试信息
-  load_debug_information(&ctx);
-  sprint("load_elf_from_file: load debug information\n");
-  // 关闭文件
-  do_close(fd);
-
-  sprint(
-      "Application loaded successfully, entry point (virtual address): 0x%lx\n",
-      proc->trapframe->epc);
-}
-
-/**
- * 加载ELF文件的符号表
- * 用于调试和错误回溯
- *
- * @param filename ELF文件名
- * @return 0表示成功，非0表示失败
- */
-int load_elf_symbols(char *filename) {
-  int fd = do_open(filename, O_RDONLY);
-  if (fd < 0) {
-    sprint("Failed to open file for symbols: %s (error %d)\n", filename, fd);
-    return -1;
-  }
-
-  elf_context ctx;
-  memset(&ctx, 0, sizeof(ctx));
-  ctx.fd = fd;
-
-  // 读取ELF头
-  if (elf_read_at(&ctx, &ctx.ehdr, sizeof(elf_header), 0) !=
-      sizeof(elf_header)) {
-    sprint("Failed to read ELF header for symbols\n");
-    do_close(fd);
-    return -1;
-  }
-
-  if (validate_elf_header(&ctx.ehdr) != 0) {
-    do_close(fd);
-    return -1;
-  }
-
-  // 此处可以实现符号表加载逻辑
-  // ...
-
-  do_close(fd);
-  return 0;
-}
-
-/**
- * 根据程序计数器值查找函数名
- * 用于调试和错误回溯
- *
- * @param epc 程序计数器值（函数地址）
- * @return 函数名，如果未找到则返回NULL
- */
-char *locate_function_name(uint64 epc) {
-  // 默认实现 - 直接返回占位符
-  // 实际实现需要搜索已加载的符号表
-  static char unknown[] = "unknown_function";
-  return unknown;
 }
