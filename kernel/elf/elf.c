@@ -170,7 +170,7 @@ static int load_segment(elf_context *ctx, elf_prog_header *ph) {
 
   for (uint64 i = 0; i < num_pages; i++) {
     uint64 vaddr = ph->vaddr + i * PAGE_SIZE;
-    if (unlikely(mm_alloc_pages(proc->mm, vaddr, 1, prot) == -1)) {
+    if (unlikely(mm_alloc_pages(proc->mm, vaddr, 1, prot) == NULL)) {
       sprint("Failed to allocate page for segment\n");
       return -1;
     }

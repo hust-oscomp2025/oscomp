@@ -11,10 +11,11 @@
 #include <kernel/elf.h>
 
 #include <kernel/mm/mm_struct.h>
+#include <kernel/mm/vma.h>
 #include <kernel/mm/mmap.h>
 #include <kernel/mm/kmalloc.h>
 
-#include <kernel/process.h>
+#include <kernel/sched/process.h>
 #include <kernel/riscv.h>
 #include <kernel/sched/sched.h>
 #include <kernel/sched/pid.h>
@@ -24,7 +25,7 @@
 #include <spike_interface/spike_utils.h>
 #include <util/string.h>
 
-static void free_kernel_stack(void* kstack);
+static void free_kernel_stack(uint64 kstack);
 
 //
 // switch to a user-mode process
@@ -43,7 +44,7 @@ struct task_struct *alloc_process() {
   ps->kstack = (uint64)alloc_kernel_stack();
   ps->trapframe = (struct trapframe*)kmalloc(sizeof(struct trapframe));
 	ps->ktrapframe = NULL;
-	ps->mm = alloc_mm();
+	ps->mm = user_alloc_mm();
   ps->pfiles = alloc_pfm();
 	//ps->active_mm =ps->mm;
   // 分配内核栈
@@ -51,6 +52,8 @@ struct task_struct *alloc_process() {
 	ps->state;
 	ps->flags;
 	ps->parent;
+	ps->pagefault_disabled = 0;
+
 	INIT_LIST_HEAD(&ps->children);
 	INIT_LIST_HEAD(&ps->sibling);
 	INIT_LIST_HEAD(&ps->queue_node);
@@ -116,8 +119,8 @@ ssize_t do_wait(int pid) {
 
 
 
-static void free_kernel_stack(void* kstack){
-	kfree((void*)ROUNDDOWN((uint64)kstack,PAGE_SIZE));
+static void free_kernel_stack(uint64 kstack){
+	kfree((uint64)ROUNDDOWN((uint64)kstack,PAGE_SIZE));
 }
 
 

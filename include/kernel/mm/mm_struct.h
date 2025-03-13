@@ -82,7 +82,7 @@ struct mm_struct *alloc_mm(void);
 void free_mm(struct mm_struct *mm);
 
 
-uint64 mm_alloc_pages(struct mm_struct *mm, uaddr va, size_t npages, int perm);
+struct page * mm_alloc_pages(struct mm_struct *mm, uaddr va, size_t npages, int perm);
 
 int protect_pages(struct mm_struct *mm, uaddr vaddr, int perm);
 uint64 prot_to_type(int prot, int user);

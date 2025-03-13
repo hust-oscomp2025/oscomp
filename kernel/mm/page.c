@@ -1,5 +1,6 @@
 #include <kernel/config.h>
 #include <kernel/mm/page.h>
+#include <kernel/mm/pagetable.h>
 
 #include <util/atomic.h>
 #include <util/list.h>
@@ -201,19 +202,6 @@ void free_page(struct page *page) {
   }
 }
 
-// 分配多个连续页，返回第一个页的page结构
-// 目前简单实现，未实现真正的buddy系统
-struct page *alloc_pages(int n) {
-  if (n <= 0)
-    return NULL;
-
-  if (n == 1)
-    return alloc_page(); // 单页分配
-
-  // 目前不支持多页连续分配，可以在后续扩展中实现buddy系统
-  return NULL;
-}
-
 // 释放多个连续页
 // 目前简单实现，未实现真正的buddy系统
 void free_pages(struct page *page, int order) {
@@ -323,3 +311,12 @@ void copy_page(struct page *dest, struct page *src) {
 
 // 获取当前空闲页数量
 int get_free_page_count(void) { return free_page_counter; }
+
+
+// 根据内核虚拟地址获取页结构
+struct page *virt_to_page(pagetable_t pgt,uint64 addr) {
+	uint64 pa = lookup_pa(pgt,addr);
+  uint64 pfn = get_pfn(pa);
+  // sprint("virt_to_page: pfn=%lx\n",pfn);
+  return pfn_to_page(pfn);
+}

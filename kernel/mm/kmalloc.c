@@ -87,12 +87,12 @@
 		 }
 	 } else {
 		 // For large allocations, use page allocator without headers
-		 unsigned int pages = ROUNDUP(size,PAGE_SIZE) / PAGE_SIZE;
-		 struct page *page = alloc_pages(pages - 1); // Convert order to pages
+		 unsigned int npages = ROUNDUP(size,PAGE_SIZE) / PAGE_SIZE;
+		 struct page *page = alloc_pages(npages); // Convert order to pages
 		 
 		 if (page) {
 			 // Store the page count in the page's index field
-			 page->index = pages;
+			 page->index = npages;
 			 // Store the actual requested size in the page's mapping field
 			 page->mapping = (void*)size;
 			 mem = page_to_virt(page);

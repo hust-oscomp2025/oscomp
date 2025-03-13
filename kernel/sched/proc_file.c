@@ -4,7 +4,7 @@
 
 #include <kernel/proc_file.h>
 #include <kernel/mm/kmalloc.h>
-#include <kernel/process.h>
+#include <kernel/sched/process.h>
 #include <kernel/sched/sched.h>
 #include <kernel/riscv.h>
 #include "spike_interface/spike_file.h"

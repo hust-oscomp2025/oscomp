@@ -286,8 +286,8 @@ void* lookup_pa(pagetable_t pagetable, uaddr va) {
 }
 
 void pagetable_activate(pagetable_t pagetable) {
-  sprint("pagetable_activate: start.\n");
-  pagetable_dump(pagetable);
+  //sprint("pagetable_activate: start.\n");
+  //pagetable_dump(pagetable);
   // 确保所有映射都已完成
   write_csr(satp, MAKE_SATP(pagetable));
   flush_tlb(); // 刷新TLB

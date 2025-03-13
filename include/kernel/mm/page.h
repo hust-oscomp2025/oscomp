@@ -6,6 +6,7 @@
 #include <util/atomic.h>
 #include <util/list.h>
 #include <util/spinlock.h>
+#include <kernel/mm/pagetable.h>
 
 // Forward declarations
 struct address_space;

@@ -276,7 +276,7 @@ int protect_pages(struct mm_struct *mm, uaddr vaddr, int perm) {
  * @param prot Memory protection flags
  * @return The starting virtual address or 0 on error
  */
-uint64 mm_alloc_pages(struct mm_struct *mm, uaddr va, size_t npages, int perm) {
+struct page * mm_alloc_pages(struct mm_struct *mm, uaddr va, size_t npages, int perm) {
   if (!mm || npages == 0) {
     sprint("mm_alloc_pages: EINVAL\n");
     panic();
