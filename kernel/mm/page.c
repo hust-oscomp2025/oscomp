@@ -38,7 +38,16 @@ static void put_free_page(void *addr); // 释放一个物理页到空闲列表�
 
 
 // 获取页框号 (PFN)
+// 注意，这里addr的值域大于整个物理内存空间
+// 所以说，在addr大于mem_base_addr的情况下，我们需要用内核页表来映射
 static uint64 get_pfn(void *addr) {
+	if(unlikely((uint64)addr < mem_base_addr)) {
+		sprint("get_pfn: invalid address 0x%lx\n",addr);
+		panic();
+	}
+	if(addr >= (void *)(mem_base_addr + mem_size)) {
+		addr = lookup_pa(g_kernel_pagetable,(uint64)addr);
+	}
   return ((uint64)addr - mem_base_addr) / PAGE_SIZE;
 }
 
@@ -143,9 +152,8 @@ struct page *pfn_to_page(uint64 pfn) {
 }
 
 // 根据物理地址获取页结构
-struct page *virt_to_page(pagetable_t pgt ,void *addr) {
-	void* pa = lookup_pa(pgt,(uint64)addr);
-  uint64 pfn = get_pfn(pa);
+struct page *virt_to_page(void *addr) {
+  uint64 pfn = get_pfn(addr);
   // sprint("virt_to_page: pfn=%lx\n",pfn);
   return pfn_to_page(pfn);
 }
@@ -174,7 +182,7 @@ struct page *alloc_page(void) {
     return NULL;
 
   memset(pa, 0, PAGE_SIZE);
-  struct page *page = virt_to_page(g_kernel_pagetable,pa);
+  struct page *page = virt_to_page(pa);
   // sprint("alloc_page: page=%lx\n",page);
   if (page) {
     init_page_struct(page);

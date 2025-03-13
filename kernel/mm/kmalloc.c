@@ -95,7 +95,7 @@ void kmem_init(void) {
     uint64 ret = do_mmap(&init_mm, 0, size, PROT_READ | PROT_WRITE,
                         MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, NULL, 0);
 
-    struct page *page = virt_to_page(g_kernel_pagetable, (void*)ret);
+    struct page *page = virt_to_page( (void*)ret);
 
     if (page) {
       page->kmalloc_size = size;
@@ -120,7 +120,7 @@ void kmem_init(void) {
   // Check if this is a page allocation (page-aligned pointer)
   if (((uint64)ptr & (PAGE_SIZE - 1)) == 0) {
     // This is a page allocation
-    struct page *page = virt_to_page(g_kernel_pagetable,(void*)ptr);
+    struct page *page = virt_to_page((void*)ptr);
     if (unlikely(!page)) {
       panic("kfree: invalid pointer 0x%lx\n", (uint64)ptr);
     }
@@ -164,7 +164,7 @@ void kmem_init(void) {
   // Check if this is a page allocation (page-aligned pointer)
   if (((uint64)ptr & (PAGE_SIZE - 1)) == 0) {
     // This is a page allocation
-    struct page *page = virt_to_page(g_kernel_pagetable, (void*)ptr);
+    struct page *page = virt_to_page((void*)ptr);
     if (!page) {
       return 0;
     }

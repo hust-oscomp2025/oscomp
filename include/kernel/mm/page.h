@@ -59,7 +59,7 @@ void free_page(struct page *page); // 释放单个页
 
 // 页框号与地址转换函数
 struct page *pfn_to_page(uint64 pfn);
-struct page *virt_to_page(pagetable_t pgt,void *addr);
+struct page *virt_to_page(void *addr);
 uint64 page_to_pfn(struct page *page);
 void *page_to_virt(struct page *page);
 

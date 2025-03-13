@@ -66,7 +66,7 @@ static void _pagetable_free_level(pagetable_t pagetable, int level) {
     if (pte & PTE_V) {
       pagetable_t next_pt = (pagetable_t)PTE2PA(pte);
       _pagetable_free_level(next_pt, level + 1);
-      free_page((virt_to_page(g_kernel_pagetable, next_pt)));
+      free_page((virt_to_page(next_pt)));
       // 释放下一级页表页
       atomic_dec(&pt_stats.page_tables);
     }
@@ -85,7 +85,7 @@ void free_pagetable(pagetable_t pagetable) {
   _pagetable_free_level(pagetable, 0);
 
   // 释放根页表
-  free_page((virt_to_page(g_kernel_pagetable, pagetable)));
+  free_page((virt_to_page(pagetable)));
 
   atomic_dec(&pt_stats.page_tables);
 }
@@ -248,7 +248,7 @@ int pgt_unmap(pagetable_t pagetable, uint64 va, uint64 size, int free_phys) {
       // 如果需要，释放物理页
       if (free_phys) {
         uint64 pa = (uint64 )PTE2PA(*pte);
-        free_page((virt_to_page(g_kernel_pagetable, (void*)pa)));
+        free_page((virt_to_page((void*)pa)));
       }
 
       // 清除页表项
@@ -358,7 +358,7 @@ pagetable_t pagetable_copy(pagetable_t src, uint64 start, uint64 end, int share)
       // 在新页表中创建映射
       pte_t *dst_pte = page_walk(dst, va, 1);
       if (dst_pte == NULL) {
-        free_page((virt_to_page(g_kernel_pagetable,new_page)));
+        free_page((virt_to_page(new_page)));
 
         spinlock_unlock_irqrestore(&pagetable_lock, flags);
         free_pagetable(dst);

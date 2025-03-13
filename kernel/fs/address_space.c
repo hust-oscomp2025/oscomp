@@ -434,5 +434,5 @@ void* alloc_page_buffer(void) {
 
 // 释放页缓存使用的物理页
 void free_page_buffer(void* addr) {
-	free_page((virt_to_page(g_kernel_pagetable, addr)));
+	free_page((virt_to_page(addr)));
 }
