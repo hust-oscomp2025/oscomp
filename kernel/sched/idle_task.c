@@ -20,23 +20,10 @@
 extern void schedule(void);
 extern void scheduler_register_task(struct task_struct *tsk);
 
-/* 内核全局内存管理结构和内核页表（假设已在其他地方初始化） */
-extern struct mm_struct init_mm;
-//extern pgd_t swapper_pg_dir[]; // 内核页目录
-
-/*
- * 静态定义 idle_task，全局唯一的 idle 进程。
- * 注意：为了简单起见，只展示了关键字段的初始化，
- * 实际实现中还会有更多字段和 CPU 上下文信息。
- */
-struct task_struct idle_task = {};
-
 
 static inline void halt_cpu(void) {
 	__asm__ volatile ("wfi" ::: "memory");
 }
-
-
 
 /*
  * idle_loop - Idle 进程的主循环
@@ -52,6 +39,19 @@ void idle_loop(void) {
   }
 }
 
+
+
+/* 内核全局内存管理结构和内核页表（假设已在其他地方初始化） */
+//extern pgd_t swapper_pg_dir[]; // 内核页目录
+
+/*
+ * 静态定义 idle_task，全局唯一的 idle 进程。
+ * 注意：为了简单起见，只展示了关键字段的初始化，
+ * 实际实现中还会有更多字段和 CPU 上下文信息。
+ * 这里特指0号idle_task
+ */
+struct task_struct idle_task;
+//struct proc_file_management kernel_file_management;
 /*
  * init_idle_task - 初始化并注册 idle 进程
  *
@@ -61,15 +61,21 @@ void idle_loop(void) {
  * 
  */
 void init_idle_task(void) {
+	sprint("Initializing idle process (PID 0)...\n");
 	idle_task.kstack = (uint64)alloc_kernel_stack();
 	idle_task.trapframe = NULL;
 
 	idle_task.ktrapframe = kmalloc(sizeof(struct trapframe));
-	memset(&idle_task.ktrapframe,0,sizeof(struct trapframe));
+	sprint("idle_task.ktrapframe: %p\n",idle_task.ktrapframe);
+	memset(idle_task.ktrapframe,0,sizeof(struct trapframe));
   idle_task.ktrapframe->epc = (unsigned long)idle_loop;
 
+	extern struct mm_struct init_mm;
 	idle_task.mm = &init_mm;
-  idle_task.pfiles = init_proc_file_management();
+  idle_task.pfiles = NULL;
+
+
+
 
 	idle_task.pid = 0;
 
@@ -88,3 +94,10 @@ void init_idle_task(void) {
 
   sprint("Idle process (PID 0) initialized and registered.\n");
 }
+
+
+
+
+
+
+

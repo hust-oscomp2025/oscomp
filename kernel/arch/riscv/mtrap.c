@@ -1,5 +1,5 @@
 #include <kernel/riscv.h>
-#include <kernel/process.h>
+#include <kernel/sched/process.h>
 #include <spike_interface/spike_utils.h>
 #include <spike_interface/spike_file.h>
 #include <util/string.h>

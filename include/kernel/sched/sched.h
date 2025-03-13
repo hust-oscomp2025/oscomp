@@ -1,7 +1,7 @@
 #ifndef _SCHED_H_
 #define _SCHED_H_
 
-#include <kernel/process.h>
+#include <kernel/sched/process.h>
 // riscv-pke kernel supports at most 32 processes
 #define NPROC 32
 #define TIME_SLICE_LEN  2

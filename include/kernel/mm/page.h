@@ -6,6 +6,7 @@
 #include <util/atomic.h>
 #include <util/list.h>
 #include <util/spinlock.h>
+#include <kernel/mm/pagetable.h>
 
 // Forward declarations
 struct address_space;
@@ -23,9 +24,9 @@ struct page {
 
 	// kmalloc分配器
   size_t kmalloc_size;           // kmalloc 分配的实际大小
-  unsigned int kmalloc_pages;    // 多页分配时的页数
 
-  void *virtual_address;         // 页在内核空间中的虚拟地址
+  paddr_t paddr;         
+	// 页的物理地址
   struct list_head lru;          // LRU链表节点
   spinlock_t page_lock;          // 页锁，用于同步访问
 };
@@ -48,21 +49,16 @@ struct page {
 // 初始化页管理子系统
 void init_page_manager();
 
-// 页分配与释放
-struct page *alloc_pages(int order);           // 分配2^order个连续页
-void free_pages(struct page *page, int order); // 释放2^order个连续页
 struct page *alloc_page(void);     // 分配单个页并返回page结构
-void free_page(struct page *page); // 释放单个页
+void put_page(struct page *page);  // 减少引用计数（并释放）
 
 // 页框号与地址转换函数
 struct page *pfn_to_page(uint64 pfn);
-struct page *virt_to_page(void *addr);
+struct page *addr_to_page(paddr_t addr);
 uint64 page_to_pfn(struct page *page);
-void *page_to_virt(struct page *page);
 
 // 页引用计数操作
 void get_page(struct page *page); // 增加页引用计数
-int put_page(struct page *page);  // 减少页引用计数
 
 // 页标志位操作
 void set_page_dirty(struct page *page);   // 设置页为脏
@@ -74,9 +70,6 @@ void lock_page(struct page *page);   // 锁定页
 void unlock_page(struct page *page); // 解锁页
 int trylock_page(struct page *page); // 尝试锁定页
 
-// 页内容操作
-void zero_page(struct page *page);                   // 清零页内容
-void copy_page(struct page *dest, struct page *src); // 复制页内容
 
 // 检查页内容是否最新
 static inline int page_uptodate(struct page *page) {

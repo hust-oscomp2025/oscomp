@@ -9,7 +9,7 @@
 
 
 #include <kernel/proc_file.h>
-#include <kernel/process.h>
+#include <kernel/sched/process.h>
 #include <kernel/sched/sched.h>
 
 #include <spike_interface/spike_utils.h>
@@ -33,7 +33,7 @@
 //   // direct mapping).
 //   assert(CURRENT);
 //   char *pa =
-//       (char *)user_va_to_pa(CURRENT->mm, (void *)buf);
+//       (char *)user_va_to_pa(CURRENT->mm, (uint64 )buf);
 //   sprint("%s\n", pa);
 //   return 0;
 // }
@@ -66,7 +66,7 @@
 // //
 // uint64 sys_user_free(uint64 va) {
 //   // user_vm_unmap((pagetable_t)current->pagetable, va, PAGE_SIZE, 1);
-//   free((void *)va);
+//   free((uint64 )va);
 //   return 0;
 // }
 
@@ -80,17 +80,17 @@
 //   uint64 temp_pc = tf->epc;
 
 //   temp_fp = *(uint64 *)user_va_to_pa((CURRENT->mm),
-//                                      (void *)temp_fp - 16);
+//                                      (uint64 )temp_fp - 16);
 //   for (int i = 1; i <= depth; i++) {
 //     temp_pc = *(uint64 *)user_va_to_pa((CURRENT->mm),
-//                                        (void *)temp_fp - 8);
+//                                        (uint64 )temp_fp - 8);
 //     char *function_name = locate_function_name(temp_pc);
 //     sprint("%s\n", function_name);
 //     if (strcmp(function_name, "main") == 0) {
 //       return i;
 //     } else {
 //       temp_fp = *(uint64 *)user_va_to_pa((CURRENT->mm),
-//                                          (void *)temp_fp - 16);
+//                                          (uint64 )temp_fp - 16);
 //     }
 //   }
 //   return depth;
@@ -130,7 +130,7 @@
 
 // ssize_t sys_user_printpa(uint64 va) {
 //   uint64 pa =
-//       (uint64)user_va_to_pa((CURRENT->mm), (void *)va);
+//       (uint64)user_va_to_pa((CURRENT->mm), (uint64 )va);
 //   sprint("%lx\n", pa);
 //   return 0;
 // }
@@ -247,9 +247,9 @@
 // //
 // ssize_t sys_user_link(char *vfn1, char *vfn2) {
 //   char *pfn1 =
-//       (char *)user_va_to_pa((CURRENT->mm), (void *)vfn1);
+//       (char *)user_va_to_pa((CURRENT->mm), (uint64 )vfn1);
 //   char *pfn2 =
-//       (char *)user_va_to_pa((CURRENT->mm), (void *)vfn2);
+//       (char *)user_va_to_pa((CURRENT->mm), (uint64 )vfn2);
 //   return do_link(pfn1, pfn2);
 // }
 
@@ -258,26 +258,26 @@
 //
 // ssize_t sys_user_unlink(char *vfn) {
 //   char *pfn =
-//       (char *)user_va_to_pa((CURRENT->mm), (void *)vfn);
+//       (char *)user_va_to_pa((CURRENT->mm), (uint64 )vfn);
 //   return do_unlink(pfn);
 // }
 
 
 // ssize_t sys_user_rcwd(char *vpath) {
 //   char *path =
-//       (char *)user_va_to_pa((CURRENT->mm), (void *)vpath);
+//       (char *)user_va_to_pa((CURRENT->mm), (uint64 )vpath);
 //   return do_rcwd(path);
 // }
 
 // ssize_t sys_user_ccwd(char *vpath) {
 //   char *path =
-//       (char *)user_va_to_pa((CURRENT->mm), (void *)vpath);
+//       (char *)user_va_to_pa((CURRENT->mm), (uint64 )vpath);
 //   return do_ccwd(path);
 // }
 
 // ssize_t sys_user_exec(char *vpath) {
 //   char *path =
-//       (char *)user_va_to_pa((CURRENT->mm), (void *)vpath);
+//       (char *)user_va_to_pa((CURRENT->mm), (uint64 )vpath);
 //   // we shall never reach here
 //   return do_exec(path);
 //   ;

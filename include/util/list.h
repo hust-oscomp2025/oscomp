@@ -23,13 +23,6 @@ struct list_head {
   struct list_head *next, *prev;
 };
 
-/*
- * 初始化链表头
- */
-#define LIST_HEAD_INIT(name)                                                   \
-  { &(name), &(name) }
-
-#define LIST_HEAD(name) struct list_head name = LIST_HEAD_INIT(name)
 
 /*
  * 链表的动态初始化函数
