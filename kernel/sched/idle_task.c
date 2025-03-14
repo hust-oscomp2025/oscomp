@@ -72,7 +72,7 @@ void init_idle_task(void) {
 
 	extern struct mm_struct init_mm;
 	idle_task.mm = &init_mm;
-  idle_task.pfiles = NULL;
+  //idle_task.pfiles = alloc_pfm();
 
 
 

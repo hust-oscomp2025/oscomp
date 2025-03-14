@@ -48,6 +48,8 @@ struct page {
 
 // 初始化页管理子系统
 void init_page_manager();
+int get_free_page_count(void);
+
 
 struct page *alloc_page(void);     // 分配单个页并返回page结构
 void put_page(struct page *page);  // 减少引用计数（并释放）
@@ -81,9 +83,6 @@ static inline void set_page_uptodate(struct page *page) {
   page->flags |= PAGE_UPTODATE;
 }
 
-int get_free_page_count(void);
-
-// 内部使用函数，但需要在头文件中声明以便PMM调用
 
 
 #endif /* _PAGE_H */
