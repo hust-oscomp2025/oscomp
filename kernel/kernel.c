@@ -85,9 +85,7 @@ static struct task_struct *load_init_process() {
   struct task_struct *task = alloc_init_task();
   extern struct mm_struct init_mm;
   task->mm = &init_mm;
-
-  // 7. 设置文件描述符表
-  //task->pfiles = alloc_pfm();
+  task->pfiles = alloc_pfm();
   // 8. 初始化标准文件描述符(stdin, stdout, stderr)
   // 这些会指向/dev/console或null设备
   // setup_std_fds(task->pfiles);

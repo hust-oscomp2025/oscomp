@@ -19,7 +19,7 @@ struct task_struct *current_percpu[NCPU];
 // initialize process pool (the procs[] array). added @lab3_1
 //
 void init_scheduler() {
-	//sprint("init_scheduler: start\n");
+  // sprint("init_scheduler: start\n");
   INIT_LIST_HEAD(&ready_queue);
   pid_init();
   memset(procs, 0, sizeof(struct task_struct *) * NPROC);
@@ -55,6 +55,7 @@ void insert_to_ready_queue(struct task_struct *proc) {
 // (by calling ready_queue_insert), and then call schedule().
 //
 void schedule() {
+  sprint("schedule: start\n");
   extern struct task_struct *procs[NPROC];
   int hartid = read_tp();
   struct task_struct *cur = CURRENT;
@@ -127,8 +128,7 @@ void switch_to(struct task_struct *proc) {
   proc->trapframe->kernel_sp = proc->kstack;     // process's kernel stack
   proc->trapframe->kernel_satp = read_csr(satp); // kernel page table
 
-
-	extern char  smode_trap_handler[];
+  extern char smode_trap_handler[];
   proc->trapframe->kernel_trap = (uint64)smode_trap_handler;
   proc->trapframe->kernel_schedule = (uint64)schedule;
 
@@ -142,7 +142,6 @@ void switch_to(struct task_struct *proc) {
   write_csr(sepc, proc->trapframe->epc);
   sprint("return to user\n");
 
-
-	extern void return_to_user(struct trapframe*, uint64);
+  extern void return_to_user(struct trapframe *, uint64);
   return_to_user(proc->trapframe, MAKE_SATP(proc->mm->pagetable));
 }
