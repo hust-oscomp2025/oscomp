@@ -1,7 +1,7 @@
 #ifndef _SEMAPHORE_H_
 #define _SEMAPHORE_H_
 
-#include <kernel/process.h>
+#include <kernel/sched/process.h>
 
 #define NSEM 256
 

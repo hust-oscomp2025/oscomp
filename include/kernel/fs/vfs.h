@@ -1,109 +1,146 @@
 #ifndef _VFS_H_
 #define _VFS_H_
 
-#include <kernel/types.h>
 #include <kernel/fs/file.h>
 #include <kernel/fs/inode.h>
+#include <kernel/fs/path.h>
+#include <kernel/fs/dentry.h>
 #include <kernel/fs/super_block.h>
 
-#define MAX_VFS_DEV 10            // the maximum number of vfs_dev_list
-#define MAX_DENTRY_NAME_LEN 30    // the maximum length of dentry name
-#define MAX_DEVICE_NAME_LEN 30    // the maximum length of device name
-#define MAX_MOUNTS 10             // the maximum number of mounts
-#define MAX_DENTRY_HASH_SIZE 100  // the maximum size of dentry hash table
-#define MAX_PATH_LEN 30           // the maximum length of path
-#define MAX_SUPPORTED_FS 10       // the maximum number of supported file systems
 
+#include <kernel/types.h>
+#include <util/list.h>
+#include <util/qstr.h>
 
-void init_fs(void);
-/**** vfs initialization function ****/
-int vfs_init();
+/* Forward declarations for VFS structures */
+// struct file;
+// struct inode;
+// struct dentry;
+// struct super_block;
+struct vfsmount; /* Keep forward declaration for compatibility */
+//struct path;
+struct nameidata;
 
-/**** vfs interfaces ****/
+/* Path name length limits */
+#define PATH_MAX          4096    /* Maximum path length */
+#define NAME_MAX          255     /* Maximum filename length */
 
-// device interfaces
-struct super_block *vfs_mount(const char *dev_name, int mnt_type);
+/* File open flags */
+#define O_RDONLY          00
+#define O_WRONLY          01
+#define O_RDWR            02
+#define O_CREAT           0100
+#define O_EXCL            0200
+#define O_NOCTTY          0400
+#define O_TRUNC           01000
+#define O_APPEND          02000
+#define O_NONBLOCK        04000
+#define O_DIRECTORY       0200000
 
-// file interfaces
-struct file *vfs_open(const char *path, int flags);
-ssize_t vfs_read(struct file *file, char *buf, size_t count);
-ssize_t vfs_write(struct file *file, const char *buf, size_t count);
-ssize_t vfs_lseek(struct file *file, ssize_t offset, int whence);
-int vfs_stat(struct file *file, struct istat *istat);
-int vfs_disk_stat(struct file *file, struct istat *istat);
-int vfs_link(const char *oldpath, const char *newpath);
-int vfs_unlink(const char *path);
-int vfs_close(struct file *file);
+/* Seek types */
+#define SEEK_SET          0       /* Set position from beginning of file */
+#define SEEK_CUR          1       /* Set position from current */
+#define SEEK_END          2       /* Set position from end of file */
 
-// directory interfaces
-struct file *vfs_opendir(const char *path);
-int vfs_readdir(struct file *file, struct dir *dir);
-int vfs_mkdir(const char *path);
-int vfs_closedir(struct file *file);
-
-/**** vfs abstract object types ****/
-// system root direntry
-extern struct dentry *vfs_root_dentry;
-
-// vfs abstract dentry
-typedef struct dentry {
-  char name[MAX_DENTRY_NAME_LEN];
-  int d_ref;
-  struct inode *dentry_inode;
-  struct dentry *parent;
-  struct super_block *sb;
-}dentry_t;
-
-
-// dentry constructor and destructor
-struct dentry *alloc_vfs_dentry(const char *name, struct inode *inode,
-                            struct dentry *parent);
-int free_vfs_dentry(struct dentry *dentry);
-
-// ** dentry hash table **
-extern struct hash_table dentry_hash_table;
-
-// dentry hash table key type
-struct dentry_key {
-  struct dentry *parent;
-  char *name;
+/**
+ * Directory entry in a directory listing
+ */
+struct dirent {
+    uint64_t        d_ino;        /* Inode number */
+    uint64_t        d_off;        /* Offset to next dirent */
+    unsigned short  d_reclen;     /* Length of this dirent */
+    unsigned char   d_type;       /* File type */
+    char            d_name[];     /* File name (null-terminated) */
 };
 
-// generic hash table method implementation
-int dentry_hash_equal(void *key1, void *key2);
-size_t dentry_hash_func(void *key);
+/* File types for d_type */
+#define DT_UNKNOWN       0
+#define DT_FIFO          1
+#define DT_CHR           2
+#define DT_DIR           4
+#define DT_BLK           6
+#define DT_REG           8
+#define DT_LNK          10
+#define DT_SOCK         12
 
-// dentry hash table interface
-struct dentry *hash_get_dentry(struct dentry *parent, char *name);
-int hash_put_dentry(struct dentry *dentry);
-int hash_erase_dentry(struct dentry *dentry);
-
-
-
-// abstract device entry in vfs_dev_list
-struct device {
-  char dev_name[MAX_DEVICE_NAME_LEN];  // the name of the device
-  int dev_id;  // the id of the device (the meaning of an id is interpreted by
-               // the specific file system, all we need to know is that it is
-               // a unique identifier)
-  struct file_system_type *fs_type;  // the file system type in the device
+/**
+ * Directory context for readdir operations
+ */
+struct dir_context {
+    int (*actor)(struct dir_context *, const char *, int, loff_t, uint64_t, unsigned);
+    loff_t pos;                   /* Current position in directory */
 };
 
-// device list in vfs layer
-extern struct device *vfs_dev_list[MAX_VFS_DEV];
-
-// supported file system types
-struct file_system_type {
-  int type_num;  // the number of the file system type
-  struct super_block *(*get_superblock)(struct device *dev);
+/**
+ * Path representation - combines dentry and vfsmount
+ */
+struct path {
+    struct vfsmount *mnt;         /* Mount point */
+    struct dentry *dentry;        /* Dentry */
 };
 
-extern struct file_system_type *fs_list[MAX_SUPPORTED_FS];
+/**
+ * Internal kernel filesystem statistics
+ * Used by the VFS layer for all filesystem operations
+ */
+struct kstatfs {
+    uint64_t f_type;              /* Type of filesystem */
+    uint64_t f_bsize;             /* Optimal transfer block size */
+    uint64_t f_blocks;            /* Total data blocks in filesystem */
+    uint64_t f_bfree;             /* Free blocks in filesystem */
+    uint64_t f_bavail;            /* Free blocks available to unprivileged user */
+    uint64_t f_files;             /* Total file nodes in filesystem */
+    uint64_t f_ffree;             /* Free file nodes in filesystem */
+    uint64_t f_namelen;           /* Maximum length of filenames */
+    uint64_t f_frsize;            /* Fragment size */
+    uint64_t f_flags;             /* Mount flags */
+};
 
-// other utility functions
-struct inode *default_alloc_vinode(struct super_block *sb);
-struct dentry *lookup_final_dentry(const char *path, struct dentry **parent,
-                                   char *miss_name);
-void get_base_name(const char *path, char *base_name);
+/**
+ * Filename lookup parameters
+ */
+struct nameidata {
+    struct path     path;          /* Path found so far */
+    struct qstr     last;          /* Last component */
+    struct inode    *inode;        /* Current inode */
+    unsigned int    flags;         /* Lookup flags */
+    int             last_type;     /* Last component type */
+};
 
-#endif
+
+
+/*
+ * VFS core API functions
+ */
+/* Initialization functions */
+int vfs_init(void);
+
+/* File operations */
+ssize_t vfs_read(struct file *, char *, size_t, loff_t *);
+ssize_t vfs_write(struct file *, const char *, size_t, loff_t *);
+loff_t vfs_llseek(struct file *, loff_t, int);
+int vfs_fsync(struct file *, int);
+int vfs_stat(const char *, struct kstat *);
+int vfs_statfs(struct path *, struct kstatfs *);
+int vfs_utimes(const char *, struct timespec *, int);
+
+/* Directory operations */
+int vfs_mkdir(struct inode *, struct dentry *, mode_t);
+int vfs_rmdir(struct inode *, struct dentry *);
+int vfs_unlink(struct inode *, struct dentry *);
+int vfs_rename(struct inode *, struct dentry *, struct inode *, struct dentry *, unsigned int);
+int iterate_dir(struct file *, struct dir_context *);
+
+/* Link operations */
+int vfs_link(struct dentry *, struct inode *, struct dentry *, struct inode **);
+int vfs_symlink(struct inode *, struct dentry *, const char *);
+
+/* Permission checking */
+int vfs_permission(struct inode *, int);
+
+/* File mode checking helpers */
+static inline int is_dir(mode_t mode) { return (mode & S_IFMT) == S_IFDIR; }
+static inline int is_file(mode_t mode) { return (mode & S_IFMT) == S_IFREG; }
+static inline int is_symlink(mode_t mode) { return (mode & S_IFMT) == S_IFLNK; }
+
+#endif /* _VFS_H_ */

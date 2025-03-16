@@ -4,7 +4,6 @@
 			"vmm.h": "c",
 			"errno.h": "c",
 			"global.h": "c",
-			<spike_interface/spike_utils.h>: "c",
 			"pmm.h": "c",
 			"process.h": "c",
 			"typeinfo": "c",
@@ -15,9 +14,13 @@
 			"file.h": "c",
 			"vfs.h": "c",
 			"spinlock.h": "c",
-			<spike_interface/spike_htif.h>: "c",
 			"list.h": "c",
-			"config.h": "c"
+			"config.h": "c",
+			"dts_parse.h": "c",
+			"spike_utils.h": "c",
+			"trapframe.h": "c",
+			"file_system_type.h": "c",
+			"super_block.h": "c"
 		},
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyFunction": true,
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyType": true,
@@ -30,6 +33,7 @@
     "editor.parameterHints.cycle": false,
     "editor.detectIndentation": false,
 	"editor.insertSpaces": false,
+	"editor.defaultFormatter": "xaver.clang-format",
 	"C_Cpp.clang_format_fallbackStyle": "LLVM",
 	"editor.tabSize": 2
 }

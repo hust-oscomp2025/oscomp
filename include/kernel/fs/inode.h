@@ -1,114 +1,250 @@
 #ifndef INODE_H
 #define INODE_H
 
+#include <kernel/fs/super_block.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/types.h>
-#include <kernel/fs/super_block.h>
 #include <util/atomic.h>
+#include <util/list.h>
+#include <util/spinlock.h>
 
-#define DIRECT_BLKNUM 10          // the number of direct blocks
+extern struct hashtable inode_hashtable;
 
-// vinode hash table
-extern struct hash_table vinode_hash_table;
+/* File types */
+#define S_IFMT 0170000   /* Mask for file type */
+#define S_IFREG 0100000  /* Regular file */
+#define S_IFDIR 0040000  /* Directory */
+#define S_IFCHR 0020000  /* Character device */
+#define S_IFBLK 0060000  /* Block device */
+#define S_IFIFO 0010000  /* FIFO */
+#define S_IFLNK 0120000  /* Symbolic link */
+#define S_IFSOCK 0140000 /* Socket */
 
-// generic hash table method implementation
-int inode_hash_equal(void *key1, void *key2);
-size_t inode_hash_func(void *key);
+/* Permission bits */
+#define S_ISUID 0004000 /* Set user ID on execution */
+#define S_ISGID 0002000 /* Set group ID on execution */
+#define S_ISVTX 0001000 /* Sticky bit */
+#define S_IRWXU 0000700 /* User mask */
+#define S_IRUSR 0000400 /* User read permission */
+#define S_IWUSR 0000200 /* User write permission */
+#define S_IXUSR 0000100 /* User execute permission */
+#define S_IRWXG 0000070 /* Group mask */
+#define S_IRGRP 0000040 /* Group read permission */
+#define S_IWGRP 0000020 /* Group write permission */
+#define S_IXGRP 0000010 /* Group execute permission */
+#define S_IRWXO 0000007 /* Others mask */
+#define S_IROTH 0000004 /* Others read permission */
+#define S_IWOTH 0000002 /* Others write permission */
+#define S_IXOTH 0000001 /* Others execute permission */
 
-// vinode hash table interface
-struct inode *hash_get_inode(struct super_block *sb, int inum);
-int hash_put_inode(struct inode *vinode);
-int hash_erase_inode(struct inode *vinode);
-
-typedef uint32 imode_t;
-
-// abstract vfs inode
-struct inode {
-	imode_t i_mode;            // file mode
-  uint64 i_ino;                  // inode number of the disk inode
-  atomic_t i_count;                   // reference count
-  loff_t i_size;                  // size of the file (in bytes)
-  uint32 i_nlink;                // number of hard links to this file
-	struct address_space	*i_mapping;
-
-  int blocks;                // number of blocks
-  int addrs[DIRECT_BLKNUM];  // direct blocks
-
-	/* 文件时间戳，可选，根据需求保留 */
-	// struct timespec i_atime;         /* 最后访问时间 */
-	// struct timespec i_mtime;         /* 最后修改时间 */
-	// struct timespec i_ctime;         /* 状态改变时间 */
-
-
-
-
-  struct super_block *sb;          // super block of the vfs inode
-  const struct inode_operations *i_op;  // vfs inode operations
-	const struct file_operations	*i_fop;
-
-  void *i_private;           // filesystem-specific info (see s_fs_info)
+/* File type check macros */
+#define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#define S_ISCHR(m) (((m) & S_IFMT) == S_IFCHR)
+#define S_ISBLK(m) (((m) & S_IFMT) == S_IFBLK)
+#define S_ISFIFO(m) (((m) & S_IFMT) == S_IFIFO)
+#define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
+#define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)
 
 
+/* Attribute flags for iattr */
+#define ATTR_MODE       (1 << 0)
+#define ATTR_UID        (1 << 1)
+#define ATTR_GID        (1 << 2)
+#define ATTR_SIZE       (1 << 3)
+#define ATTR_ATIME      (1 << 4)
+#define ATTR_MTIME      (1 << 5)
+#define ATTR_CTIME      (1 << 6)
+#define ATTR_ATIME_SET  (1 << 7)
+#define ATTR_MTIME_SET  (1 << 8)
+#define ATTR_FORCE      (1 << 9)
 
+/**
+ * struct iattr - attributes to be changed
+ * @ia_valid: bitmask of attributes to change
+ * @ia_mode: new file mode
+ * @ia_uid: new owner uid
+ * @ia_gid: new group id
+ * @ia_size: new file size
+ * @ia_atime: new access time
+ * @ia_mtime: new modification time
+ * @ia_ctime: new change time
+ */
+struct iattr {
+    unsigned int ia_valid;
+    mode_t ia_mode;
+    uid_t ia_uid;
+    gid_t ia_gid;
+    loff_t ia_size;
+    time_t ia_atime;
+    time_t ia_mtime;
+    time_t ia_ctime;
 };
 
-// vinode hash table key type
-struct inode_key {
-  int inum;
-  struct super_block *sb;
-};
+/* Forward declarations */
+struct dir_context;
+struct kstat;
+struct iattr;
+struct fiemap_extent_info;
 
-
+/*
+ * Inode operations
+ */
 struct inode_operations {
-  // file operations
-  ssize_t (*viop_read)(struct inode *node, char *buf, ssize_t len,
-                       int *offset);
-  ssize_t (*viop_write)(struct inode *node, const char *buf, ssize_t len,
-                        int *offset);
-  struct inode *(*viop_create)(struct inode *parent, struct dentry *sub_dentry);
-  int (*viop_lseek)(struct inode *node, ssize_t new_off, int whence, int *off);
-  int (*viop_disk_stat)(struct inode *node, struct istat *istat);
-  int (*viop_link)(struct inode *parent, struct dentry *sub_dentry,
-                   struct inode *link_node);
-  int (*viop_unlink)(struct inode *parent, struct dentry *sub_dentry,
-                     struct inode *unlink_node);
-  struct inode *(*viop_lookup)(struct inode *parent,
-                                struct dentry *sub_dentry);
+  /* File operations */
+  struct dentry *(*lookup)(struct inode *, struct dentry *, unsigned int);
+  struct inode *(*create)(struct inode *, struct dentry *, mode_t, bool);
+  int (*link)(struct dentry *, struct inode *, struct dentry *);
+  int (*unlink)(struct inode *, struct dentry *);
+  int (*symlink)(struct inode *, struct dentry *, const char *);
+  int (*mkdir)(struct inode *, struct dentry *, mode_t);
+  int (*rmdir)(struct inode *, struct dentry *);
+  int (*mknod)(struct inode *, struct dentry *, mode_t, dev_t);
+  int (*rename)(struct inode *, struct dentry *, struct inode *,
+                struct dentry *, unsigned int);
 
-  // directory operations
-  int (*viop_readdir)(struct inode *dir_vinode, struct dir *dir, int *offset);
-  struct inode *(*viop_mkdir)(struct inode *parent, struct dentry *sub_dentry);
+  /* Extended attribute operations */
+  int (*setxattr)(struct dentry *, const char *, const void *, size_t, int);
+  ssize_t (*getxattr)(struct dentry *, const char *, void *, size_t);
+  ssize_t (*listxattr)(struct dentry *, char *, size_t);
+  int (*removexattr)(struct dentry *, const char *);
 
-  // write back inode to disk
-  int (*viop_write_back_vinode)(struct inode *node);
+  /* Special file operations */
+  int (*readlink)(struct dentry *, char *, int);
+  int (*get_link)(struct dentry *, struct inode *, struct path *);
+  int (*permission)(struct inode *, int);
+  int (*get_acl)(struct inode *, int);
+  int (*setattr)(struct dentry *, struct iattr *);
+  int (*getattr)(const struct path *, struct kstat *, unsigned int,
+                 unsigned int);
+  int (*fiemap)(struct inode *, struct fiemap_extent_info *, uint64, uint64);
 
-  // hook functions
-  // In the vfs layer, we do not assume that hook functions will do anything,
-  // but simply call them (when they are defined) at the appropriate time.
-  // Hook functions exist because the fs layer may need to do some additional
-  // operations (such as allocating additional data structures) at some critical
-  // times.
-  int (*viop_hook_open)(struct inode *node, struct dentry *dentry);
-  int (*viop_hook_close)(struct inode *node, struct dentry *dentry);
-  int (*viop_hook_opendir)(struct inode *node, struct dentry *dentry);
-  int (*viop_hook_closedir)(struct inode *node, struct dentry *dentry);
+  /* Block operations */
+  int (*get_block)(struct inode *, sector_t, struct buffer_head *, int create);
+  sector_t (*bmap)(struct inode *, sector_t);
+  void (*truncate_blocks)(struct inode *, loff_t size);
+
+  /* Direct I/O support */
+  int (*direct_IO)(struct kiocb *, struct iov_iter *);
 };
 
-// inode operation interface
-// the implementation depends on the vinode type and the specific file system
+/* Inode hash key - combination of superblock and inode number */
+struct inode_key {
+  struct super_block *sb;
+  unsigned long ino;
+};
 
-// virtual file system inode interfaces
-#define viop_read(node, buf, len, offset)      (node->i_op->viop_read(node, buf, len, offset))
-#define viop_write(node, buf, len, offset)     (node->i_op->viop_write(node, buf, len, offset))
-#define viop_create(node, name)                (node->i_op->viop_create(node, name))
-#define viop_lseek(node, new_off, whence, off) (node->i_op->viop_lseek(node, new_off, whence, off))
-#define viop_disk_stat(node, istat)            (node->i_op->viop_disk_stat(node, istat))
-#define viop_link(node, name, link_node)       (node->i_op->viop_link(node, name, link_node))
-#define viop_unlink(node, name, unlink_node)   (node->i_op->viop_unlink(node, name, unlink_node))
-#define viop_lookup(parent, sub_dentry)        (parent->i_op->viop_lookup(parent, sub_dentry))
-#define viop_readdir(dir_vinode, dir, offset)  (dir_vinode->i_op->viop_readdir(dir_vinode, dir, offset))
-#define viop_mkdir(dir, sub_dentry)            (dir->i_op->viop_mkdir(dir, sub_dentry))
-#define viop_write_back_vinode(node)           (node->i_op->viop_write_back_vinode(node))
+/*
+ * Inode structure - core of the filesystem
+ */
+struct inode {
+  /* Identity */
+  mode_t i_mode;       /* File type and permissions */
+  uid_t i_uid;         /* Owner user ID */
+  gid_t i_gid;         /* Owner group ID */
+  unsigned long i_ino; /* Inode number */
+  dev_t i_rdev;        /* Device number (for special files) */
+
+  /* File attributes */
+  loff_t i_size;           /* File size in bytes */
+  struct timespec i_atime; /* Last access time */
+  struct timespec i_mtime; /* Last modification time */
+  struct timespec i_ctime; /* Last status change time */
+  unsigned int i_nlink;    /* Number of hard links */
+  blkcnt_t i_blocks;       /* Number of blocks allocated */
+
+  /* Memory management */
+  struct address_space *i_mapping; /* Associated address space */
+
+  /* Filesystem information */
+  struct super_block *i_sb;           /* Superblock */
+  struct list_head i_sb_list_node;    /* Superblock list of inodes */
+  struct list_head i_state_list_node; /* For ONE state list (LRU/dirty/IO) */
+
+  /* Operations */
+  const struct inode_operations *i_op; /* Inode operations */
+  const struct file_operations *i_fop; /* Default file operations */
+
+  /* Reference counting and locking */
+  atomic_t i_count;  /* Reference count */
+  spinlock_t i_lock; /* Protects changes to inode */
+
+  /* State tracking */
+  unsigned long i_state; /* Inode state flags */
+
+  /* File system specific data */
+  void *i_fs_info; /* Filesystem-specific data */
+
+  /* Dentry management */
+  struct list_head i_dentry; /* List of dentries for this inode */
+
+  /* Block mapping */
+  sector_t *i_data; /* Block mapping array */
+};
+
+/* Inode state flags */
+#define I_DIRTY (1 << 0)          /* Inode is dirty - needs writing */
+#define I_NEW (1 << 1)            /* Inode is newly created */
+#define I_SYNC (1 << 2)           /* Sync is in progress for this inode */
+#define I_REFERENCED (1 << 3)     /* Inode was recently accessed */
+#define I_DIRTY_TIME (1 << 4)     /* Dirty timestamps only */
+#define I_DIRTY_PAGES (1 << 5)    /* Dirty pages only */
+#define I_FREEING (1 << 6)        /* Inode is being freed */
+#define I_CLEAR (1 << 7)          /* Inode is being cleared */
+#define I_DIRTY_SYNC (1 << 8)     /* Inode needs fsync */
+#define I_DIRTY_DATASYNC (1 << 9) /* Data needs fsync */
+
+/* Permission checking masks */
+#define MAY_EXEC    0x0001 /* Execute permission */
+#define MAY_WRITE   0x0002 /* Write permission */  
+#define MAY_READ    0x0004 /* Read permission */
+#define MAY_APPEND  0x0008 /* Append-only permission */
+#define MAY_ACCESS  0x0010 /* Check for existence */
+#define MAY_OPEN    0x0020 /* Check permission for open */
+#define MAY_CHDIR   0x0040 /* Check permission to use as working directory */
+
+/* Combined permissions for common operations */
+#define MAY_LOOKUP  (MAY_EXEC)           /* For path traversal */
+#define MAY_READLINK (MAY_READ)          /* For reading symlinks */
+#define MAY_READ_WRITE (MAY_READ | MAY_WRITE) /* For both read and write */
+#define MAY_CREATE  (MAY_WRITE | MAY_EXEC) /* For creating new files */
+#define MAY_DELETE  (MAY_WRITE | MAY_EXEC) /* For deleting files */
 
 
-#endif
+
+/*
+ * Inode APIs
+ */
+int inode_cache_init(void);
+
+/* Inode allocation and initialization */
+struct inode *new_inode(struct super_block *sb);
+// void inode_init_once(struct inode *inode);
+
+/* Reference counting */
+void ihold(struct inode *inode);
+void put_inode(struct inode *inode);
+
+/* Inode lookup and creation */
+struct inode *iget(struct super_block *sb, unsigned long ino);
+struct inode *iget_locked(struct super_block *sb, unsigned long ino);
+void unlock_new_inode(struct inode *inode);
+
+/* Inode state management */
+void mark_inode_dirty(struct inode *inode);
+int sync_inode(struct inode *inode, int wait);
+int sync_inode_metadata(struct inode *inode, int wait);
+//void __clear_inode(struct inode *inode);
+void evict_inode(struct inode *inode);
+
+/* Permission checking */
+int generic_permission(struct inode *inode, int mask);
+
+
+/* Utility functions */
+int is_bad_inode(struct inode *inode);
+int inode_permission(struct inode *inode, int mask);
+int setattr_prepare(struct dentry *dentry, struct iattr *attr);
+int notify_change(struct dentry *dentry, struct iattr *attr);
+
+#endif /* INODE_H */

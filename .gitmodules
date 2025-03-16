@@ -1,0 +1,3 @@
+[submodule "vendor/busybox"]
+	path = vendor/busybox
+	url = https://github.com/hust-oscomp2025/busybox.git

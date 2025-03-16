@@ -6,7 +6,7 @@
 #include <kernel/types.h>
 
 typedef struct syscall_function {
-	void *func;
+	uint64 func;
 	const char *name;
 } syscall_function;
 

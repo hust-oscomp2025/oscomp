@@ -11,10 +11,11 @@
 #include <kernel/elf.h>
 
 #include <kernel/mm/mm_struct.h>
+#include <kernel/mm/vma.h>
 #include <kernel/mm/mmap.h>
 #include <kernel/mm/kmalloc.h>
 
-#include <kernel/process.h>
+#include <kernel/sched/process.h>
 #include <kernel/riscv.h>
 #include <kernel/sched/sched.h>
 #include <kernel/sched/pid.h>
@@ -43,14 +44,16 @@ struct task_struct *alloc_process() {
   ps->kstack = (uint64)alloc_kernel_stack();
   ps->trapframe = (struct trapframe*)kmalloc(sizeof(struct trapframe));
 	ps->ktrapframe = NULL;
-	ps->mm = mm_alloc();
-  ps->pfiles = init_proc_file_management();
+	ps->mm = user_alloc_mm();
+  ps->fd_struct = alloc_pfm();
 	//ps->active_mm =ps->mm;
   // 分配内核栈
 	ps->pid = pid_alloc();
 	ps->state;
 	ps->flags;
 	ps->parent;
+	ps->pagefault_disabled = 0;
+
 	INIT_LIST_HEAD(&ps->children);
 	INIT_LIST_HEAD(&ps->sibling);
 	INIT_LIST_HEAD(&ps->queue_node);
@@ -117,7 +120,7 @@ ssize_t do_wait(int pid) {
 
 
 static void free_kernel_stack(void* kstack){
-	kfree((void*)ROUNDDOWN((uint64)kstack,PAGE_SIZE));
+	kfree((void*)(ROUNDDOWN((uint64)kstack,PAGE_SIZE)));
 }
 
 
