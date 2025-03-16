@@ -6,6 +6,7 @@
 #include <kernel/mm/mm_struct.h>
 #include <kernel/sched/pid.h>
 #include <kernel/sched/sched.h>
+#include <kernel/sched/process.h>
 #include <kernel/trapframe.h>
 #include <spike_interface/spike_utils.h>
 #include <util/list.h>

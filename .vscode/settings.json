@@ -17,7 +17,10 @@
 			"list.h": "c",
 			"config.h": "c",
 			"dts_parse.h": "c",
-			"spike_utils.h": "c"
+			"spike_utils.h": "c",
+			"trapframe.h": "c",
+			"file_system_type.h": "c",
+			"super_block.h": "c"
 		},
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyFunction": true,
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyType": true,
@@ -30,6 +33,7 @@
     "editor.parameterHints.cycle": false,
     "editor.detectIndentation": false,
 	"editor.insertSpaces": false,
+	"editor.defaultFormatter": "xaver.clang-format",
 	"C_Cpp.clang_format_fallbackStyle": "LLVM",
 	"editor.tabSize": 2
 }

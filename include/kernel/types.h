@@ -31,6 +31,10 @@ typedef signed short int16;
 typedef signed int int32;
 typedef signed long long int64;
 
+#ifndef bool
+typedef int bool;
+#endif
+
 
 
 // 方便的宏定义
@@ -65,13 +69,26 @@ typedef void* __user uptr_t;   // User space pointer
 
 #define MASK_FILEMODE 0x003
 
+/* Timestamp structure */
+struct timespec {
+	int64 tv_sec;   /* Seconds */
+	int64 tv_nsec;  /* Nanoseconds */
+};
+
 
 
 // file system type
-
+/*
+ * File type and permission bits
+ */
 
 #define MAX_FILE_NAME_LEN 256
 typedef uint64 loff_t;
+typedef uint32 mode_t;
+typedef uint64_t sector_t;  /* 64-bit sector number */
+/* File permissions and type mode */
+typedef unsigned short mode_t;
+
 
 struct dir {
   char name[MAX_FILE_NAME_LEN];

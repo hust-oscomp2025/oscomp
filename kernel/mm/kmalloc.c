@@ -238,3 +238,55 @@ void* alloc_kernel_stack(){
 	void* kstack = kmalloc(PAGE_SIZE);
   return kstack + PAGE_SIZE - 16;
 }
+
+
+/**
+ * kstrdup - Duplicate a string with kmalloc
+ * @s: The string to duplicate
+ * @gfp: Memory allocation flags
+ *
+ * Allocates memory and copies the given string into it.
+ * Returns the pointer to the new string or NULL on allocation failure.
+ */
+char *kstrdup(const char *s, unsigned int gfp)
+{
+    size_t len;
+    char *buf;
+    
+    if (!s)
+        return NULL;
+    
+    len = strlen(s) + 1;
+    buf = kmalloc(len);
+    if (buf) {
+        memcpy(buf, s, len);
+    }
+    return buf;
+}
+
+/**
+ * kstrndup - Duplicate a string with kmalloc limiting the size
+ * @s: The string to duplicate
+ * @max: Maximum length to copy
+ * @gfp: Memory allocation flags
+ *
+ * Allocates memory and copies up to @max characters from the given string.
+ * The result is always null-terminated.
+ * Returns the pointer to the new string or NULL on allocation failure.
+ */
+char *kstrndup(const char *s, size_t max, unsigned int gfp)
+{
+    size_t len;
+    char *buf;
+    
+    if (!s)
+        return NULL;
+    
+    len = strnlen(s, max);
+    buf = kmalloc(len + 1);
+    if (buf) {
+        memcpy(buf, s, len);
+        buf[len] = '\0';
+    }
+    return buf;
+}

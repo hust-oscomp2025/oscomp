@@ -1,198 +1,214 @@
 #ifndef _FILE_H
 #define _FILE_H
-#include <kernel/types.h>
+
 #include <kernel/fs/vfs.h>
+#include <kernel/types.h>
 #include <util/atomic.h>
 #include <util/spinlock.h>
 
-typedef struct dentry dentry_t;
-typedef struct inode inode_t;
+/* Forward declarations */
+struct dentry;
+struct inode;
+struct address_space;
+struct task_struct;
+struct kiocb;
+struct iov_iter;
+struct pipe_inode_info;
+struct poll_table_struct;
+struct vm_area_struct;
+struct dir_context;
+
+typedef uint64 loff_t;
 typedef uint32 fmode_t;
+typedef unsigned int __poll_t;
 
+/*
+ * File mode flags
+ */
+/* Access modes */
+#define FMODE_READ (1U << 0)  /* File is open for reading */
+#define FMODE_WRITE (1U << 1) /* File is open for writing */
+#define FMODE_EXEC (1U << 5)  /* File is executable */
 
-struct file *alloc_vfs_file(dentry_t *file_dentry, int readable,
-	int writable, int offset);
+/* Seeking flags */
+#define FMODE_LSEEK (1U << 2)  /* File is seekable */
+#define FMODE_PREAD (1U << 3)  /* File supports pread */
+#define FMODE_PWRITE (1U << 4) /* File supports pwrite */
 
+/* Special access flags */
+#define FMODE_ATOMIC_POS (1U << 12) /* File needs atomic access to position */
+#define FMODE_RANDOM (1U << 13)     /* File will be accessed randomly */
+#define FMODE_PATH (1U << 14)       /* O_PATH flag - minimal file access */
+#define FMODE_STREAM (1U << 16)     /* File is stream-like */
 
-// data structure of an openned file
-struct file {
-  dentry_t *f_dentry;
-	const struct file_operations	*f_op;
-	spinlock_t		f_lock;
-	fmode_t f_mode;
-	//struct mutex		f_pos_lock;
-  int f_pos;
-	// struct file_ra_state	f_ra;
-	struct address_space	*f_mapping;
-	// 和对应的inode指向的是同一个address_space*页缓存
-};
+/* Permission indicators */
+#define FMODE_WRITER (1U << 17)    /* Has write access to underlying fs */
+#define FMODE_CAN_READ (1U << 18)  /* Has read methods */
+#define FMODE_CAN_WRITE (1U << 19) /* Has write methods */
 
+/* State flags */
+#define FMODE_OPENED (1U << 20)  /* File has been opened */
+#define FMODE_CREATED (1U << 21) /* File was created */
 
+/* Optimization flags */
+#define FMODE_NOWAIT (1U << 22)      /* Return -EAGAIN if I/O would block */
+#define FMODE_CAN_ODIRECT (1U << 24) /* Supports direct I/O */
+#define FMODE_BUF_RASYNC (1U << 28)  /* Supports async buffered reads */
+#define FMODE_BUF_WASYNC (1U << 29)  /* Supports async buffered writes */
+
+/**
+ * File operation structure - provides methods for file manipulation
+ */
 struct file_operations {
-	// struct module *owner;   /* 指向该操作所属模块，防止模块卸载 */
-	// 通过这个管理内核动态模块的引用计数，避免模块被卸载后操作函数失效。
-	// 但由于本设计是简化版，这里不考虑模块的加载和卸载，因此这个字段暂时不需要。
+  /* Position manipulation */
+  loff_t (*llseek)(struct file*, loff_t, int);
 
-	/* 基本的文件定位操作，用于实现 lseek 功能 */
-	loff_t (*llseek) (struct file *, loff_t, int);
+  /* Basic I/O */
+  ssize_t (*read)(struct file*, char*, size_t, loff_t*);
+  ssize_t (*write)(struct file*, const char*, size_t, loff_t*);
 
-	/* 基本的文件读操作 */
-	ssize_t (*read) (struct file *, uaddr, size_t, loff_t *);
+  /* Vectored I/O */
+  ssize_t (*read_iter)(struct kiocb*, struct iov_iter*);
+  ssize_t (*write_iter)(struct kiocb*, struct iov_iter*);
 
-	/* 基本的文件写操作 */
-	ssize_t (*write) (struct file *, uaddr, size_t, loff_t *);
+  /* Directory operations */
+  int (*iterate)(struct file*, struct dir_context*);
+  int (*iterate_shared)(struct file*, struct dir_context*);
 
-	/*
-	 * 以下函数在完整的 Linux 内核中用于实现更多高级特性，
-	 * 例如异步 I/O、迭代读取、ioctl 控制、内存映射、文件锁定、
-	 * 事件轮询等。由于本设计是简化版，这里仅保留基本接口，
-	 * 其他接口均置为 NULL 或不支持。
-	 *
-	 * // ssize_t (*read_iter) (struct kiocb *, struct iov_iter *);
-	 * // ssize_t (*write_iter) (struct kiocb *, struct iov_iter *);
-	 * // int (*iopoll)(struct kiocb *, struct io_comp_batch *, unsigned int flags);
-	 * // int (*iterate) (struct file *, struct dir_context *);
-	 * // int (*iterate_shared) (struct file *, struct dir_context *);
-	 * // __poll_t (*poll) (struct file *, struct poll_table_struct *);
-	 * // long (*unlocked_ioctl) (struct file *, unsigned int, unsigned long);
-	 * // long (*compat_ioctl) (struct file *, unsigned int, unsigned long);
-	 * // int (*vma_list) (struct file *, struct vm_area_struct *);
-	 * // unsigned long mmap_supported_flags;
-	 * // int (*flush) (struct file *, fl_owner_t id);
-	 * // ssize_t (*sendpage) (struct file *, struct page *, int, size_t, loff_t *, int);
-	 * // unsigned long (*get_unmapped_area)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
-	 * // int (*check_flags)(int);
-	 * // int (*flock) (struct file *, int, struct file_lock *);
-	 * // ssize_t (*splice_write)(struct pipe_inode_info *, struct file *, loff_t *, size_t, unsigned int);
-	 * // ssize_t (*splice_read)(struct file *, loff_t *, struct pipe_inode_info *, size_t, unsigned int);
-	 * // int (*setlease)(struct file *, long, struct file_lock **, void **);
-	 * // long (*fallocate)(struct file *, int, loff_t, loff_t);
-	 * // void (*show_fdinfo)(struct seq_file *, struct file *);
-	 * // #ifndef CONFIG_MMU
-	 * // unsigned (*mmap_capabilities)(struct file *);
-	 * // #endif
-	 * // ssize_t (*copy_file_range)(struct file *, loff_t, struct file *, loff_t, size_t, unsigned int);
-	 * // loff_t (*remap_file_range)(struct file *, loff_t, struct file *, loff_t, loff_t, unsigned int);
-	 * // int (*fadvise)(struct file *, loff_t, loff_t, int);
-	 * // int (*uring_cmd)(struct io_uring_cmd *, unsigned int);
-	 * // int (*uring_cmd_iopoll)(struct io_uring_cmd *, struct io_comp_batch *, unsigned int);
-	 */
+  /* Polling/selection */
+  __poll_t (*poll)(struct file*, struct poll_table_struct*);
 
-	/* 文件打开操作，在打开文件时调用 */
-	int (*open) (struct inode *, struct file *);
+  /* Management operations */
+  int (*open)(struct inode*, struct file*);
+  int (*flush)(struct file*);
+  int (*release)(struct inode*, struct file*);
+  int (*fsync)(struct file*, loff_t, loff_t, int datasync);
 
-	/* 文件释放操作，在关闭文件时调用 */
-	int (*release) (struct inode *, struct file *);
+  /* Memory mapping */
+  int (*mmap)(struct file*, struct vm_area_struct*);
+
+  /* Special operations */
+  long (*unlocked_ioctl)(struct file*, unsigned int, unsigned long);
+  int (*fasync)(int, struct file*, int);
+
+  /* Splice operations */
+  ssize_t (*splice_read)(struct file*, loff_t*, struct pipe_inode_info*, size_t,
+                         unsigned int);
+  ssize_t (*splice_write)(struct pipe_inode_info*, struct file*, loff_t*,
+                          size_t, unsigned int);
+
+  /* Space allocation */
+  long (*fallocate)(struct file*, int, loff_t, loff_t);
 };
 
+/**
+ * Represents an open file in the system
+ */
+struct file {
+  /* File identity */
+  struct dentry* f_dentry;            /* Associated dentry */
+  struct inode* f_inode;              /* Inode of the file */
+  struct path f_path;                 /* Path to file */
+  const struct file_operations* f_op; /* File operations */
 
+  /* File state */
+  fmode_t f_mode;       /* File access mode */
+  spinlock_t f_lock;    /* Lock for f_flags/f_pos */
+  atomic_t f_count;     /* Reference count */
+  unsigned int f_flags; /* Kernel internal flags */
 
+  /* File position */
+  loff_t f_pos; /* Current file position */
+
+  /* Memory management */
+  struct address_space* f_mapping; /* Page cache mapping */
+
+  /* Private data */
+  void* f_private; /* Filesystem/driver private data */
+
+  /* Data read-ahead */
+  struct file_ra_state f_ra; /* Read-ahead state */
+};
 
 /*
- * flags in file.f_mode.  Note that FMODE_READ and FMODE_WRITE must correspond
- * to O_WRONLY and O_RDWR via the strange trick
- * 这个“strange trick”正是利用了 O_ACCMODE 的值和 FMODE 标志之间的巧妙转换。在
-Linux 中，打开文件时的访问模式标志定义为：
-
-O_RDONLY = 0
-O_WRONLY = 1
-O_RDWR = 2
-而在 file.f_mode 中，我们希望用非零的位来表示读和写权限，这里定义：
-
-FMODE_READ = 0x1
-FMODE_WRITE = 0x2
-这样就希望实现下面的对应关系：
-
-打开为只读的文件：希望 f_mode 为 FMODE_READ (1)
-打开为只写的文件：希望 f_mode 为 FMODE_WRITE (2)
-打开为读写的文件：希望 f_mode 同时包含读和写，即 (1 | 2 = 3)
-但由于 O_RDONLY 为 0，直接赋值会丢失读权限的信息。为了解决这个问题，内核在
-do_dentry_open() 中采用了一个简单的“加1”技巧： 将 O_ACCMODE 的值加 1，从而得到：
-
-0 + 1 = 1 → FMODE_READ
-1 + 1 = 2 → FMODE_WRITE
-2 + 1 = 3 → FMODE_READ | FMODE_WRITE
-这样，所有情况都能正确对应，既保证了 O_RDONLY 得到非零的读标志，也使得 O_WRONLY
-和 O_RDWR 分别映射到正确的写和读写组合。这个加 1
-的“trick”就是用来把内核的打开模式转换为 file.f_mode 中的位标志的关键。 in
-do_dentry_open()
+ * File API functions
  */
+struct file* file_open_path(const struct path* path, int flags, mode_t mode);
+struct file* file_open_qstr(const struct qstr* name, int flags, mode_t mode);
+struct file* file_open(const char* filename, int flags, mode_t mode);
 
-/* file is open for reading */
-#define FMODE_READ (0x1)
-/* file is open for writing */
-#define FMODE_WRITE (0x2)
-/* file is seekable */
-#define FMODE_LSEEK (0x4)
-/* file can be accessed using pread */
-#define FMODE_PREAD (0x8)
-/* file can be accessed using pwrite */
-#define FMODE_PWRITE (0x10)
-/* File is opened for execution with sys_execve / sys_uselib */
-#define FMODE_EXEC (0x20)
-/* File is opened with O_NDELAY (only set for block devices) */
-#define FMODE_NDELAY (0x40)
-/* File is opened with O_EXCL (only set for block devices) */
-#define FMODE_EXCL (0x80)
-/* File is opened using open(.., 3, ..) and is writeable only for ioctls
-   (specialy hack for floppy.c) */
-#define FMODE_WRITE_IOCTL (0x100)
-/* 32bit hashes as llseek() offset (for directories) */
-#define FMODE_32BITHASH (0x200)
-/* 64bit hashes as llseek() offset (for directories) */
-#define FMODE_64BITHASH (0x400)
-/*
- * Don't update ctime and mtime.
- *
- * Currently a special hack for the XFS open_by_handle ioctl, but we'll
- * hopefully graduate it to a proper O_CMTIME flag supported by open(2) soon.
+/**
+ * File descriptor table structure
  */
-#define FMODE_NOCMTIME (0x800)
+struct fd_struct {
+  struct file** fd_array; /* Array of file pointers */
+  unsigned int* fd_flags; /* Array of file pointers */
 
-/* Expect random access pattern */
-#define FMODE_RANDOM (0x1000)
+  unsigned int max_fds; /* Size of the array */
+  unsigned int next_fd; /* Next free fd number */
+  spinlock_t file_lock; /* Lock for the struct */
+  atomic_t count;       /* Reference count */
+};
 
-/* File is huge (eg. /dev/mem): treat loff_t as unsigned */
-#define FMODE_UNSIGNED_OFFSET (0x2000)
+/* Process-level file table management */
+int init_files(void);
+struct fd_struct* get_files_struct(struct task_struct* task);
+void put_files_struct(struct fd_struct* files);
+int unshare_files(struct fd_struct** new_filesp,
+                  struct fd_struct* old_files);
 
-/* File is opened with O_PATH; almost nothing can be done with it */
-#define FMODE_PATH (0x4000)
+/* File descriptor management */
+struct file* get_file(unsigned int fd, struct task_struct* owner);
+void put_file(struct file* file, struct task_struct* owner);
 
-/* File needs atomic accesses to f_pos */
-#define FMODE_ATOMIC_POS (0x8000)
-/* Write access to underlying fs */
-#define FMODE_WRITER (0x10000)
-/* Has read method(s) */
-#define FMODE_CAN_READ (0x20000)
-/* Has write method(s) */
-#define FMODE_CAN_WRITE (0x40000)
-
-#define FMODE_OPENED (0x80000)
-#define FMODE_CREATED (0x100000)
-
-/* File is stream-like */
-#define FMODE_STREAM (0x200000)
-
-/* File supports DIRECT IO */
-#define FMODE_CAN_ODIRECT (0x400000)
-
-/* File was opened by fanotify and shouldn't generate fanotify events */
-#define FMODE_NONOTIFY (0x4000000)
-
-/* File is capable of returning -EAGAIN if I/O will block */
-#define FMODE_NOWAIT (0x8000000)
-
-/* File represents mount that needs unmounting */
-#define FMODE_NEED_UNMOUNT (0x10000000)
-
-/* File does not contribute to nr_files count */
-#define FMODE_NOACCOUNT (0x20000000)
-
-/* File supports async buffered reads */
-#define FMODE_BUF_RASYNC (0x40000000)
-
-/* File supports async nowait buffered writes */
-#define FMODE_BUF_WASYNC (0x80000000)
+int alloc_fd(struct file* file, unsigned int flags);
 
 
-#endif
+/**
+ * Read-ahead state for file
+ */
+struct file_ra_state {
+  unsigned long start;      /* Current window start */
+  unsigned long size;       /* Size of read-ahead window */
+  unsigned long async_size; /* Async read-ahead size */
+  unsigned int ra_pages;    /* Maximum pages to read ahead */
+  unsigned int mmap_miss;   /* Cache miss stat for mmap */
+};
+
+/**
+ * Open flags - used when opening files
+ */
+#define O_ACCMODE 00000003         /* Access mode mask */
+#define O_RDONLY 00000000          /* Open read-only */
+#define O_WRONLY 00000001          /* Open write-only */
+#define O_RDWR 00000002            /* Open read-write */
+#define O_CREAT 00000100           /* Create if nonexistent */
+#define O_EXCL 00000200            /* Error if already exists */
+#define O_NOCTTY 00000400          /* Don't assign controlling terminal */
+#define O_TRUNC 00001000           /* Truncate to zero length */
+#define O_APPEND 00002000          /* Append to file */
+#define O_NONBLOCK 00004000        /* Non-blocking I/O */
+#define O_DSYNC 00010000           /* Synchronize data */
+#define O_SYNC (O_DSYNC | O_RSYNC) /* Synchronize data and metadata */
+#define O_RSYNC 00040000           /* Synchronize read operations */
+#define O_DIRECT 00100000          /* Direct I/O */
+#define O_DIRECTORY 00200000       /* Must be a directory */
+#define O_NOFOLLOW 00400000        /* Don't follow symbolic links */
+#define O_CLOEXEC 02000000         /* Close on exec */
+#define O_PATH 010000000           /* Path-only access */
+
+
+
+
+
+
+
+
+
+/* File reading and writing */
+ssize_t kernel_read(struct file* file, void* buf, size_t count, loff_t* pos);
+ssize_t kernel_write(struct file* file, const void* buf, size_t count,
+                     loff_t* pos);
+
+
+#endif /* _FILE_H */

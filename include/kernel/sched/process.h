@@ -1,10 +1,12 @@
 #ifndef _PROC_H_
 #define _PROC_H_
 
-#include <kernel/proc_file.h>
 #include <kernel/riscv.h>
 #include <kernel/trapframe.h>
 #include <util/list.h>
+
+struct fd_struct;
+struct fs_struct;
 
 /* Linux内核进程flags定义表 */
 
@@ -105,13 +107,15 @@ enum fork_choice {
 struct task_struct {
   uint64 kstack; // 分配一个页面当内核栈，注意内核栈的范围是[kstack-PAGE_SIZE,
                  // kstack)
-  struct trapframe *trapframe;
-  struct trapframe *ktrapframe;
+  struct trapframe* trapframe;
+  struct trapframe* ktrapframe;
 
-  struct mm_struct *mm;
+  struct mm_struct* mm;
   // struct mm_struct *active_mm;
   //  我们不需要使用复杂的active_mm特性
-  proc_file_management *pfiles;
+  /* File system info */
+  struct fs_struct* fs;
+  struct fd_struct* fd_struct;
 
   // process id
   pid_t pid;
@@ -119,7 +123,7 @@ struct task_struct {
   unsigned int state;
   unsigned int flags;
   // parent process
-  struct task_struct *parent;
+  struct task_struct* parent;
   struct list_head children;
   struct list_head sibling;
   // ready queue
@@ -136,27 +140,25 @@ struct task_struct {
   int exit_code;
   int exit_signal;
 
-  // uid_t uid;
-  // uid_t euid;
-  // gid_t gid;
-  // gid_t egid;
+  uid_t uid;
+  uid_t euid;
+  gid_t gid;
+  gid_t egid;
   // 目前还用不上这些字段
 };
-struct task_struct *alloc_init_task();
+struct task_struct* alloc_init_task();
 
-struct task_struct *alloc_process();
-int free_process(struct task_struct *proc);
+struct task_struct* alloc_process();
+int free_process(struct task_struct* proc);
 
 // fork a child from parent
-int do_fork(struct task_struct *parent);
+int do_fork(struct task_struct* parent);
 int do_exec(uint64 path);
 ssize_t do_wait(int pid);
 
 /**
  * 打印进程的内存布局信息，用于调试
  */
-void print_proc_memory_layout(struct task_struct *proc);
-
-
+void print_proc_memory_layout(struct task_struct* proc);
 
 #endif

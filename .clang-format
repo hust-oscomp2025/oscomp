@@ -1,0 +1,2 @@
+BasedOnStyle: LLVM  # 或 Google、Mozilla
+PointerAlignment: Left

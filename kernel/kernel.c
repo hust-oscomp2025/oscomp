@@ -22,6 +22,8 @@
 
 #include <spike_interface/spike_utils.h>
 
+#include <errno.h>
+
 static void kernel_vm_init(void) {
   sprint("kernel_vm_init: start\n");
   // extern struct mm_struct init_mm;
@@ -73,19 +75,40 @@ static void kernel_vm_init(void) {
   sprint("kern_vm_init: complete\n");
 }
 
-// typedef union {
-//   uint64 buf[MAX_CMDLINE_ARGS];
-//   char *argv[MAX_CMDLINE_ARGS];
-// } arg_buf;
+int setup_init_fds(struct task_struct *init_task) {
+	int fd, console_fd;
+	
+	
+	// Open console device for standard I/O
+	console_fd = vfs_open("/dev/console", O_RDWR);
+	if (console_fd < 0) {
+		sprint("Failed to open /dev/console\n");
+			// Fallback: create a simple kernel console device
+			console_fd = create_console_device();
+			if (console_fd < 0)
+					return console_fd;
+	}
+	
+	// Set up standard file descriptors
+	for (fd = 0; fd < 3; fd++) {
+			if (fd_install(init_task, fd, console_fd) < 0) {
+					return -EMFILE;
+			}
+	}
+	
+	return 0;
+}
+
+
 
 //
 // 初始化1号进程
 //
-static struct task_struct *load_init_process() {
+static struct task_struct *load_init_task() {
   struct task_struct *task = alloc_init_task();
   extern struct mm_struct init_mm;
   task->mm = &init_mm;
-  task->pfiles = alloc_pfm();
+  task->fd_struct = alloc_pfm();
   // 8. 初始化标准文件描述符(stdin, stdout, stderr)
   // 这些会指向/dev/console或null设备
   // setup_std_fds(task->pfiles);
@@ -169,7 +192,7 @@ int s_start(void) {
   sprint("Switch to user mode...\n");
   // the application code (elf) is first loaded into memory, and then put into
   // execution added @lab3_1
-  insert_to_ready_queue(load_init_process());
+  insert_to_ready_queue(load_init_task());
   schedule();
 
   // we should never reach here.

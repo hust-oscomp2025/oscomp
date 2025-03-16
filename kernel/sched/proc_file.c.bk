@@ -47,7 +47,7 @@ struct file *get_opened_file(int fd) {
 	if(fd < 0 || fd >= MAX_FILES){
 		panic("do_read: invalid fd!\n");
 	}
-  struct file *pfile = CURRENT->pfiles->fd_table[fd]; // file entry
+  struct file *pfile = CURRENT->files_struct->fd_table[fd]; // file entry
 	if (pfile == NULL)
 		panic("do_read: no such opened file!\n");
   return pfile;
@@ -68,14 +68,14 @@ int do_open(char *pathname, int flags) {
 
 	// 从进程控制块中分配fd
   for (int fd = 0; fd < MAX_FILES; ++fd) {
-    struct file *pfile = CURRENT->pfiles->fd_table[fd];
+    struct file *pfile = CURRENT->files_struct->fd_table[fd];
     if (pfile == NULL) {
 			sprint("do_open: choosing fd=%d.\n",fd);
 
       // initialize this file structure
 			pfile = (struct file *)kmalloc(sizeof(struct file));
       memcpy(pfile, opened_file, sizeof(struct file));
-      CURRENT->pfiles->nfiles++;
+      CURRENT->files_struct->nfiles++;
       return fd;
     }
   }
@@ -151,8 +151,8 @@ int do_close(int fd) {
   struct file *pfile = get_opened_file(fd);
 	int ret = vfs_close(pfile);
 	kfree(pfile);
-	CURRENT->pfiles->fd_table[fd] = NULL;
-	CURRENT->pfiles->nfiles--;
+	CURRENT->files_struct->fd_table[fd] = NULL;
+	CURRENT->files_struct->nfiles--;
   return ret;
 }
 
@@ -167,12 +167,12 @@ int do_opendir(char *pathname) {
 
 	// 从进程控制块中分配fd
   for (int fd = 0; fd < MAX_FILES; ++fd) {
-    struct file *pfile = CURRENT->pfiles->fd_table[fd];
+    struct file *pfile = CURRENT->files_struct->fd_table[fd];
     if (pfile == NULL) {
       // initialize this file structure
 			pfile = (struct file *)kmalloc(sizeof(struct file));
       memcpy(pfile, opened_file, sizeof(struct file));
-      CURRENT->pfiles->nfiles++;
+      CURRENT->files_struct->nfiles++;
       return fd;
     }
   }
@@ -223,7 +223,7 @@ ssize_t do_rcwd(char* path) {
         return -1;  // Invalid buffer
     }
     
-    struct dentry* cwd = CURRENT->pfiles->cwd;
+    struct dentry* cwd = CURRENT->files_struct->cwd;
     if (!cwd) {
         return -1;  // No current working directory
     }
@@ -280,7 +280,7 @@ ssize_t do_ccwd(char* path) {
 	struct file* dir_file = vfs_opendir(path);
 	if (dir_file == NULL)
     return -1;
-	CURRENT->pfiles->cwd = dir_file->f_dentry;
+	CURRENT->files_struct->cwd = dir_file->f_dentry;
 	return 0;
 }
 
