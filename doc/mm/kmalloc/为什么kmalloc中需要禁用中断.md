@@ -23,7 +23,7 @@ void top_level_function(void) {
 void do_something_complex(void) {
     // 这个函数的作者必须知道它可能在中断禁用的上下文中被调用
     // 因此必须使用GFP_ATOMIC
-    void *buffer = kmalloc(size, GFP_ATOMIC);
+    uint64 buffer = kmalloc(size, GFP_ATOMIC);
     // ...
 }
 ```
@@ -33,7 +33,7 @@ void do_something_complex(void) {
 内核的内存分配器会检查当前执行上下文：
 
 ```c
-void *kmalloc(size_t size, gfp_t flags) {
+uint64 kmalloc(size_t size, gfp_t flags) {
     // 如果在中断上下文但没有使用GFP_ATOMIC，这会触发内核警告或错误
     if (in_interrupt() && !(flags & GFP_ATOMIC)) {
         WARN_ON(1);
@@ -98,7 +98,7 @@ buffer = kmalloc(size, gfp);
 或者更常见的，根据函数参数决定：
 
 ```c
-void *cache_alloc(struct kmem_cache *cachep, gfp_t flags)
+uint64 cache_alloc(struct kmem_cache *cachep, gfp_t flags)
 {
     // 这里flags由调用者决定传入什么
     return kmem_cache_alloc(cachep, flags);

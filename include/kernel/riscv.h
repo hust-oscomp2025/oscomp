@@ -186,6 +186,12 @@ typedef struct riscv_regs_t {
 // following lines are added @lab2_1
 static inline void flush_tlb(void) { asm volatile("sfence.vma zero, zero"); }
 #define PAGE_SIZE 4096  // bytes per page
+/* 
+ * Mark parameters that must be page-aligned.
+ * For documentation and static analysis.
+ */
+#define __page_aligned
+
 
 // extract the property bits of a pte
 

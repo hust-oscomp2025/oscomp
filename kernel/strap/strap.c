@@ -9,7 +9,7 @@
 
 #include <kernel/mm/page.h>
 #include <kernel/mm/mm_struct.h>
-#include <kernel/process.h>
+#include <kernel/sched/process.h>
 #include <kernel/riscv.h>
 #include <kernel/sched/sched.h>
 #include <util/string.h>
@@ -72,7 +72,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 	// 处理基于 VMA 的内存管理
 	if (proc->mm) {
 			// 查找地址所在的VMA
-			struct vm_area_struct *vma = mm_find_vma(proc->mm, addr);
+			struct vm_area_struct *vma = find_vma(proc->mm, addr);
 			
 			if (vma) {
 					// 确认访问权限
@@ -102,8 +102,8 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 					// 				if (!new_page) goto error;
 									
 					// 				// 复制页内容
-					// 				void *old_pa = page_to_virt(old_page);
-					// 				void *new_pa = page_to_virt(new_page);
+					// 				uint64 old_pa = page_to_addr(old_page);
+					// 				uint64 new_pa = page_to_addr(new_page);
 					// 				memcpy(new_pa, old_pa, PAGE_SIZE);
 									
 					// 				// 更新映射
@@ -113,13 +113,13 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 									
 					// 				// 更新页结构
 					// 				vma->pages[page_idx] = new_page;
-					// 				new_page->virtual_address = (void*)page_va;
+					// 				new_page->paddr = (uint64)page_va;
 					// 				put_page(old_page);
 									
 					// 				return;
 					// 		} else {
 					// 				// 页已分配但可能未映射，确保映射正确
-					// 				void *pa = page_to_virt(vma->pages[page_idx]);
+					// 				uint64 pa = page_to_addr(vma->pages[page_idx]);
 					// 				user_vm_map(proc->pagetable, page_va, PAGE_SIZE, (uint64)pa,
 					// 									prot_to_type(vma->vm_prot, 1));
 					// 				return;
@@ -127,7 +127,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 					// }
 					
 					// // 分配新页并映射
-					// void *page_addr = mm_alloc_page(proc, page_va, vma->vm_prot);
+					// uint64 page_addr = mm_alloc_page(proc, page_va, vma->vm_prot);
 					// if (page_addr) return;
 			}
 	}
@@ -137,7 +137,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 	// 		// 检查是否是栈扩展
 	// 		if (stval >= proc->user_stack_bottom - PAGE_SIZE) {
 	// 				proc->user_stack_bottom -= PAGE_SIZE;
-	// 				void *pa = Alloc_page();
+	// 				uint64 pa = Alloc_page();
 	// 				user_vm_map(proc->pagetable, proc->user_stack_bottom, PAGE_SIZE,
 	// 									(uint64)pa, prot_to_type(PROT_WRITE | PROT_READ, 1));
 	// 				proc->mapped_info[STACK_SEGMENT].va = proc->user_stack_bottom;
@@ -150,7 +150,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 	// 		if (pte && ((uint64)*pte & PTE_W) == 0 && (*pte & PTE_X) == 0) {
 	// 				uint64 page_va = stval & (~0xfff);
 	// 				uint64 newpa = (uint64)Alloc_page();
-	// 				memcpy((void *)newpa, (void *)PTE2PA(*pte), PAGE_SIZE);
+	// 				memcpy((uint64 )newpa, (uint64 )PTE2PA(*pte), PAGE_SIZE);
 	// 				user_vm_unmap(proc->pagetable, page_va, PAGE_SIZE, 0);
 	// 				user_vm_map(proc->pagetable, page_va, PAGE_SIZE, newpa, 
 	// 									 prot_to_type(PROT_WRITE | PROT_READ, 1));

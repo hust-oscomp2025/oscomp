@@ -1,11 +1,9 @@
 #ifndef _ELF_H_
 #define _ELF_H_
-
-
 #include <kernel/types.h>
-#include <kernel/process.h>
+#include <kernel/sched/process.h>
 
-#define MAX_CMDLINE_ARGS 64
+void load_elf_from_file(struct task_struct *p, char* filename);
 
 // elf header structure
 typedef struct elf_header_t {
@@ -36,7 +34,7 @@ typedef struct elf_prog_header_t {
   uint32 type;   /* Segment type */
   uint32 flags;  /* Segment flags */
   uint64 off;    /* Segment file offset */
-  uaddr vaddr;  /* Segment virtual address */
+  uint64 vaddr;  /* Segment virtual address */
   uint64 paddr;  /* Segment physical address */
   uint64 filesz; /* Segment size in file */
   uint64 memsz;  /* Segment size in memory */
@@ -59,7 +57,6 @@ typedef struct __attribute__((packed)) {
 
 typedef enum elf_status_t {
   EL_OK = 0,
-
   EL_EIO,
   EL_ENOMEM,
   EL_NOTELF,
@@ -72,10 +69,7 @@ typedef struct elf_ctx_t {
   elf_header ehdr;
 } elf_ctx;
 
-elf_status elf_init(elf_ctx *ctx, void *info);
-elf_status elf_load(elf_ctx *ctx);
 
-void load_elf_from_file(struct task_struct *p, char* filename);
 
 //lab1_challenge1
 // ELF符号表结构体
@@ -121,20 +115,9 @@ typedef struct elf_section_header_t {
 #define ELF_SHF_ALLOC      0x2    // 分配内存
 #define ELF_SHF_EXECINSTR  0x4    // 可执行
 
-elf_status load_debug_infomation(elf_ctx *ctx);
-void print_elf_symbol(const elf_symbol *symbol, int index);
+
 char* locate_function_name(uint64 epc);
 
-#define SYMBOL_NUM 400
-#define SYMBOL_LENGTH 1000
-extern elf_symbol funtion_symbols[SYMBOL_NUM];
-extern char function_names[SYMBOL_NUM][SYMBOL_LENGTH];
-extern int function_count;
-
-// lab1_challenge2
-void load_debugline(elf_ctx *ctx);
-void print_chars(const char* start, int n);
-void print_elf_section_header(elf_sect_header *section_header, char *shstr);
 
 
 

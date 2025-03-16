@@ -35,7 +35,7 @@ const struct inode_operations hostfs_i_ops = {
 // append hostfs to the fs list.
 //
 int register_hostfs() {
-	sprint("register_hostfs: begin\n");
+	//sprint("register_hostfs: begin\n");
 
   struct file_system_type *fs_type = kmalloc(sizeof(struct file_system_type));
   fs_type->type_num = HOSTFS_TYPE;
@@ -44,7 +44,7 @@ int register_hostfs() {
   for (int i = 0; i < MAX_SUPPORTED_FS; i++) {
     if (fs_list[i] == NULL) {
       fs_list[i] = fs_type;
-			sprint("register_hostfs: end\n");
+			//sprint("register_hostfs: end\n");
 
       return 0;
     }

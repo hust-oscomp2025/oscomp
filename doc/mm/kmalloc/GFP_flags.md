@@ -38,7 +38,7 @@
 **示例代码**：
 ```c
 // 中断处理程序中
-void my_interrupt_handler(int irq, void *dev_id) {
+void my_interrupt_handler(int irq, uint64 dev_id) {
     struct buffer *buf = kmalloc(sizeof(struct buffer), GFP_ATOMIC);
     if (!buf)
         return; // 必须处理分配失败！
@@ -189,8 +189,8 @@ struct data *zeroed_data = kmalloc(sizeof(struct data),
 #define __GFP_DMA      0x00000008  /* 适用于DMA的内存 */
 
 /* 分配内存的函数 */
-void *kmalloc(size_t size, gfp_t flags) {
-    void *ptr = NULL;
+uint64 kmalloc(size_t size, gfp_t flags) {
+    uint64 ptr = NULL;
     
     /* 根据标志选择分配策略 */
     if (flags & GFP_ATOMIC) {

@@ -35,7 +35,7 @@
   // 内核源码（kernel/pid.c）
   struct pidmap {
       atomic_t nr_free;     // 可用 PID 数量
-      void *page;           // 位图存储页
+      uint64 page;           // 位图存储页
   };
   ```
 • **位图初始化**：系统启动时，初始化一个或多个 `pidmap` 页，每个页管理 `PAGE_SIZE * 8` 个 PID（例如 4KB 页管理 32768 个 PID）。

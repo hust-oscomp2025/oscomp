@@ -21,7 +21,7 @@
        unsigned int kmalloc_pages;  // 多页分配时的页数
        
        // 其他通用字段
-       void *virtual_address;       // 页在内核空间中的虚拟地址
+       uint64 virtual_address;       // 页在内核空间中的虚拟地址
        struct list_head lru;        // LRU链表节点
        spinlock_t page_lock;        // 页锁，用于同步访问
    };

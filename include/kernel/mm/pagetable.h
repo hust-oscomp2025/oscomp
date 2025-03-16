@@ -9,11 +9,11 @@
 #ifndef _PAGETABLE_H
 #define _PAGETABLE_H
 
-#include <util/atomic.h>
-#include <kernel/riscv.h>
-#include <util/spinlock.h>
-#include <kernel/types.h>
 #include <kernel/mm/page.h>
+#include <kernel/riscv.h>
+#include <kernel/types.h>
+#include <util/atomic.h>
+#include <util/spinlock.h>
 
 /**
  * @brief 页表管理数据结构
@@ -58,18 +58,6 @@ typedef pte_t *pagetable_t; // 页表类型(指向512个PTE的数组)
 #define PXSHIFT(level) (PAGE_SHIFT + (PT_INDEX_BITS * (level)))
 #define PX(level, va) ((((uint64)(va)) >> PXSHIFT(level)) & PT_INDEX_MASK)
 
-/* 页表项标志位定义 */
-#define _PAGE_PRESENT   (1UL << 0)  /* 页面存在 */
-#define _PAGE_READ      (1UL << 1)  /* 可读 */
-#define _PAGE_WRITE     (1UL << 2)  /* 可写 */
-#define _PAGE_EXEC      (1UL << 3)  /* 可执行 */
-#define _PAGE_USER      (1UL << 4)  /* 用户态可访问 */
-#define _PAGE_GLOBAL    (1UL << 5)  /* 全局页 */
-#define _PAGE_ACCESSED  (1UL << 6)  /* 已访问 */
-#define _PAGE_DIRTY     (1UL << 7)  /* 已修改 */
-
-
-
 /**
  * @brief 页表统计信息结构
  */
@@ -78,70 +66,20 @@ typedef struct {
   atomic_t page_tables;  // 页表数量
 } pagetable_stats_t;
 
+void pagetable_server_init(void);
 
 
-/**
- * @brief 初始化页表子系统
- */
-void pagetable_init(void);
+pagetable_t create_pagetable(void);
+void free_pagetable(pagetable_t pagetable);
 
-/**
- * @brief 创建一个新的空页表
- *
- * @return pagetable_t 返回新页表的虚拟地址指针，失败时返回NULL
- */
-pagetable_t pagetable_create(void);
+int pgt_map_page(pagetable_t pagetable, vaddr_t va, paddr_t pa, int perm);
+int pgt_map_pages(pagetable_t pagetable, vaddr_t va, paddr_t pa, uint64 size,  int perm);
 
-/**
- * @brief 释放整个页表结构(包括所有级别的页表)
- *
- * @param pagetable 要释放的页表
- */
-void pagetable_free(pagetable_t pagetable);
+int pgt_unmap(pagetable_t pagetable, vaddr_t va, uint64 size, int free_phys);
 
-/**
- * @brief 在页表中映射虚拟地址到物理地址，可能会分配新的页表页
- *
- * @param pagetable 页表
- * @param va 虚拟地址(页对齐)
- * @param pa 物理地址(页对齐)
- * @param size 要映射的字节数(将四舍五入到页的大小)
- * @param perm 权限标志(PTE_R, PTE_W, PTE_X, PTE_U等)
- * @return int 成功返回0，失败返回负值
- */
-int pgt_map_page(pagetable_t pagetable, uaddr va, uint64 pa,
-                  int perm);
+pte_t *page_walk(pagetable_t pagetable, vaddr_t va, int alloc);
+paddr_t lookup_pa(pagetable_t pagetable, vaddr_t va);
 
-/**
- * @brief 解除页表中一块虚拟地址区域的映射
- *
- * @param pagetable 页表
- * @param va 虚拟地址起始点(页对齐)
- * @param size 要取消映射的字节数(将四舍五入到页的大小)
- * @param free_phys 是否同时释放物理页内存
- * @return int 成功返回0，失败返回负值
- */
-int pgt_unmap(pagetable_t pagetable, uaddr va, uint64 size,
-                    int free_phys);
-
-/**
- * @brief 在页表中查找页表项
- *
- * @param pagetable 页表
- * @param va 虚拟地址
- * @param alloc 如果为1，则在页表不存在时分配一个新页表页
- * @return pte_t* 返回PTE的地址，如果不存在且alloc=0，则返回NULL
- */
-pte_t *pgt_walk(pagetable_t pagetable, uaddr va, int alloc);
-
-/**
- * @brief 查找虚拟地址对应的物理地址
- *
- * @param pagetable 页表
- * @param va 虚拟地址
- * @return uint64 物理地址，如果映射不存在则返回0
- */
-uint64 pgt_lookuppa(pagetable_t pagetable, uaddr va);
 
 /**
  * @brief 复制页表结构(可选择是否复制映射)
@@ -152,7 +90,7 @@ uint64 pgt_lookuppa(pagetable_t pagetable, uaddr va);
  * @param share 映射类型: 0=复制物理页, 1=共享物理页, 2=写时复制
  * @return pagetable_t 复制的页表，失败返回NULL
  */
-pagetable_t pagetable_copy(pagetable_t src, uaddr start, uaddr end, int share);
+pagetable_t pagetable_copy(pagetable_t src, vaddr_t start, vaddr_t end, int share);
 
 /**
  * @brief 打印页表内容(用于调试)
@@ -175,7 +113,7 @@ void pagetable_activate(pagetable_t pagetable);
  */
 pagetable_t pagetable_current(void);
 
-void check_address_mapping(pagetable_t pagetable, uint64 va);
+void check_address_mapping(pagetable_t pagetable, vaddr_t va);
 
 extern pagetable_stats_t pt_stats; // 全局页表统计信息
 // pointer to kernel page directory
