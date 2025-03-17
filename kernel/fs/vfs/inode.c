@@ -1,10 +1,41 @@
-#include <errno.h>
+#include <kernel/types.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/mm/kmalloc.h>
 #include <kernel/sched/sched.h>
 #include <util/string.h>
 
 static void __clear_inode(struct inode* inode);
+static unsigned int inode_hash_func(const void *key, unsigned int size);
+static int inode_key_equals(const void *k1, const void *k2);
+static void hash_inode(struct inode *inode);
+static void unhash_inode(struct inode *inode);
+static void wake_up_inode(struct inode *inode);
+static struct inode *iget_locked(struct super_block *sb, unsigned long ino);
+static void evict_inode(struct inode* inode);
+static int generic_permission(struct inode* inode, int mask);
+
+
+/**
+ * inode_cache_init - Initialize the inode cache
+ *
+ * Sets up the inode cache hash table and related structures.
+ */
+int inode_cache_init(void) {
+  int err;
+
+  sprint("Initializing inode cache\n");
+
+  /* Initialize hash table */
+  err = hashtable_init(&inode_hashtable, 1024, 75, inode_hash_func,
+                       inode_key_equals);
+  if (err != 0) {
+    sprint("Failed to initialize inode hashtable: %d\n", err);
+    return;
+  }
+
+  sprint("Inode cache initialized\n");
+}
+
 
 /**
  * generic_permission - Check for access rights on a Unix-style file system
@@ -16,7 +47,7 @@ static void __clear_inode(struct inode* inode);
  *
  * Returns 0 if access is allowed, -EACCES otherwise.
  */
-int generic_permission(struct inode* inode, int mask) {
+static int generic_permission(struct inode* inode, int mask) {
   int mode = inode->i_mode;
   int res = 0;
 
@@ -90,27 +121,31 @@ int inode_permission(struct inode* inode, int mask) {
 struct inode* alloc_inode(struct super_block* sb) {
   struct inode* inode;
 
-  if (sb->s_op && sb->s_op->alloc_inode) {
-    inode = sb->s_op->alloc_inode(sb);
+  if (sb->operations && sb->operations->alloc_inode) {
+    inode = sb->operations->alloc_inode(sb);
   } else {
     inode = kmalloc(sizeof(struct inode));
   }
-
-  if (!inode)
+  if (unlikely(!inode))
     return NULL;
 
   /* Initialize the inode */
   memset(inode, 0, sizeof(struct inode));
   atomic_set(&inode->i_count, 1);
   INIT_LIST_HEAD(&inode->i_dentry);
+  INIT_LIST_HEAD(&inode->i_sb_list_node);
+  INIT_LIST_HEAD(&inode->i_state_list_node);
   spinlock_init(&inode->i_lock);
-  inode->i_sb = sb;
+  inode->i_superblock = sb;
+  inode->i_state = I_NEW; /* Mark as new */
+  list_add(&inode->i_sb_list_node, &sb->all_inodes);
+  list_add(&inode->i_state_list_node, &sb->clean_inodes);
 
   return inode;
 }
 
 /**
- * iget - Get inode from inode cache or create a new one
+ * get_inode - Get a fully initialized inode
  * @sb: superblock to get inode from
  * @ino: inode number to look up
  *
@@ -119,7 +154,7 @@ struct inode* alloc_inode(struct super_block* sb) {
  *
  * Returns the inode or NULL if an error occurs.
  */
-struct inode* iget(struct super_block* sb, unsigned long ino) {
+struct inode* get_inode(struct super_block* sb, unsigned long ino) {
   struct inode* inode;
 
   /* Look in the inode hash table first */
@@ -132,8 +167,8 @@ struct inode* iget(struct super_block* sb, unsigned long ino) {
     return inode;
 
   /* Initialize new inode from disk */
-  if (sb->s_op && sb->s_op->read_inode) {
-    sb->s_op->read_inode(inode);
+  if (sb->operations && sb->operations->read_inode) {
+    sb->operations->read_inode(inode);
   }
 
   /* Mark inode as initialized and wake up waiters */
@@ -143,14 +178,14 @@ struct inode* iget(struct super_block* sb, unsigned long ino) {
 }
 
 /**
- * igrab - Increment inode reference count
+ * grab_inode - Increment inode reference count
  * @inode: inode to grab
  *
  * Increments the reference count on an inode if it's valid.
  *
  * Returns the inode with incremented count, or NULL if the inode is invalid.
  */
-struct inode* igrab(struct inode* inode) {
+struct inode* grab_inode(struct inode* inode) {
   if (!inode || is_bad_inode(inode))
     return NULL;
 
@@ -163,21 +198,29 @@ struct inode* igrab(struct inode* inode) {
  * @inode: inode to put
  *
  * Decrements the reference count on an inode. If the count reaches zero,
- * the inode is deallocated or returned to the cache.
+ * the inode is added to the LRU list waiting for recycle.
  */
 void put_inode(struct inode* inode) {
-  if (!inode)
+  if (unlikely(!inode))
     return;
 
+  struct super_block* sb = inode->i_superblock;
+  spinlock_lock(&inode->i_lock);
+  /* Decrease reference count */
   if (atomic_dec_and_test(&inode->i_count)) {
-    if (inode->i_nlink == 0) {
-      /* No links, evict the inode */
-      evict_inode(inode);
-    } else {
-      /* Still has links, return to cache */
-      /* Implement inode cache write-back here */
+    /* Last reference gone - add to superblock's LRU */
+    if (!(inode->i_state & I_DIRTY)) {
+      /* If it's on another state list, remove it first */
+      spin_lock(&sb->inode_states_lock);
+      if (!list_empty(&inode->i_state_list_node)) {
+        list_del_init(&inode->i_state_list_node);
+      }
+
+      list_add_tail(&inode->i_state_list_node, &sb->clean_inodes);
+      spin_unlock(&sb->inode_states_lock);
     }
   }
+  spinlock_unlock(&inode->i_lock);
 }
 
 /**
@@ -294,14 +337,22 @@ void mark_inode_dirty(struct inode* inode) {
   if (!inode)
     return;
 
+  struct super_block* sb = inode->i_superblock;
+
   /* Add to superblock's dirty list if not already there */
-  if (!(inode->i_state & I_DIRTY) && inode->i_sb) {
-		
-    spin_lock(&inode->i_sb->s_inode_list_lock);
+  if (!(inode->i_state & I_DIRTY) && sb) {
+    spinlock_lock(&sb->inode_states_lock);
+    spinlock_lock(&inode->i_lock);
+
+    if (likely(!list_empty(&inode->i_state_list_node))) {
+      list_del_init(&inode->i_state_list_node);
+    }
 
     inode->i_state |= I_DIRTY;
-    list_add(&inode->i_list, &inode->i_sb->s_dirty);
-    spin_unlock(&inode->i_sb->s_inode_list_lock);
+    list_add(&inode->i_state_list_node, &sb->dirty_inodes);
+
+    spinlock_unlock(&inode->i_lock);
+    spinlock_unlock(&sb->inode_states_lock);
   }
 }
 
@@ -314,7 +365,7 @@ void mark_inode_dirty(struct inode* inode) {
  * cleaning up filesystem-specific resources and then clearing
  * the inode.
  */
-void evict_inode(struct inode* inode) {
+static void evict_inode(struct inode* inode) {
   if (!inode)
     return;
 
@@ -322,8 +373,9 @@ void evict_inode(struct inode* inode) {
   inode->i_state |= I_FREEING;
 
   /* Call filesystem-specific cleanup through superblock operations */
-  if (inode->i_sb && inode->i_sb->s_op && inode->i_sb->s_op->evict_inode) {
-    inode->i_sb->s_op->evict_inode(inode);
+  if (inode->i_superblock && inode->i_superblock->operations &&
+      inode->i_superblock->operations->evict_inode) {
+    inode->i_superblock->operations->evict_inode(inode);
   }
 
   /* Delete any remaining pages in the page cache */
@@ -350,11 +402,11 @@ void __clear_inode(struct inode* inode) {
   inode->i_state = 0;
 
   /* Remove from superblock lists */
-  if (inode->i_sb) {
-    spin_lock(&inode->i_sb->s_inode_list_lock);
+  if (inode->i_superblock) {
+    spin_lock(&inode->i_superblock->all_inodes_lock);
     list_del_init(&inode->i_sb_list_node);
     list_del_init(&inode->i_state_list_node);
-    spin_unlock(&inode->i_sb->s_inode_list_lock);
+    spin_unlock(&inode->i_superblock->all_inodes_lock);
   }
 
   /* Clear file system specific data if needed */
@@ -371,4 +423,198 @@ void __clear_inode(struct inode* inode) {
 
   /* Free the inode memory */
   kfree(inode);
+}
+
+
+/**
+ * iget_locked - Get inode from cache or allocate a new one
+ * @sb: superblock to get inode from
+ * @ino: inode number to look up
+ *
+ * Looks up an inode in the hash table. If found, increments its
+ * reference count. If not found, allocates a new inode and adds
+ * it to the hash table with the I_NEW flag set.
+ *
+ * Returns locked inode on success, NULL on allocation failure.
+ */
+static struct inode *iget_locked(struct super_block *sb, unsigned long ino) {
+	struct inode *inode;
+	struct inode_key key = { .sb = sb, .ino = ino };
+	
+	/* Look up in the hash table */
+	inode = hashtable_lookup(&inode_hashtable, &key);
+	
+	if (inode) {
+			/* Found in cache - grab a reference */
+			ihold(inode);
+			return inode;
+	}
+	
+	/* Not found - allocate a new one */
+	inode = new_inode(sb);
+	if (!inode)
+			return NULL;
+			
+	/* Set the inode number */
+	inode->i_ino = ino;
+	
+	/* Add to the hash table */
+	hashtable_insert(&inode_hashtable, &key, inode);
+	
+	return inode;
+}
+/**
+ * Hash function for inode keys
+ */
+static unsigned int inode_hash_func(const void *key, unsigned int size) {
+  const struct inode_key *ikey = (const struct inode_key *)key;
+  unsigned long val = (unsigned long)ikey->sb ^ ikey->ino;
+
+  /* Mix the bits to distribute values better */
+  val = (val * 11400714819323198485ULL) >> 32; /* Fast hash multiply */
+  return (unsigned int)val;
+}
+
+
+
+/**
+ * Compare two inode keys for equality
+ */
+static int inode_key_equals(const void *k1, const void *k2) {
+  const struct inode_key *key1 = (const struct inode_key *)k1;
+  const struct inode_key *key2 = (const struct inode_key *)k2;
+
+  return (key1->sb == key2->sb && key1->ino == key2->ino);
+}
+
+
+/**
+ * hash_inode - Add an inode to the hash table
+ * @inode: The inode to add
+ *
+ * Adds an inode to the inode hash table for fast lookups.
+ */
+static void hash_inode(struct inode *inode) {
+  struct inode_key *key;
+
+  if (!inode || !inode->i_superblock)
+    return;
+
+  /* Create hash key */
+  key = kmalloc(sizeof(struct inode_key));
+  if (!key)
+    return;
+
+  key->sb = inode->i_superblock;
+  key->ino = inode->i_ino;
+
+  /* Insert into hash table */
+  hashtable_insert(&inode_hashtable, key, inode);
+}
+
+/**
+ * unhash_inode - Remove an inode from the hash table
+ * @inode: The inode to remove
+ */
+static void unhash_inode(struct inode *inode) {
+  struct inode_key key;
+
+  if (!inode || !inode->i_superblock)
+    return;
+
+  key.sb = inode->i_superblock;
+  key.ino = inode->i_ino;
+
+  /* Remove from hash table */
+  hashtable_remove(&inode_hashtable, &key);
+}
+
+
+/**
+ * unlock_new_inode - Unlock a newly allocated inode
+ * @inode: inode to unlock
+ *
+ * Clears the I_NEW state bit and wakes up any processes
+ * waiting on this inode to be initialized.
+ */
+void unlock_new_inode(struct inode *inode) {
+	if (!inode)
+			return;
+			
+	spin_lock(&inode->i_lock);
+	inode->i_state &= ~I_NEW;
+	spin_unlock(&inode->i_lock);
+	
+	/* Wake up anyone waiting for this inode to be initialized */
+	wake_up_inode(inode);
+}
+
+
+/**
+ * sync_inode - Write an inode to disk
+ * @inode: inode to write
+ * @wait: whether to wait for I/O to complete
+ *
+ * Calls the filesystem's writeback function to synchronize
+ * the inode to disk.
+ *
+ * Returns 0 on success or negative error code.
+ */
+int sync_inode(struct inode *inode, int wait) {
+	int ret = 0;
+	
+	if (!inode)
+			return -EINVAL;
+			
+	/* If clean, nothing to do */
+	if (!(inode->i_state & I_DIRTY))
+			return 0;
+			
+	/* Call the filesystem's write_inode method if available */
+	if (inode->i_superblock && inode->i_superblock->operations && 
+			inode->i_superblock->operations->write_inode) {
+			ret = inode->i_superblock->operations->write_inode(inode, wait);
+	}
+	
+	/* If successful and waiting requested, clear dirty state */
+	if (ret == 0 && wait) {
+			spin_lock(&inode->i_superblock->inode_states_lock);
+			/* Remove from dirty list */
+			if (inode->i_state & I_DIRTY) {
+					list_del_init(&inode->i_state_list_node);
+					inode->i_state &= ~I_DIRTY;
+					list_add(&inode->i_state_list_node, &inode->i_superblock->clean_inodes);
+			}
+			spin_unlock(&inode->i_superblock->inode_states_lock);
+	}
+	
+	return ret;
+}
+
+/**
+* sync_inode_metadata - Sync only inode metadata to disk
+* @inode: inode to sync
+* @wait: whether to wait for I/O to complete
+*
+* Like sync_inode(), but only writes inode metadata, not data blocks.
+* Used when only attributes have changed.
+*
+* Returns 0 on success or negative error code.
+*/
+int sync_inode_metadata(struct inode *inode, int wait) {
+	/* For now, just delegate to sync_inode */
+	/* In a more complete implementation, this would only sync metadata */
+	return sync_inode(inode, wait);
+}
+
+/**
+ * wake_up_inode - Wake up processes waiting on an inode
+ * @inode: the inode to wake up waiters for
+ *
+ * Helper function to wake up processes waiting for an inode
+ * to become available (e.g., after initialization).
+ */
+static void wake_up_inode(struct inode *inode) {
+	/* In a full implementation, this would use wait queues */
+	/* For now, we'll assume no waiters or that it's handled elsewhere */
 }

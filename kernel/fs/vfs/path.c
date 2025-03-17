@@ -1,16 +1,11 @@
-#include <errno.h>
-#include <kernel/fs/dentry.h>
-#include <kernel/fs/fd_struct.h>
-#include <kernel/fs/fs_struct.h>
-#include <kernel/fs/inode.h>
-#include <kernel/fs/namespace.h> // Add this include
-#include <kernel/fs/super_block.h>
 #include <kernel/fs/vfs.h>
-#include <kernel/fs/path.h>
+#include <kernel/types.h>
+
 #include <kernel/sched/process.h>
 #include <kernel/sched/sched.h>
 #include <spike_interface/spike_utils.h>
 #include <util/string.h>
+#include <util/list.h>
 
 static int vfs_path_lookup(struct dentry* base_dentry,
                            struct vfsmount* base_mnt, const char* path_str,
@@ -215,9 +210,9 @@ static int vfs_path_lookup(struct dentry* base_dentry,
     if (!base_mnt && base_dentry->d_sb) {
       /* Fall back to first mount in superblock's mount list */
       spin_lock(&base_dentry->d_sb->s_mounts_lock);
-      if (!list_empty(&base_dentry->d_sb->s_mounts)) {
-        struct vfsmount* mnt = list_first_entry(&base_dentry->d_sb->s_mounts,
-                                                struct vfsmount, mnt_instance);
+      if (!list_empty(&base_dentry->d_sb->s_mounts_list)) {
+        struct vfsmount* mnt = list_first_entry(&base_dentry->d_sb->s_mounts_list,
+                                                struct vfsmount, mnt_node_superblock);
         base_mnt = mnt;
       }
       spin_unlock(&base_dentry->d_sb->s_mounts_lock);
@@ -281,7 +276,7 @@ static int vfs_path_lookup(struct dentry* base_dentry,
       struct dentry* parent;
 
       /* Check if we're at the root already */
-      if (dentry == dentry->d_sb->s_root &&
+      if (dentry == dentry->d_sb->global_root_dentry &&
           (!base_mnt || base_mnt->mnt_parent == base_mnt)) {
         /* Already at root - stay at root */
         component = next_slash;
@@ -292,7 +287,7 @@ static int vfs_path_lookup(struct dentry* base_dentry,
       if (base_mnt && dentry == base_mnt->mnt_root) {
         /* Cross mount point to parent */
         if (base_mnt->mnt_parent != base_mnt) {
-          struct dentry* mnt_parent = base_mnt->mnt_parent->mnt_mountpoint;
+          struct dentry* mnt_parent = base_mnt->mnt_parent->mnt_dentry_mtpoint;
           struct vfsmount* parent_mnt = base_mnt->mnt_parent;
 
           put_dentry(dentry);

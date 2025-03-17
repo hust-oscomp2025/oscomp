@@ -1,4 +1,5 @@
-#include <errno.h>
+#include <kernel/types.h>
+
 #include <kernel/mm/mm_struct.h>
 #include <kernel/mm/mmap.h>
 #include <kernel/mm/vma.h>

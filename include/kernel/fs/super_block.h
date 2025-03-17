@@ -1,7 +1,5 @@
 #ifndef SUPER_BLOCK_H
 #define SUPER_BLOCK_H
-#include <kernel/fs/inode.h>
-#include <kernel/fs/vfs.h>
 #include <kernel/types.h>
 #include <util/list.h>
 #include <util/spinlock.h>
@@ -12,50 +10,49 @@ struct dentry;
 
 /* Superblock structure representing a mounted filesystem */
 struct super_block {
+  spinlock_t superblock_lock; 			// Lock protecting the superblock
+
   /* Filesystem identification */
-  unsigned int s_magic;           // Magic number identifying filesystem
-  dev_t s_dev;                    // Device identifier
+  unsigned int magic;          			 // Magic number identifying filesystem
+  dev_t device_id;                    // Device identifier
   unsigned long s_blocksize;      // Block size in bytes
   unsigned long s_blocksize_bits; // Block size bits (log2 of blocksize)
 
   /* Root of the filesystem */
-  struct dentry *s_root; // Root dentry
+  struct dentry* global_root_dentry; // Root dentry
 
   /* Filesystem information and operations */
-  struct file_system_type *s_type;     // Filesystem type
-  const struct super_operations *s_op; // Superblock operations
-  void *s_fs_info;                     // Filesystem-specific information
+  struct file_system_type* fs_type;     // Filesystem type
+  struct list_head fstype_node; // Instances of this filesystem
+
+  void* fs_specific_data;                     // Filesystem-specific information
 
   /* Master list - all inodes belong to this superblock */
-  struct list_head s_inode_list; // List of inodes belonging to this sb
-  spinlock_t s_inode_lock;       // Lock for s_inode_list
+  struct list_head all_inodes; // List of inodes belonging to this sb
+  spinlock_t all_inodes_lock;       // Lock for all_inodes
 
   /* State lists - an inode is on exactly ONE of these at any time */
-  struct list_head s_inode_lru_list;   // Clean, unused inodes (for reclaiming)
-  struct list_head s_inode_dirty_list; // Dirty inodes (need write-back)
-  struct list_head s_inode_io_list;    // Inodes currently under I/O
+  struct list_head clean_inodes;   // Clean, unused inodes (for reclaiming)
+  struct list_head dirty_inodes; // Dirty inodes (need write-back)
+  struct list_head io_inodes;    // Inodes currently under I/O
   /* One lock for all state lists */
-  spinlock_t s_inode_states_lock; // Lock for all state lists
+  spinlock_t inode_states_lock; // Lock for all state lists
 
   /* Filesystem statistics */
-  unsigned long s_maxbytes; // Max file size
+  unsigned long file_maxbytes; // Max file size
   int s_nblocks;            // Number of blocks
-  int s_ninodes;            // Number of inodes
+  atomic_int ninodes;            // Number of inodes
 
   /* Locking and reference counting */
-  spinlock_t s_lock; // Lock protecting the superblock
-  int s_count;       // Reference count
-  int s_active;      // Active reference count
+  atomic_int ref_count;       // Reference count: mount point count + open file count
+  //int s_active;      // Active reference count: 用来做懒卸载，目前不需要
 
   /* Mount info */
-  struct list_head s_mounts;    // List of mounts
-  spinlock_t s_mounts_lock; // Lock for all state lists
-
-	/* List of instances */
-  struct list_head s_instances; // Instances of this filesystem
+  struct list_head s_mounts_list; // List of mounts
+  spinlock_t s_mounts_lock;  // Lock for all state lists
 
   /* Flags */
-  unsigned long s_flags; // Mount flags
+  unsigned long superblock_flags; // Mount flags
 
   /* Quotas */
   // struct quota_info s_dquot;       // Quota operations
@@ -63,7 +60,40 @@ struct super_block {
   /* Time values */
   time_t s_time_min; // Earliest time the fs can represent
   time_t s_time_max; // Latest time the fs can represent
+	// 取决于文件系统自身的属性，例如ext4的时间戳范围是1970-2106
+
+  const struct super_operations* operations; // Superblock operations
+
 };
+
+/* Function prototypes */
+
+struct super_block* get_superblock(struct file_system_type* type, void* data);
+void drop_super(struct super_block* sb);
+
+/* File system types */
+struct file_system_type {
+  const char* name;
+  int fs_flags;
+
+  /* Fill in a superblock */
+  int (*fill_super)(struct super_block* sb, void* data, int silent);
+  struct super_block* (*mount)(struct file_system_type*, int, const char*,
+                               void*);
+  void (*kill_sb)(struct super_block*);
+
+  /* Inside file_system_type structure */
+  struct list_head fs_fslist_node; /* Node for linking into global filesystem list */
+	//spinlock_t fs_fslist_node_lock;
+
+  struct list_head superblock_list;
+	spinlock_t superblock_list_lock;
+};
+
+int register_filesystem_types(void);
+int register_filesystem(struct file_system_type*);
+int unregister_filesystem(struct file_system_type*);
+struct file_system_type* get_fs_type(const char* name);
 
 /**
  * User-facing filesystem statistics
@@ -96,65 +126,33 @@ struct statfs {
 /* Superblock operations supported by all filesystems */
 struct super_operations {
   /* Inode lifecycle management */
-  struct inode *(*alloc_inode)(struct super_block *sb);
-  void (*destroy_inode)(struct inode *inode);
-  void (*dirty_inode)(struct inode *inode);
+  struct inode* (*alloc_inode)(struct super_block* sb);
+  void (*destroy_inode)(struct inode* inode);
+  void (*dirty_inode)(struct inode* inode);
 
   /* Inode I/O operations */
-  int (*write_inode)(struct inode *inode, int wait);
-  int (*read_inode)(struct inode *inode);
-  void (*evict_inode)(struct inode *inode);
-  void (*drop_inode)(struct inode *inode);
-  void (*delete_inode)(struct inode *inode);
+  int (*write_inode)(struct inode* inode, int wait);
+  int (*read_inode)(struct inode* inode);
+  void (*evict_inode)(struct inode* inode);
+  void (*drop_inode)(struct inode* inode);
+  void (*delete_inode)(struct inode* inode);
 
   /* Superblock management */
-  int (*sync_fs)(struct super_block *sb, int wait);
-  int (*freeze_fs)(struct super_block *sb);
-  int (*unfreeze_fs)(struct super_block *sb);
-  int (*statfs)(struct super_block *sb, struct statfs *statfs);
-  int (*remount_fs)(struct super_block *sb, int *flags, char *data);
-  void (*umount_begin)(struct super_block *sb);
+  int (*sync_fs)(struct super_block* sb, int wait);
+  int (*freeze_fs)(struct super_block* sb);
+  int (*unfreeze_fs)(struct super_block* sb);
+  int (*statfs)(struct super_block* sb, struct statfs* statfs);
+  int (*remount_fs)(struct super_block* sb, int* flags, char* data);
+  void (*umount_begin)(struct super_block* sb);
 
   /* Superblock lifecycle */
-  void (*put_super)(struct super_block *sb);
-  int (*sync_super)(struct super_block *sb, int wait);
+  void (*put_super)(struct super_block* sb);
+  int (*sync_super)(struct super_block* sb, int wait);
 
   /* Filesystem-specific clear operations */
-  void (*__clear_inode)(struct inode *inode);
-  int (*show_options)(struct seq_file *seq, struct dentry *root);
+  void (*__clear_inode)(struct inode* inode);
+  int (*show_options)(struct seq_file* seq, struct dentry* root);
 };
-
-/* Function prototypes */
-
-struct super_block *sget(struct file_system_type *type, void *data);
-void drop_super(struct super_block *sb);
 
 #endif
 
-//        ┌─────────────┐
-//        │             │
-// ┌─────▶│   CLEAN    │◀─────┐
-// │      │  (LRU)      │      │
-// │      │             │      │
-// │      └─────────────┘      │
-// │             │             │
-// │             │             │
-// Write        Mark dirty     I/O completes
-// completes     │             │
-// │             │             │
-// │             ▼             │
-// │      ┌─────────────┐      │
-// │      │             │      │
-// └─────-│   DIRTY     │------┘
-//        │             │
-//        └─────────────┘
-// 							 │
-// 							 │
-// 				   Start I/O
-// 							 │
-// 							 ▼
-//				 ┌─────────────┐
-// 			 	 │             │
-// 		 		 │    I/O      │
-//				 │             │
-// 				 └─────────────┘

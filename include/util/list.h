@@ -23,6 +23,8 @@ struct list_head {
   struct list_head *next, *prev;
 };
 
+#define list_node list_head
+
 
 /*
  * 链表的动态初始化函数

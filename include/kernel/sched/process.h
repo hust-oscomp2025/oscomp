@@ -155,6 +155,7 @@ int free_process(struct task_struct* proc);
 int do_fork(struct task_struct* parent);
 int do_exec(uint64 path);
 ssize_t do_wait(int pid);
+int current_is_in_group(gid_t gid);
 
 /**
  * 打印进程的内存布局信息，用于调试

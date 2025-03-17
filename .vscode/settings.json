@@ -20,7 +20,10 @@
 			"spike_utils.h": "c",
 			"trapframe.h": "c",
 			"file_system_type.h": "c",
-			"super_block.h": "c"
+			"super_block.h": "c",
+			"sched.h": "c",
+			"inode.h": "c",
+			"page.h": "c"
 		},
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyFunction": true,
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyType": true,

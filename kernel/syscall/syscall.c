@@ -2,13 +2,12 @@
  * contains the implementation of all syscalls.
  */
 
-#include <errno.h>
+
 #include <stdint.h>
 
 #include <kernel/elf.h>
 
 
-#include <kernel/proc_file.h>
 #include <kernel/sched/process.h>
 #include <kernel/sched/sched.h>
 

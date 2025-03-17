@@ -1,2 +1,5 @@
 BasedOnStyle: LLVM  # 或 Google、Mozilla
 PointerAlignment: Left
+TabWidth: 4
+IndentWidth: 4
+UseTab: ForIndentation  # 或 UseTab: ForIndentation 如果你希望使用实际的制表符而非空格

@@ -181,3 +181,23 @@ void print_proc_memory_layout(struct task_struct *proc) {
            vma->vm_end, prot_str, vma->page_count);
   }
 }
+
+
+/**
+ * current_is_in_group - Check if current task belongs to specified group
+ * @gid: group ID to check
+ *
+ * Returns true if the current task belongs to the specified group.
+ */
+int current_is_in_group(gid_t gid) {
+	struct task_struct *task = current_task();
+	
+	/* Check primary group */
+	if (task->egid == gid)
+			return 1;
+	
+	/* Check supplementary groups if implemented */
+	/* This would iterate through task's supplementary groups */
+	
+	return 0;
+}

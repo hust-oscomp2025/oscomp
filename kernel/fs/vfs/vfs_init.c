@@ -9,7 +9,8 @@
 #include <kernel/mm/kmalloc.h>
 #include <spike_interface/spike_utils.h>
 #include <util/hashtable.h>
-#include <errno.h>
+#include <kernel/types.h>
+
 
 /* Global mount list */
 static struct list_head mount_list;
@@ -136,22 +137,22 @@ struct vfsmount *vfs_kern_mount(struct file_system_type *type, int flags,
 
   /* Initialize the mount */
   mnt->mnt_root = root;
-  mnt->mnt_sb = root->d_sb;
+  mnt->mnt_superblock = root->d_sb;
   mnt->mnt_flags = flags;
-  atomic_set(&mnt->mnt_count, 1);
+  atomic_set(&mnt->mnt_refcount, 1);
   mnt->mnt_devname = kstrdup(name, GFP_KERNEL);
-  INIT_LIST_HEAD(&mnt->mnt_instance);
-  INIT_LIST_HEAD(&mnt->mnt_mounts);
-  INIT_LIST_HEAD(&mnt->mnt_child);
+  INIT_LIST_HEAD(&mnt->mnt_node_superblock);
+  INIT_LIST_HEAD(&mnt->mnt_list_children);
+  INIT_LIST_HEAD(&mnt->mnt_node_parent);
 
   /* Add to superblock's mount list */
-  spin_lock(&mnt->mnt_sb->s_mounts_lock);
-  list_add(&mnt->mnt_instance, &mnt->mnt_sb->s_mounts);
-  spin_unlock(&mnt->mnt_sb->s_mounts_lock);
+  spin_lock(&mnt->mnt_superblock->s_mounts_lock);
+  list_add(&mnt->mnt_node_superblock, &mnt->mnt_superblock->s_mounts_list);
+  spin_unlock(&mnt->mnt_superblock->s_mounts_lock);
 
   /* Add to global mount list */
   spin_lock(&mount_lock);
-  list_add(&mnt->mnt_list, &mount_list);
+  list_add(&mnt->mnt_node_global, &mount_list);
   spin_unlock(&mount_lock);
 
   return mnt;
@@ -162,7 +163,7 @@ struct vfsmount *vfs_kern_mount(struct file_system_type *type, int flags,
  */
 struct vfsmount *get_mount(struct vfsmount *mnt) {
   if (mnt) {
-    atomic_inc(&mnt->mnt_count);
+    atomic_inc(&mnt->mnt_refcount);
     return mnt;
   }
   return NULL;
@@ -175,15 +176,15 @@ void put_mount(struct vfsmount *mnt) {
   if (!mnt)
     return;
 
-  if (atomic_dec_and_test(&mnt->mnt_count)) {
+  if (atomic_dec_and_test(&mnt->mnt_refcount)) {
     /* Last reference - free the mount */
     spin_lock(&mount_lock);
-    list_del(&mnt->mnt_list);
+    list_del(&mnt->mnt_node_global);
     spin_unlock(&mount_lock);
 
-    spin_lock(&mnt->mnt_sb->s_mounts_lock);
-    list_del(&mnt->mnt_instance);
-    spin_unlock(&mnt->mnt_sb->s_mounts_lock);
+    spin_lock(&mnt->mnt_superblock->s_mounts_lock);
+    list_del(&mnt->mnt_node_superblock);
+    spin_unlock(&mnt->mnt_superblock->s_mounts_lock);
 
     put_dentry(mnt->mnt_root);
     if (mnt->mnt_devname)

@@ -1,7 +1,6 @@
 #ifndef INODE_H
 #define INODE_H
 
-#include <kernel/fs/super_block.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/types.h>
 #include <util/atomic.h>
@@ -76,9 +75,9 @@ struct iattr {
     uid_t ia_uid;
     gid_t ia_gid;
     loff_t ia_size;
-    time_t ia_atime;
-    time_t ia_mtime;
-    time_t ia_ctime;
+    struct timespec ia_atime;
+    struct timespec ia_mtime;
+    struct timespec ia_ctime;
 };
 
 /* Forward declarations */
@@ -134,54 +133,6 @@ struct inode_key {
   unsigned long ino;
 };
 
-/*
- * Inode structure - core of the filesystem
- */
-struct inode {
-  /* Identity */
-  mode_t i_mode;       /* File type and permissions */
-  uid_t i_uid;         /* Owner user ID */
-  gid_t i_gid;         /* Owner group ID */
-  unsigned long i_ino; /* Inode number */
-  dev_t i_rdev;        /* Device number (for special files) */
-
-  /* File attributes */
-  loff_t i_size;           /* File size in bytes */
-  struct timespec i_atime; /* Last access time */
-  struct timespec i_mtime; /* Last modification time */
-  struct timespec i_ctime; /* Last status change time */
-  unsigned int i_nlink;    /* Number of hard links */
-  blkcnt_t i_blocks;       /* Number of blocks allocated */
-
-  /* Memory management */
-  struct address_space *i_mapping; /* Associated address space */
-
-  /* Filesystem information */
-  struct super_block *i_sb;           /* Superblock */
-  struct list_head i_sb_list_node;    /* Superblock list of inodes */
-  struct list_head i_state_list_node; /* For ONE state list (LRU/dirty/IO) */
-
-  /* Operations */
-  const struct inode_operations *i_op; /* Inode operations */
-  const struct file_operations *i_fop; /* Default file operations */
-
-  /* Reference counting and locking */
-  atomic_t i_count;  /* Reference count */
-  spinlock_t i_lock; /* Protects changes to inode */
-
-  /* State tracking */
-  unsigned long i_state; /* Inode state flags */
-
-  /* File system specific data */
-  void *i_fs_info; /* Filesystem-specific data */
-
-  /* Dentry management */
-  struct list_head i_dentry; /* List of dentries for this inode */
-
-  /* Block mapping */
-  sector_t *i_data; /* Block mapping array */
-};
-
 /* Inode state flags */
 #define I_DIRTY (1 << 0)          /* Inode is dirty - needs writing */
 #define I_NEW (1 << 1)            /* Inode is newly created */
@@ -210,35 +161,76 @@ struct inode {
 #define MAY_CREATE  (MAY_WRITE | MAY_EXEC) /* For creating new files */
 #define MAY_DELETE  (MAY_WRITE | MAY_EXEC) /* For deleting files */
 
+/*
+ * Inode structure - core of the filesystem
+ */
+struct inode {
+  /* Identity */
+  mode_t i_mode;       /* File type and permissions */
+  uid_t i_uid;         /* Owner user ID */
+  gid_t i_gid;         /* Owner group ID */
+  unsigned long i_ino; /* Inode number */
+  dev_t i_rdev;        /* Device number (for special files) */
 
+  /* File attributes */
+  loff_t i_size;           /* File size in bytes */
+  struct timespec i_atime; /* Last access time */
+  struct timespec i_mtime; /* Last modification time */
+  struct timespec i_ctime; /* Last status change time */
+  unsigned int i_nlink;    /* Number of hard links */
+  blkcnt_t i_blocks;       /* Number of blocks allocated */
+
+  /* Memory management */
+  struct address_space *i_mapping; /* Associated address space */
+
+  /* Filesystem information */
+  struct super_block *i_superblock;           /* Superblock */
+  struct list_head i_sb_list_node;    /* Superblock list of inodes */
+  struct list_head i_state_list_node; /* For ONE state list (LRU/dirty/IO) */
+
+  /* Operations */
+  const struct inode_operations *i_op; /* Inode operations */
+  const struct file_operations *i_fop; /* Default file operations */
+
+  /* Reference counting and locking */
+  atomic_t i_count;  /* Reference count */
+  spinlock_t i_lock; /* Protects changes to inode */
+
+  /* State tracking */
+  unsigned long i_state; /* Inode state flags */
+
+  /* File system specific data */
+  void *i_fs_info; /* Filesystem-specific data */
+
+  /* Dentry management */
+  struct list_head i_dentry; /* List of dentries for this inode */
+
+  /* Block mapping */
+  sector_t *i_data; /* Block mapping array */
+};
 
 /*
  * Inode APIs
  */
 int inode_cache_init(void);
 
-/* Inode allocation and initialization */
-struct inode *new_inode(struct super_block *sb);
-// void inode_init_once(struct inode *inode);
+struct inode* alloc_inode(struct super_block* sb);
 
 /* Reference counting */
-void ihold(struct inode *inode);
+struct inode* grab_inode(struct inode* inode);
 void put_inode(struct inode *inode);
 
 /* Inode lookup and creation */
-struct inode *iget(struct super_block *sb, unsigned long ino);
-struct inode *iget_locked(struct super_block *sb, unsigned long ino);
-void unlock_new_inode(struct inode *inode);
+struct inode *get_inode(struct super_block *sb, unsigned long ino);
 
 /* Inode state management */
 void mark_inode_dirty(struct inode *inode);
+void unlock_new_inode(struct inode *inode);
+
 int sync_inode(struct inode *inode, int wait);
 int sync_inode_metadata(struct inode *inode, int wait);
-//void __clear_inode(struct inode *inode);
-void evict_inode(struct inode *inode);
-
 /* Permission checking */
-int generic_permission(struct inode *inode, int mask);
+//int generic_permission(struct inode *inode, int mask);
 
 
 /* Utility functions */
@@ -248,3 +240,32 @@ int setattr_prepare(struct dentry *dentry, struct iattr *attr);
 int notify_change(struct dentry *dentry, struct iattr *attr);
 
 #endif /* INODE_H */
+
+
+//        ┌─────────────┐
+//        │             │
+// ┌─────▶│   CLEAN    │◀─────┐
+// │      │  (LRU)      │      │
+// │      │             │      │
+// │      └─────────────┘      │
+// │             │             │
+// │             │             │
+// Write        Mark dirty     I/O completes
+// completes     │             │
+// │             │             │
+// │             ▼             │
+// │      ┌─────────────┐      │
+// │      │             │      │
+// └─────-│   DIRTY     │------┘
+//        │             │
+//        └─────────────┘
+// 							 │
+// 							 │
+// 				   Start I/O
+// 							 │
+// 							 ▼
+//				 ┌─────────────┐
+// 			 	 │             │
+// 		 		 │    I/O      │
+//				 │             │
+// 				 └─────────────┘

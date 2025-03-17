@@ -2,7 +2,6 @@
 #define PID_H
 
 #include <stdint.h>
-#include <errno.h>      // 错误码定义
 #include <util/spinlock.h>    // 自旋锁支持
 #include <kernel/types.h>
 

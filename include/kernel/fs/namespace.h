@@ -19,28 +19,66 @@ struct path;
 #define MNT_STRICTATIME (1 << 29) /* Always perform atime updates */
 
 /**
+ * Mount namespace structure
+ *
+ * A mount namespace contains an isolated view of the filesystem hierarchy.
+ * Different processes can have different mount namespaces, allowing
+ * containerization and isolation.
+ */
+struct mnt_namespace {
+  /* Root of the mount tree for this namespace */
+  struct vfsmount* root;
+
+  /* All mounts in this namespace */
+  struct list_head mount_list;
+
+  /* Count of mounts in this namespace */
+  int mount_count;
+
+  /* Reference counting */
+  atomic_t count;
+
+  /* Owner info */
+  uid_t owner;
+
+  /* Protection */
+  spinlock_t lock;
+};
+
+
+/**
  * Mount point structure
  */
 struct vfsmount {
-  struct dentry *mnt_root;    /* Root of this mount */
-  struct super_block *mnt_sb; /* Superblock of this mount */
-  int mnt_flags;              /* Mount flags */
+  struct dentry* mnt_root;    /* Root of this mount */
 
+  int mnt_flags;              /* Mount flags */
+	
+	int mnt_id;							/* Unique identifier for this mount */
   /* Mount point location */
-  struct vfsmount *mnt_parent;   /* Parent mount point */
-  struct dentry *mnt_mountpoint; /* Dentry where this fs is mounted */
+  struct dentry* mnt_dentry_mtpoint; /* Dentry where this fs is mounted */
 
   /* List management */
-  struct list_head mnt_instance; /* Link in sb->s_mounts list */
-  struct list_head mnt_mounts;   /* List of children mounts */
-  struct list_head mnt_child;    /* Link in parent's mnt_mounts */
-  struct list_head mnt_list;     /* Link in global mount list */
+  struct super_block* mnt_superblock; /* Superblock of this mount */
+  struct list_node mnt_node_superblock; /* Link in sb->s_mounts_list list */
+
+  struct vfsmount* mnt_parent;   /* Parent mount point */
+  struct list_node mnt_node_parent; /* Link in parent's mnt_list_children */
+  struct list_head mnt_list_children;  /* List of children mounts */
+
+
+  struct list_node mnt_node_global; /* Link in global mount list */
+
+
+
+	/* Namespace mount list linkage */
+	struct list_node mnt_node_namespace;
 
   /* Reference counting */
-  atomic_t mnt_count; /* Reference count */
+  atomic_t mnt_refcount; /* Reference count */
 
   /* Device info */
-  const char *mnt_devname; /* Device name */
+  const char* mnt_devname; /* Device name */
 };
 
 /*
@@ -51,29 +89,45 @@ struct vfsmount {
 void init_mount_hash(void);
 
 /* Mount management */
-struct vfsmount *vfs_kern_mount(struct file_system_type *type, int flags,
-                                const char *name, void *data);
-int do_mount(const char *dev_name, const char *path, const char *fstype,
-             unsigned long flags, void *data);
+int do_mount(const char* dev_name, const char* path, const char* fstype,
+             unsigned long flags, void* data);
 
 /* Unmount operations */
-int do_umount(struct vfsmount *mnt, int flags);
+int do_umount(struct vfsmount* mnt, int flags);
 
 /* Reference counting */
-struct vfsmount *get_mount(struct vfsmount *mnt);
-void put_mount(struct vfsmount *mnt);
+struct vfsmount* get_mount(struct vfsmount* mnt);
+void put_mount(struct vfsmount* mnt);
 
 /* Mount point lookup */
-struct vfsmount *lookup_vfsmount(struct dentry *dentry);
-struct vfsmount *lookup_mnt(struct path *path);
+struct vfsmount* lookup_vfsmount(struct dentry* dentry);
+struct vfsmount* lookup_mnt(struct path* path);
 
 /* Mount registry management */
-void get_mnt_ns(struct mnt_namespace *ns);
-void put_mnt_ns(struct mnt_namespace *ns);
+inline struct mnt_namespace* grab_mnt_ns(struct mnt_namespace* ns);
+void put_mnt_ns(struct mnt_namespace* ns);
+struct mnt_namespace *create_mnt_ns(struct mnt_namespace *parent);
 
 /* Mount traversal */
-bool is_mounted(struct dentry *dentry);
-int iterate_mounts(int (*f)(struct vfsmount *, void *), void *arg,
-                   struct vfsmount *root);
+bool is_mounted(struct dentry* dentry);
+int iterate_mounts(int (*f)(struct vfsmount*, void*), void* arg,
+                   struct vfsmount* root);
 
 #endif /* _NAMESPACE_H */
+
+
+// [rootfs mount]
+// ├── parent: NULL
+// ├── children: [/home mount], [/mnt/cdrom mount]
+// │
+// ├── [/home mount]
+// │   ├── parent: [rootfs mount]
+// │   └── children: [/home/user/data mount]
+// │       │
+// │       └── [/home/user/data mount]
+// │           ├── parent: [/home mount]
+// │           └── children: []
+// │
+// └── [/mnt/cdrom mount]
+//     ├── parent: [rootfs mount]
+//     └── children: []

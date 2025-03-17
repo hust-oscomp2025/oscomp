@@ -3,14 +3,12 @@
  */
 
 #include <kernel/elf.h>
-#include <kernel/proc_file.h>
 #include <kernel/riscv.h>
 #include <kernel/sched/process.h>
 
 #include <kernel/sched/sched.h>
 
 #include <kernel/fs/vfs.h>
-#include <kernel/types.h>
 
 #include <kernel/mm/kmalloc.h>
 #include <kernel/mm/mm_struct.h>
@@ -22,7 +20,8 @@
 
 #include <spike_interface/spike_utils.h>
 
-#include <errno.h>
+#include <kernel/types.h>
+
 
 static void kernel_vm_init(void) {
   sprint("kernel_vm_init: start\n");
