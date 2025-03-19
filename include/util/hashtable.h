@@ -2,122 +2,124 @@
 #define _HASHTABLE_H
 
 #include <kernel/types.h>
+#include <util/list.h>
 #include <util/spinlock.h>
 
-/* Hash slot states */
-#define HASH_EMPTY      0    /* Empty slot */
-#define HASH_OCCUPIED   1    /* Contains an entry */
-#define HASH_DELETED    2    /* Previously occupied but now deleted */
-
 /**
- * Hash table entry - kept small for cache efficiency
- */
-struct hash_entry {
-    void *key;              /* Key pointer */
-    void *value;            /* Value pointer */
-    uint8_t state;          /* Slot state (EMPTY, OCCUPIED, DELETED) */
-};
-
-/**
- * High-performance hash table
+ * 哈希表结构 - 使用container_of模式
+ * 设计用于高效地存储对象的哈希表，对象应内嵌list_head节点
  */
 struct hashtable {
-    /* Configuration */
-    unsigned int     size;         /* Number of slots (power of 2) */
-    unsigned int     items;        /* Number of items stored */
-    unsigned int     tombstones;   /* Number of deleted entries */
-    unsigned int     max_load;     /* Maximum load percent (0-100) */
-    
-    /* Data */
-    struct hash_entry *entries;    /* Array of entries */
-    
-    /* Lock for concurrent access */
-    spinlock_t       lock;
-    
-    /* Operations */
-    unsigned int (*hash_func)(const void *key, unsigned int size);
-    int (*key_equals)(const void *key1, const void *key2);
+	/* 配置参数 */
+	unsigned int size;     /* 桶数量 */
+	atomic_t items;    /* 当前元素数量 */
+	unsigned int max_load; /* 最大负载百分比(0-100) */
+	int expanding; /* 是否正在扩容 */
+
+	struct hash_bucket {
+		struct list_head head; /* 链表头 */
+		spinlock_t lock;       /* 桶级锁 */
+	}* buckets;
+
+	/* 回调函数 */
+	unsigned int (*hash_func)(const void* key); /* 返回完整哈希值，用来支持2幂的哈希表大小 */
+	void* (*get_key)(struct list_head* node);                      /* 从节点获取键 */
+	int (*key_equals)(const void* key1, const void* key2);         /* 比较两个键 */
 };
 
 /**
- * Initialize a hash table
- * @ht: Hash table to initialize
- * @initial_size: Initial number of slots (rounded to next power of 2)
- * @max_load: Maximum load factor percentage (typically 70-80)
- * @hash_func: Hash function
- * @key_equals: Key comparison function
+ * 初始化哈希表
+ * @ht: 待初始化的哈希表
+ * @initial_size: 初始桶数量(会调整为2的幂)
+ * @max_load: 最大负载因子百分比(通常70-80)
+ * @hash_func: 哈希函数
+ * @get_key: 从节点获取键的回调函数
+ * @key_equals: 键比较函数
  *
- * Returns: 0 on success, negative error code on failure
+ * 返回: 成功返回0，失败返回负错误码
  */
-int hashtable_init(struct hashtable *ht, 
-                  unsigned int initial_size,
-                  unsigned int max_load,
-                  unsigned int (*hash_func)(const void *key, unsigned int size),
-                  int (*key_equals)(const void *key1, const void *key2));
+int hashtable_setup(struct hashtable* ht, unsigned int initial_size, unsigned int max_load, unsigned int (*hash_func)(const void* key, unsigned int size), void* (*get_key)(struct list_head* node),
+                   int (*key_equals)(const void* key1, const void* key2));
 
 /**
- * Insert an item into the hash table
- * @ht: Hash table
- * @key: Key to insert
- * @value: Value to associate with key
+ * 向哈希表插入节点
+ * @ht: 哈希表
+ * @node: 要插入的节点(list_head结构，通常嵌入在对象中)
  *
- * Returns: 0 on success, negative error code on failure
+ * 返回: 成功返回0，失败返回负错误码
+ * 注意: 如果键已存在，此函数不会更新现有节点
  */
-int hashtable_insert(struct hashtable *ht, void *key, void *value);
+int hashtable_insert(struct hashtable* ht, struct list_head* node);
 
 /**
- * Lookup an item in the hash table
- * @ht: Hash table
- * @key: Key to look up
+ * 在哈希表中查找键
+ * @ht: 哈希表
+ * @key: 要查找的键
  *
- * Returns: Associated value or NULL if not found
+ * 返回: 找到则返回关联节点，未找到返回NULL
  */
-void *hashtable_lookup(struct hashtable *ht, const void *key);
+struct list_head* hashtable_lookup(struct hashtable* ht, const void* key);
 
 /**
- * Remove an item from the hash table
- * @ht: Hash table
- * @key: Key to remove
+ * 从哈希表中删除节点
+ * @ht: 哈希表
+ * @node: 要删除的节点
  *
- * Returns: 0 on success, negative error code if not found
+ * 返回: 成功返回0，节点不在表中返回-ENOENT
  */
-int hashtable_remove(struct hashtable *ht, const void *key);
+int hashtable_remove(struct hashtable* ht, struct list_head* node);
 
 /**
- * Destroy a hash table and free its resources
- * @ht: Hash table to destroy
+ * 从哈希表中按键删除节点
+ * @ht: 哈希表
+ * @key: 要删除的键
+ *
+ * 返回: 成功返回0，键不存在返回-ENOENT
  */
-void hashtable_destroy(struct hashtable *ht);
+int hashtable_remove_by_key(struct hashtable* ht, const void* key);
 
 /**
- * Get the number of items in the hash table
- * @ht: Hash table
+ * 销毁哈希表并释放资源
+ * @ht: 要销毁的哈希表
  *
- * Returns: Number of items stored
+ * 注意: 此函数不会释放或清理节点内容，仅释放哈希表本身的资源
  */
-static inline unsigned int hashtable_count(struct hashtable *ht) {
-    return ht->items;
-}
+void hashtable_clear(struct hashtable* ht);
 
 /**
- * Calculate next power of 2
- * @x: Input value
+ * 获取哈希表中项数
+ * @ht: 哈希表
  *
- * Returns: Next power of 2 >= x
+ * 返回: 存储的项数
+ */
+static inline unsigned int hashtable_count(struct hashtable* ht) { return ht ? atomic_read(&ht->items) : 0; }
+
+/**
+ * 计算字符串的哈希值
+ */
+unsigned int hash_string(const void* key, unsigned int size);
+
+/**
+ * 计算整数的哈希值
+ */
+unsigned int hash_int(const void* key, unsigned int size);
+
+/**
+ * 计算指针的哈希值
+ */
+unsigned int hash_ptr(const void* key, unsigned int size);
+
+/**
+ * 计算下一个2的幂
  */
 static inline unsigned int next_power_of_2(unsigned int x) {
-    x--;
-    x |= x >> 1;
-    x |= x >> 2;
-    x |= x >> 4;
-    x |= x >> 8;
-    x |= x >> 16;
-    return x + 1;
+	x--;
+	x |= x >> 1;
+	x |= x >> 2;
+	x |= x >> 4;
+	x |= x >> 8;
+	x |= x >> 16;
+	return x + 1;
 }
-
-/* Standard hash functions */
-unsigned int hash_string(const void *key, unsigned int size);
-unsigned int hash_int(const void *key, unsigned int size);
-unsigned int hash_ptr(const void *key, unsigned int size);
 
 #endif /* _HASHTABLE_H */

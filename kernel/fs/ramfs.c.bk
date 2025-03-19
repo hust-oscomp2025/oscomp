@@ -213,7 +213,7 @@ struct super_block *ramfs_get_sb(struct device *dev) {
   sb->magic = RAMFS_MAGIC;
   sb->size = 0; // 内存文件系统不关心大小
   sb->nblocks = 0;
-  sb->ninodes = 0;
+  sb->sb_ninodes = 0;
   sb->s_dev = dev;
 
   // 创建超级块私有信息

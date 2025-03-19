@@ -15,6 +15,7 @@
 struct fs_struct {
 	struct path root;          /* Root directory */
 	struct path pwd;           /* Current working directory */
+	struct mnt_namespace* mnt_ns;  /* Mount namespace */
 	spinlock_t lock;           /* Lock for pwd/root */
 	atomic_t count;            /* Reference count */
 };

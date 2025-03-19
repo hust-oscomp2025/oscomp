@@ -34,7 +34,7 @@ int vfs_init(void)
 
     /* Initialize the dcache subsystem */
     sprint("VFS: Initializing dentry cache...\n");
-    err = d_cache_init();
+    err = init_dentry_hashtable();
     if (err < 0) {
         sprint("VFS: Failed to initialize dentry cache\n");
         return err;
@@ -57,14 +57,7 @@ int vfs_init(void)
         sprint("VFS: Failed to register filesystems\n");
         return err;
     }
-    
-    /* Initialize the file table */
-    sprint("VFS: Initializing file table...\n");
-    err = init_files();
-    if (err < 0) {
-        sprint("VFS: Failed to initialize file table\n");
-        return err;
-    }
+
     
     sprint("VFS: Initialization complete\n");
     return 0;
@@ -96,7 +89,7 @@ static int mountpoint_equal(const void *k1, const void *k2) {
  * init_mount_hash - Initialize the mount hash table
  */
 void init_mount_hash(void) {
-  hashtable_init(&mount_hashtable, 256, 70, hash_mountpoint, mountpoint_equal);
+  hashtable_setup(&mount_hashtable, 256, 70, hash_mountpoint, mountpoint_equal);
 	INIT_LIST_HEAD(&mount_list);
   spinlock_init(&mount_lock);
 }
@@ -115,7 +108,7 @@ struct vfsmount *lookup_mnt(struct path *path) {
 /**
  * vfs_kern_mount - Mount a filesystem
  */
-struct vfsmount *vfs_kern_mount(struct file_system_type *type, int flags,
+struct vfsmount *vfs_kern_mount(struct fs_type *type, int flags,
                                 const char *name, void *data) {
   struct vfsmount *mnt;
   struct dentry *root;
@@ -124,20 +117,20 @@ struct vfsmount *vfs_kern_mount(struct file_system_type *type, int flags,
     return ERR_PTR(-EINVAL);
 
   /* Call the filesystem's mount method */
-  root = type->mount(type, flags, name, data);
+  root = type->fs_mount_sb(type, flags, name, data);
   if (IS_ERR(root))
     return ERR_CAST(root);
 
   /* Allocate a new mount structure */
   mnt = kmalloc(sizeof(struct vfsmount));
   if (!mnt) {
-    put_dentry(root);
+    dentry_put(root);
     return ERR_PTR(-ENOMEM);
   }
 
   /* Initialize the mount */
   mnt->mnt_root = root;
-  mnt->mnt_superblock = root->d_sb;
+  mnt->mnt_superblock = root->d_superblock;
   mnt->mnt_flags = flags;
   atomic_set(&mnt->mnt_refcount, 1);
   mnt->mnt_devname = kstrdup(name, GFP_KERNEL);
@@ -146,9 +139,9 @@ struct vfsmount *vfs_kern_mount(struct file_system_type *type, int flags,
   INIT_LIST_HEAD(&mnt->mnt_node_parent);
 
   /* Add to superblock's mount list */
-  spin_lock(&mnt->mnt_superblock->s_mounts_lock);
-  list_add(&mnt->mnt_node_superblock, &mnt->mnt_superblock->s_mounts_list);
-  spin_unlock(&mnt->mnt_superblock->s_mounts_lock);
+  spin_lock(&mnt->mnt_superblock->sb_list_mounts_lock);
+  list_add(&mnt->mnt_node_superblock, &mnt->mnt_superblock->sb_list_mounts);
+  spin_unlock(&mnt->mnt_superblock->sb_list_mounts_lock);
 
   /* Add to global mount list */
   spin_lock(&mount_lock);
@@ -182,11 +175,11 @@ void put_mount(struct vfsmount *mnt) {
     list_del(&mnt->mnt_node_global);
     spin_unlock(&mount_lock);
 
-    spin_lock(&mnt->mnt_superblock->s_mounts_lock);
+    spin_lock(&mnt->mnt_superblock->sb_list_mounts_lock);
     list_del(&mnt->mnt_node_superblock);
-    spin_unlock(&mnt->mnt_superblock->s_mounts_lock);
+    spin_unlock(&mnt->mnt_superblock->sb_list_mounts_lock);
 
-    put_dentry(mnt->mnt_root);
+    dentry_put(mnt->mnt_root);
     if (mnt->mnt_devname)
       kfree(mnt->mnt_devname);
     kfree(mnt);

@@ -12,9 +12,9 @@ struct path {
 };
 
 /* Path lookup and traversal */
-int kern_path(const char* name, unsigned int flags, struct path* result);
-int kern_path_qstr(const struct qstr *name, unsigned int flags, struct path *result);
-void put_path(struct path* path);
+int path_create(const char* name, unsigned int flags, struct path* result);
+//int kern_path_qstr(const struct qstr *name, unsigned int flags, struct path *result);
+void path_destroy(struct path* path);
 int filename_lookup(int dfd, const char* name, unsigned int flags,
                     struct path* path, struct path* started);
 

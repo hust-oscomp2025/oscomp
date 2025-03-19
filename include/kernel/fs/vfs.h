@@ -8,6 +8,7 @@
 #include <kernel/fs/namespace.h>
 #include <kernel/fs/path.h>
 #include <kernel/fs/super_block.h>
+#include <kernel/fs/fdtable.h>
 
 #include <kernel/types.h>
 #include <util/list.h>
@@ -72,15 +73,6 @@ struct dir_context {
 		     unsigned);
 	loff_t pos; /* Current position in directory */
 };
-
-/**
- * Path representation - combines dentry and vfsmount
- */
-struct path {
-	struct vfsmount* mnt;  /* Mount point */
-	struct dentry* dentry; /* Dentry */
-};
-
 /**
  * Internal kernel filesystem statistics
  * Used by the VFS layer for all filesystem operations
@@ -115,7 +107,7 @@ struct nameidata {
 /* Initialization functions */
 int vfs_init(void);
 
-struct vfsmount* vfs_kern_mount(struct file_system_type* type, int flags,
+struct vfsmount* vfs_kern_mount(struct fs_type* type, int flags,
 				const char* name, void* data);
 
 /* File operations */
@@ -128,7 +120,7 @@ int vfs_statfs(struct path*, struct kstatfs*);
 int vfs_utimes(const char*, struct timespec*, int);
 
 /* Directory operations */
-int vfs_mkdir(struct inode*, struct dentry*, mode_t);
+int vfs_mkdir(struct inode*, struct dentry*, fmode_t);
 int vfs_rmdir(struct inode*, struct dentry*);
 int vfs_unlink(struct inode*, struct dentry*);
 int vfs_rename(struct inode*, struct dentry*, struct inode*, struct dentry*,
@@ -143,8 +135,8 @@ int vfs_symlink(struct inode*, struct dentry*, const char*);
 int vfs_permission(struct inode*, int);
 
 /* File mode checking helpers */
-static inline int is_dir(mode_t mode) { return (mode & S_IFMT) == S_IFDIR; }
-static inline int is_file(mode_t mode) { return (mode & S_IFMT) == S_IFREG; }
-static inline int is_symlink(mode_t mode) { return (mode & S_IFMT) == S_IFLNK; }
+static inline int is_dir(fmode_t mode) { return (mode & S_IFMT) == S_IFDIR; }
+static inline int is_file(fmode_t mode) { return (mode & S_IFMT) == S_IFREG; }
+static inline int is_symlink(fmode_t mode) { return (mode & S_IFMT) == S_IFLNK; }
 
 #endif /* _VFS_H_ */

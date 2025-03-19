@@ -1,5 +1,5 @@
 /*
- * RISC-V Atomic operations header
+ * RISC-V Atomic sb_operations header
  * 
  * Implementation for RISC-V architecture using GNU toolchain
  * Self-contained without external dependencies on Linux kernel headers
@@ -501,7 +501,7 @@
  #define atomic_inc_not_zero(v)          atomic_add_unless((v), 1, 0)
  #define atomic64_inc_not_zero(v)        atomic64_add_unless((v), 1, 0)
  
- /* Atomic operations to memory barriers */
+ /* Atomic sb_operations to memory barriers */
  #define smp_mb__before_atomic()         mb()
  #define smp_mb__after_atomic()          mb()
 

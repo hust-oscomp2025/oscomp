@@ -11,3 +11,15 @@
 - [ ] 重写中断服务程序
 - [ ] 在内核页表中分配一整段虚拟内存
 - [ ] 在wakeup_inode中唤醒进程
+- [ ] 在fs_struct中初始化mnt_ns
+- [ ] 在struct file中，只保留path字段
+- [ ] 实现基数树
+- [ ] 重做使用链表处理碰撞的哈希表
+- [ ] 在dentry hash中记录错误
+- [ ] 实现dentry lru机制
+- [x] 设计一个dentry专用的哈希表
+- [ ] 在dentry中额外维护成员表
+- [x] fdtable的size要能动态扩展
+- [ ] 实现io多路复用
+- [ ] 在file_open中做文件创建
+- [ ] 在file_close中处理f_private字段

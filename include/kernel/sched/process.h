@@ -5,7 +5,7 @@
 #include <kernel/trapframe.h>
 #include <util/list.h>
 
-struct fd_struct;
+struct fdtable;
 struct fs_struct;
 
 /* Linux内核进程flags定义表 */
@@ -115,7 +115,7 @@ struct task_struct {
   //  我们不需要使用复杂的active_mm特性
   /* File system info */
   struct fs_struct* fs;
-  struct fd_struct* fd_struct;
+  struct fdtable* fdtable;
 
   // process id
   pid_t pid;

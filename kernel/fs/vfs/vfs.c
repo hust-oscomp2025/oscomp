@@ -17,7 +17,7 @@
  *
  * Returns a vfsmount structure on success, NULL on failure.
  */
-struct vfsmount* vfs_kern_mount(struct file_system_type* type, int flags,
+struct vfsmount* vfs_kern_mount(struct fs_type* type, int flags,
 				const char* name, void* data) {
 	struct vfsmount* mnt;
 	struct super_block* sb;
@@ -44,7 +44,7 @@ struct vfsmount* vfs_kern_mount(struct file_system_type* type, int flags,
 	memset(mnt, 0, sizeof(struct vfsmount));
 	atomic_set(&mnt->mnt_refcount, 1);
 	mnt->mnt_superblock = sb;
-	mnt->mnt_root = dget(sb->global_root_dentry);
+	mnt->mnt_root = dget(sb->sb_global_root_dentry);
 	mnt->mnt_flags = flags;
 	mnt->mnt_id = mount_id++;
 
@@ -54,9 +54,9 @@ struct vfsmount* vfs_kern_mount(struct file_system_type* type, int flags,
 	INIT_LIST_HEAD(&mnt->mnt_node_namespace);
 
 	/* Add to superblock's mount list */
-	spin_lock(&sb->s_mounts_lock);
-	list_add(&mnt->mnt_node_superblock, &sb->s_mounts_list);
-	spin_unlock(&sb->s_mounts_lock);
+	spin_lock(&sb->sb_list_mounts_lock);
+	list_add(&mnt->mnt_node_superblock, &sb->sb_list_mounts);
+	spin_unlock(&sb->sb_list_mounts_lock);
 
 	return mnt;
 }
@@ -71,17 +71,17 @@ struct vfsmount* vfs_kern_mount(struct file_system_type* type, int flags,
  * Returns bytes read or negative error code
  */
 ssize_t vfs_read(struct file* file, char* buf, size_t count, loff_t* pos) {
-	if (!file || !file->f_op)
+	if (!file || !file->f_operations)
 		return -EINVAL;
 
-	if (!file->f_op->read)
+	if (!file->f_operations->read)
 		return -EINVAL;
 
 	/* Check permission */
 	if (!(file->f_mode & FMODE_READ))
 		return -EBADF;
 
-	return file->f_op->read(file, buf, count, pos);
+	return file->f_operations->read(file, buf, count, pos);
 }
 
 /**
@@ -95,17 +95,17 @@ ssize_t vfs_read(struct file* file, char* buf, size_t count, loff_t* pos) {
  */
 ssize_t vfs_write(struct file* file, const char* buf, size_t count,
 		  loff_t* pos) {
-	if (!file || !file->f_op)
+	if (!file || !file->f_operations)
 		return -EINVAL;
 
-	if (!file->f_op->write)
+	if (!file->f_operations->write)
 		return -EINVAL;
 
 	/* Check permission */
 	if (!(file->f_mode & FMODE_WRITE))
 		return -EBADF;
 
-	return file->f_op->write(file, buf, count, pos);
+	return file->f_operations->write(file, buf, count, pos);
 }
 
 /**
@@ -116,7 +116,7 @@ ssize_t vfs_write(struct file* file, const char* buf, size_t count,
  *
  * Returns 0 on success or negative error code
  */
-int vfs_mkdir(struct inode* dir, struct dentry* dentry, mode_t mode) {
+int vfs_mkdir(struct inode* dir, struct dentry* dentry, fmode_t mode) {
 	int error;
 
 	if (!dir || !dentry)

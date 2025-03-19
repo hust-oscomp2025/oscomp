@@ -15,7 +15,7 @@ struct task_struct* alloc_init_task(){
 	task->pagefault_disabled = 0;
   task->kstack = (uint64)alloc_kernel_stack();
   task->mm = NULL;
-  task->fd_struct = alloc_pfm();
+  task->fdtable = alloc_pfm();
 	return task;
 }
 

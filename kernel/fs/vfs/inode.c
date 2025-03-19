@@ -26,7 +26,7 @@ int inode_cache_init(void) {
   sprint("Initializing inode cache\n");
 
   /* Initialize hash table */
-  err = hashtable_init(&inode_hashtable, 1024, 75, inode_hash_func,
+  err = hashtable_setup(&inode_hashtable, 1024, 75, inode_hash_func,
                        inode_key_equals);
   if (err != 0) {
     sprint("Failed to initialize inode hashtable: %d\n", err);
@@ -121,8 +121,8 @@ int inode_permission(struct inode* inode, int mask) {
 struct inode* alloc_inode(struct super_block* sb) {
   struct inode* inode;
 
-  if (sb->operations && sb->operations->alloc_inode) {
-    inode = sb->operations->alloc_inode(sb);
+  if (sb->sb_operations && sb->sb_operations->alloc_inode) {
+    inode = sb->sb_operations->alloc_inode(sb);
   } else {
     inode = kmalloc(sizeof(struct inode));
   }
@@ -132,14 +132,14 @@ struct inode* alloc_inode(struct super_block* sb) {
   /* Initialize the inode */
   memset(inode, 0, sizeof(struct inode));
   atomic_set(&inode->i_count, 1);
-  INIT_LIST_HEAD(&inode->i_dentry);
+  INIT_LIST_HEAD(&inode->i_dentryList);
   INIT_LIST_HEAD(&inode->i_sb_list_node);
   INIT_LIST_HEAD(&inode->i_state_list_node);
   spinlock_init(&inode->i_lock);
   inode->i_superblock = sb;
   inode->i_state = I_NEW; /* Mark as new */
-  list_add(&inode->i_sb_list_node, &sb->all_inodes);
-  list_add(&inode->i_state_list_node, &sb->clean_inodes);
+  list_add(&inode->i_sb_list_node, &sb->sb_list_all_inodes);
+  list_add(&inode->i_state_list_node, &sb->sb_list_clean_inodes);
 
   return inode;
 }
@@ -167,8 +167,8 @@ struct inode* get_inode(struct super_block* sb, unsigned long ino) {
     return inode;
 
   /* Initialize new inode from disk */
-  if (sb->operations && sb->operations->read_inode) {
-    sb->operations->read_inode(inode);
+  if (sb->sb_operations && sb->sb_operations->read_inode) {
+    sb->sb_operations->read_inode(inode);
   }
 
   /* Mark inode as initialized and wake up waiters */
@@ -211,13 +211,13 @@ void put_inode(struct inode* inode) {
     /* Last reference gone - add to superblock's LRU */
     if (!(inode->i_state & I_DIRTY)) {
       /* If it's on another state list, remove it first */
-      spin_lock(&sb->inode_states_lock);
+      spin_lock(&sb->sb_list_inode_states_lock);
       if (!list_empty(&inode->i_state_list_node)) {
         list_del_init(&inode->i_state_list_node);
       }
 
-      list_add_tail(&inode->i_state_list_node, &sb->clean_inodes);
-      spin_unlock(&sb->inode_states_lock);
+      list_add_tail(&inode->i_state_list_node, &sb->sb_list_clean_inodes);
+      spin_unlock(&sb->sb_list_inode_states_lock);
     }
   }
   spinlock_unlock(&inode->i_lock);
@@ -341,7 +341,7 @@ void mark_inode_dirty(struct inode* inode) {
 
   /* Add to superblock's dirty list if not already there */
   if (!(inode->i_state & I_DIRTY) && sb) {
-    spinlock_lock(&sb->inode_states_lock);
+    spinlock_lock(&sb->sb_list_inode_states_lock);
     spinlock_lock(&inode->i_lock);
 
     if (likely(!list_empty(&inode->i_state_list_node))) {
@@ -349,10 +349,10 @@ void mark_inode_dirty(struct inode* inode) {
     }
 
     inode->i_state |= I_DIRTY;
-    list_add(&inode->i_state_list_node, &sb->dirty_inodes);
+    list_add(&inode->i_state_list_node, &sb->sb_list_dirty_inodes);
 
     spinlock_unlock(&inode->i_lock);
-    spinlock_unlock(&sb->inode_states_lock);
+    spinlock_unlock(&sb->sb_list_inode_states_lock);
   }
 }
 
@@ -373,9 +373,9 @@ static void evict_inode(struct inode* inode) {
   inode->i_state |= I_FREEING;
 
   /* Call filesystem-specific cleanup through superblock operations */
-  if (inode->i_superblock && inode->i_superblock->operations &&
-      inode->i_superblock->operations->evict_inode) {
-    inode->i_superblock->operations->evict_inode(inode);
+  if (inode->i_superblock && inode->i_superblock->sb_operations &&
+      inode->i_superblock->sb_operations->evict_inode) {
+    inode->i_superblock->sb_operations->evict_inode(inode);
   }
 
   /* Delete any remaining pages in the page cache */
@@ -403,10 +403,10 @@ void __clear_inode(struct inode* inode) {
 
   /* Remove from superblock lists */
   if (inode->i_superblock) {
-    spin_lock(&inode->i_superblock->all_inodes_lock);
+    spin_lock(&inode->i_superblock->sb_list_all_inodes_lock);
     list_del_init(&inode->i_sb_list_node);
     list_del_init(&inode->i_state_list_node);
-    spin_unlock(&inode->i_superblock->all_inodes_lock);
+    spin_unlock(&inode->i_superblock->sb_list_all_inodes_lock);
   }
 
   /* Clear file system specific data if needed */
@@ -571,21 +571,21 @@ int sync_inode(struct inode *inode, int wait) {
 			return 0;
 			
 	/* Call the filesystem's write_inode method if available */
-	if (inode->i_superblock && inode->i_superblock->operations && 
-			inode->i_superblock->operations->write_inode) {
-			ret = inode->i_superblock->operations->write_inode(inode, wait);
+	if (inode->i_superblock && inode->i_superblock->sb_operations && 
+			inode->i_superblock->sb_operations->write_inode) {
+			ret = inode->i_superblock->sb_operations->write_inode(inode, wait);
 	}
 	
 	/* If successful and waiting requested, clear dirty state */
 	if (ret == 0 && wait) {
-			spin_lock(&inode->i_superblock->inode_states_lock);
+			spin_lock(&inode->i_superblock->sb_list_inode_states_lock);
 			/* Remove from dirty list */
 			if (inode->i_state & I_DIRTY) {
 					list_del_init(&inode->i_state_list_node);
 					inode->i_state &= ~I_DIRTY;
-					list_add(&inode->i_state_list_node, &inode->i_superblock->clean_inodes);
+					list_add(&inode->i_state_list_node, &inode->i_superblock->sb_list_clean_inodes);
 			}
-			spin_unlock(&inode->i_superblock->inode_states_lock);
+			spin_unlock(&inode->i_superblock->sb_list_inode_states_lock);
 	}
 	
 	return ret;

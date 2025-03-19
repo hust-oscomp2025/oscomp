@@ -30,13 +30,13 @@ struct super_operations {
 ```c
 struct inode_operations {
     struct dentry *(*lookup)(struct inode *dir, struct dentry *dentry, unsigned int flags);
-    int (*create)(struct inode *dir, struct dentry *dentry, mode_t mode, bool excl);
+    int (*create)(struct inode *dir, struct dentry *dentry, fmode_t mode, bool excl);
     int (*link)(struct dentry *old_dentry, struct inode *dir, struct dentry *new_dentry);
     int (*unlink)(struct inode *dir, struct dentry *dentry);
     int (*symlink)(struct inode *dir, struct dentry *dentry, const char *symname);
-    int (*mkdir)(struct inode *dir, struct dentry *dentry, mode_t mode);
+    int (*mkdir)(struct inode *dir, struct dentry *dentry, fmode_t mode);
     int (*rmdir)(struct inode *dir, struct dentry *dentry);
-    int (*mknod)(struct inode *dir, struct dentry *dentry, mode_t mode, dev_t rdev);
+    int (*mknod)(struct inode *dir, struct dentry *dentry, fmode_t mode, dev_t rdev);
     int (*rename)(struct inode *old_dir, struct dentry *old_dentry,
                   struct inode *new_dir, struct dentry *new_dentry, unsigned int flags);
 };

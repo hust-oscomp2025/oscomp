@@ -82,8 +82,8 @@ void put_fs_struct(struct fs_struct *fs)
     /* Decrease reference count */
     if (atomic_dec_and_test(&fs->count)) {
         /* Release references to root and pwd */
-        put_path(&fs->root);
-        put_path(&fs->pwd);
+        path_destroy(&fs->root);
+        path_destroy(&fs->pwd);
         
         /* Free the structure */
         kfree(fs);
@@ -116,7 +116,7 @@ void set_fs_root(struct fs_struct *fs, const struct path *path)
     spin_unlock(&fs->lock);
     
     /* Release references to old path */
-    put_path(&old_root);
+    path_destroy(&old_root);
 }
 
 /**
@@ -145,5 +145,5 @@ void set_fs_pwd(struct fs_struct *fs, const struct path *path)
     spin_unlock(&fs->lock);
     
     /* Release references to old path */
-    put_path(&old_pwd);
+    path_destroy(&old_pwd);
 }

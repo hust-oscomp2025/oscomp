@@ -18,7 +18,7 @@
 #define __GFP_WAIT 0x0001    /* Can sleep */
 #define __GFP_HIGH 0x0002    /* High priority allocation */
 #define __GFP_IO 0x0004      /* Can start I/O */
-#define __GFP_FS 0x0008      /* Can start filesystem operations */
+#define __GFP_FS 0x0008      /* Can start filesystem sb_operations */
 #define __GFP_NOWARN 0x0010  /* Don't print allocation failure warnings */
 #define __GFP_REPEAT 0x0020  /* Retry the allocation */
 #define __GFP_NOFAIL 0x0040  /* Allocation cannot fail */

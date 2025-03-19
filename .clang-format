@@ -1,5 +1,10 @@
-BasedOnStyle: LLVM  # 或 Google、Mozilla
-PointerAlignment: Left
-TabWidth: 4
+---
+BasedOnStyle: LLVM
+ColumnLimit: 200
+# Explicitly override LLVM's default indentation
 IndentWidth: 4
-UseTab: ForIndentation  # 或 UseTab: ForIndentation 如果你希望使用实际的制表符而非空格
+TabWidth: 4
+UseTab: ForIndentation
+ContinuationIndentWidth: 4
+AccessModifierOffset: -4
+PointerAlignment: Left
