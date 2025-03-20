@@ -145,7 +145,7 @@ struct inode {
 	struct list_head i_dentryList; /* List of dentries for this inode */
 	                               /*只需要服务活跃的dentry，用来同步*/
 	                               /*它们之间的状态，不用写回磁盘*/
-	spinlock_t i_dentryList_lock; /* Protects changes to inode */
+	spinlock_t i_dentryList_lock; 
 	
 
 	/* Block mapping */

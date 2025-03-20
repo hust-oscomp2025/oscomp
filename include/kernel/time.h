@@ -2,7 +2,6 @@
 #define _KERNEL_TIME_H
 
 #include <kernel/types.h>
-#include <time.h>
 
 /* Time limits and constants */
 #define TIME_T_MAX      ((1UL << ((sizeof(time_t) << 3) - 1)) - 1)
@@ -15,6 +14,13 @@
 #define CLOCK_MONOTONIC         1   /* Monotonic system-wide clock */
 #define CLOCK_BOOTTIME          2   /* Monotonic clock that includes time system was suspended */
 #define CLOCK_PROCESS_CPUTIME_ID 3  /* Per-process CPU time clock */
+
+/* Filesystem time range capabilities */
+struct timerange {
+    time_t min_time;     /* Earliest representable time */
+    time_t max_time;     /* Latest representable time */
+    unsigned int granularity;  /* Time granularity in nanoseconds (e.g., 1 for ns, 1000 for us) */
+};
 
 /* Time comparison and manipulation functions */
 
@@ -76,6 +82,50 @@ static inline void timeval_to_timespec(struct timespec *ts, const struct timeval
 {
     ts->tv_sec = tv->tv_sec;
     ts->tv_nsec = tv->tv_usec * NSEC_PER_USEC;
+}
+
+/**
+ * current_time - Get current system time
+ * @sb: Superblock (optional, can be NULL)
+ *
+ * Returns the current system time as a timespec structure.
+ * If a superblock is provided, adjusts the time to respect
+ * the filesystem's time range capabilities.
+ */
+struct timespec current_time(struct super_block *sb);
+
+/**
+ * current_time_unix - Get current time in Unix seconds
+ * @sb: Superblock (optional, can be NULL)
+ *
+ * Returns the current time as seconds since the Unix epoch,
+ * adjusted for the filesystem's capabilities if a superblock is provided.
+ */
+time_t current_time_unix(struct super_block *sb);
+
+/**
+ * current_fs_time - Get filesystem-specific current time
+ * @sb: Superblock for the filesystem
+ *
+ * Returns the current time formatted according to the filesystem's
+ * time representation capabilities.
+ */
+struct timespec current_fs_time(struct super_block *sb);
+
+/**
+ * timespec_trunc - Truncate timespec to specified granularity
+ * @ts: The timespec to truncate
+ * @granularity: Time granularity in nanoseconds
+ *
+ * Returns the truncated timespec value.
+ */
+static inline struct timespec timespec_trunc(struct timespec ts, unsigned int granularity)
+{
+    if (granularity == 0 || granularity == 1)
+        return ts; /* No truncation needed */
+    
+    ts.tv_nsec = ts.tv_nsec - (ts.tv_nsec % granularity);
+    return ts;
 }
 
 /* Core time function prototypes */

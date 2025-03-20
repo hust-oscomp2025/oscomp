@@ -58,6 +58,7 @@ struct super_block {
 	// struct quota_info s_dquot;       // Quota operations
 
 	/* Time values */
+	unsigned long time_granularity;  /* Time granularity in nanoseconds */
 	time_t sb_time_min; // Earliest time the fs can represent
 	time_t sb_time_max; // Latest time the fs can represent
 	                   // 取决于文件系统自身的属性，例如ext4的时间戳范围是1970-2106

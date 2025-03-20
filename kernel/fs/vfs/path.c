@@ -412,5 +412,3 @@ static int vfs_path_lookup(struct dentry* base_dentry,
   kfree(path_copy);
   return 0;
 }
-
-// Add these functions to your existing file

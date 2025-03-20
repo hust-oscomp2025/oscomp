@@ -6,18 +6,6 @@
 #include <util/atomic.h>
 #include <util/spinlock.h>
 
-/* Forward declarations */
-struct dentry;
-struct inode;
-struct address_space;
-struct task_struct;
-struct kiocb;
-struct iov_iter;
-struct pipe_inode_info;
-struct poll_table_struct;
-struct vm_area_struct;
-struct dir_context;
-
 /**
  * Represents an open file in the system
  */
@@ -189,9 +177,5 @@ struct file_operations {
 #define FMODE_CAN_ODIRECT (1U << 24) /* Supports direct I/O */
 #define FMODE_BUF_RASYNC (1U << 28)  /* Supports async buffered reads */
 #define FMODE_BUF_WASYNC (1U << 29)  /* Supports async buffered writes */
-
-/* File reading and writing */
-ssize_t kernel_read(struct file* file, void* buf, size_t count, loff_t* pos);
-ssize_t kernel_write(struct file* file, const void* buf, size_t count, loff_t* pos);
 
 #endif /* _FILE_H */
