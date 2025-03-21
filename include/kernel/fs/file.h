@@ -6,6 +6,8 @@
 #include <util/atomic.h>
 #include <util/spinlock.h>
 
+#define f_mapping f_inode->i_mapping
+#define f_dentry f_path.dentry
 /**
  * Represents an open file in the system
  */

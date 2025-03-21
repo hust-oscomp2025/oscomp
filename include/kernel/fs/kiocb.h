@@ -23,6 +23,8 @@ struct kiocb {
 
 // Initialization and setup
 void init_kiocb(struct kiocb *kiocb, struct file *file);
+void init_async_kiocb(struct kiocb *kiocb, struct file *file,
+	ioCompletion_callback complete, void *data);
 void kiocb_set_pos(struct kiocb *kiocb, loff_t pos);
 void kiocb_set_flags(struct kiocb *kiocb, int flags);
 
@@ -36,10 +38,19 @@ int kiocb_is_async(const struct kiocb *kiocb);
 int kiocb_is_error(const struct kiocb *kiocb);
 
 // I/O operations
-ssize_t kiocb_read(struct kiocb *kiocb, char *buf, size_t count);
-ssize_t kiocb_write(struct kiocb *kiocb, const char *buf, size_t count);
-ssize_t kiocb_read_iter(struct kiocb *kiocb, struct io_vector_iterator *iter);
-ssize_t kiocb_write_iter(struct kiocb *kiocb, struct io_vector_iterator *iter);
+ssize_t kiocb_perform_read(struct kiocb *kiocb, char *buf, size_t len);
+ssize_t kiocb_perform_write(struct kiocb *kiocb, const char *buf, size_t len);
+ssize_t kiocb_perform_readv(struct kiocb *kiocb, struct io_vector_iterator *iter);
+ssize_t kiocb_perform_writev(struct kiocb *kiocb, struct io_vector_iterator *iter);
 
+/* KI_OCB flags - used to control I/O behavior */
+#define KIOCB_NOUPDATE_POS  (1 << 0)   /* Don't update file position */
+#define KIOCB_SYNC          (1 << 1)   /* Synchronous I/O */
+#define KIOCB_DIRECT        (1 << 2)   /* Direct I/O, bypass page cache */
+#define KIOCB_NOWAIT        (1 << 3)   /* Don't block on locks or I/O */
+#define KIOCB_APPEND        (1 << 4)   /* File is opened in append mode */
+/* Operation codes for direct I/O */
+#define KIOCB_OP_READ   0
+#define KIOCB_OP_WRITE  1
 
 #endif /* _KIOCB_H */
