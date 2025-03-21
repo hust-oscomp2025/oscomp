@@ -90,7 +90,7 @@ struct radix_tree_root;
 
 /* Inode hash key - combination of superblock and inode number */
 struct inode_key {
-	struct super_block* sb;
+	struct superblock* sb;
 	unsigned long ino;
 };
 
@@ -123,7 +123,7 @@ struct inode {
 	}* i_mapping;                                     /* Associated address space */
 
 	/* Filesystem information */
-	struct super_block* i_superblock;   /* Superblock */
+	struct superblock* i_superblock;   /* Superblock */
 	struct list_head i_s_list_node;    /* Superblock list of inodes */
 	struct list_head i_state_list_node; /* For ONE state list (LRU/dirty/IO) */
 
@@ -157,14 +157,14 @@ struct inode {
  */
 int inode_cache_init(void);
 
-struct inode* alloc_inode(struct super_block* sb);
+struct inode* alloc_inode(struct superblock* sb);
 
 /* Reference counting */
 struct inode* grab_inode(struct inode* inode);
 void put_inode(struct inode* inode);
 
 /* Inode lookup and creation */
-struct inode* get_inode(struct super_block* sb, unsigned long ino);
+struct inode* get_inode(struct superblock* sb, unsigned long ino);
 
 /* Inode state management */
 void mark_inode_dirty(struct inode* inode);

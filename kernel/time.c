@@ -1,5 +1,5 @@
 #include <kernel/time.h>
-#include <kernel/fs/super_block.h>
+#include <kernel/fs/superblock.h>
 
 /* System time variables */
 static struct timespec system_time;
@@ -13,7 +13,7 @@ static unsigned long system_jiffies;
  * If a superblock is provided, adjusts the time to respect
  * the filesystem's time range capabilities.
  */
-struct timespec current_time(struct super_block *sb)
+struct timespec current_time(struct superblock *sb)
 {
     struct timespec now;
     
@@ -35,7 +35,7 @@ struct timespec current_time(struct super_block *sb)
  * Returns the current time as seconds since the Unix epoch,
  * adjusted for the filesystem's capabilities if a superblock is provided.
  */
-time_t current_time_unix(struct super_block *sb)
+time_t current_time_unix(struct superblock *sb)
 {
     struct timespec ts = current_time(sb);
     return ts.tv_sec;
@@ -48,7 +48,7 @@ time_t current_time_unix(struct super_block *sb)
  * Returns the current time formatted according to the filesystem's
  * time representation capabilities.
  */
-struct timespec current_fs_time(struct super_block *sb)
+struct timespec current_fs_time(struct superblock *sb)
 {
     struct timespec now;
     

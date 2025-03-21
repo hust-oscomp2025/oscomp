@@ -1,5 +1,5 @@
-#ifndef SUPER_BLOCK_H
-#define SUPER_BLOCK_H
+#ifndef superblock_H
+#define superblock_H
 #include <kernel/types.h>
 #include <util/list.h>
 #include <util/spinlock.h>
@@ -9,7 +9,7 @@ struct super_operations;
 struct dentry;
 
 /* Superblock structure representing a mounted filesystem */
-struct super_block {
+struct superblock {
 	spinlock_t s_lock; // Lock protecting the superblock
 
 	/* Filesystem identification */
@@ -68,8 +68,8 @@ struct super_block {
 
 /* Function prototypes */
 
-struct super_block* get_superblock(struct fs_type* type, void* data);
-void drop_super(struct super_block* sb);
+struct superblock* get_superblock(struct fs_type* type, void* data);
+void drop_super(struct superblock* sb);
 
 /* File system types */
 struct fs_type {
@@ -77,9 +77,9 @@ struct fs_type {
 	int fs_flags;
 
 	/* Fill in a superblock */
-	int (*fs_fill_sb)(struct super_block* sb, void* data, int silent);
-	struct super_block* (*fs_mount_sb)(struct fs_type*, int, const char*, void*);
-	void (*fs_kill_sb)(struct super_block*);
+	int (*fs_fill_sb)(struct superblock* sb, void* data, int silent);
+	struct superblock* (*fs_mount_sb)(struct fs_type*, int, const char*, void*);
+	void (*fs_kill_sb)(struct superblock*);
 
 	/* Inside fs_type structure */
 	struct list_node fs_node_gfslist; /* Node for linking into global filesystem list */
@@ -125,7 +125,7 @@ struct statfs {
 /* Superblock operations supported by all filesystems */
 struct super_operations {
 	/* Inode lifecycle management */
-	struct inode* (*alloc_inode)(struct super_block* sb);
+	struct inode* (*alloc_inode)(struct superblock* sb);
 	void (*destroy_inode)(struct inode* inode);
 	void (*dirty_inode)(struct inode* inode);
 
@@ -137,16 +137,16 @@ struct super_operations {
 	void (*delete_inode)(struct inode* inode);
 
 	/* Superblock management */
-	int (*sync_fs)(struct super_block* sb, int wait);
-	int (*freeze_fs)(struct super_block* sb);
-	int (*unfreeze_fs)(struct super_block* sb);
-	int (*statfs)(struct super_block* sb, struct statfs* statfs);
-	int (*remount_fs)(struct super_block* sb, int* flags, char* data);
-	void (*umount_begin)(struct super_block* sb);
+	int (*sync_fs)(struct superblock* sb, int wait);
+	int (*freeze_fs)(struct superblock* sb);
+	int (*unfreeze_fs)(struct superblock* sb);
+	int (*statfs)(struct superblock* sb, struct statfs* statfs);
+	int (*remount_fs)(struct superblock* sb, int* flags, char* data);
+	void (*umount_begin)(struct superblock* sb);
 
 	/* Superblock lifecycle */
-	void (*put_super)(struct super_block* sb);
-	int (*sync_super)(struct super_block* sb, int wait);
+	void (*put_super)(struct superblock* sb);
+	int (*sync_super)(struct superblock* sb, int wait);
 
 	/* Filesystem-specific clear operations */
 	void (*__clear_inode)(struct inode* inode);

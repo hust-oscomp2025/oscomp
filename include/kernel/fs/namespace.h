@@ -6,7 +6,7 @@
 #include <util/list.h>
 
 /* Forward declarations */
-struct super_block;
+struct superblock;
 struct dentry;
 struct path;
 
@@ -58,7 +58,7 @@ struct vfsmount {
 	struct dentry* mnt_mountpoint; /* Dentry where this fs is mounted */
 
 	/* List management */
-	struct super_block* mnt_superblock;   /* Superblock of this mount */
+	struct superblock* mnt_superblock;   /* Superblock of this mount */
 	struct list_node mnt_node_superblock; /* Link in sb->s_list_mounts list */
 
 	struct vfsmount* mnt_parent;        /* Parent mount point */

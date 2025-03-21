@@ -92,7 +92,7 @@ static inline void timeval_to_timespec(struct timespec *ts, const struct timeval
  * If a superblock is provided, adjusts the time to respect
  * the filesystem's time range capabilities.
  */
-struct timespec current_time(struct super_block *sb);
+struct timespec current_time(struct superblock *sb);
 
 /**
  * current_time_unix - Get current time in Unix seconds
@@ -101,7 +101,7 @@ struct timespec current_time(struct super_block *sb);
  * Returns the current time as seconds since the Unix epoch,
  * adjusted for the filesystem's capabilities if a superblock is provided.
  */
-time_t current_time_unix(struct super_block *sb);
+time_t current_time_unix(struct superblock *sb);
 
 /**
  * current_fs_time - Get filesystem-specific current time
@@ -110,7 +110,7 @@ time_t current_time_unix(struct super_block *sb);
  * Returns the current time formatted according to the filesystem's
  * time representation capabilities.
  */
-struct timespec current_fs_time(struct super_block *sb);
+struct timespec current_fs_time(struct superblock *sb);
 
 /**
  * timespec_trunc - Truncate timespec to specified granularity

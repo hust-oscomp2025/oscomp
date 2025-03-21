@@ -15,10 +15,9 @@
 - [x] 在struct file中，只保留path字段
 - [ ] 实现基数树
 - [x] 重做使用链表处理碰撞的哈希表
-- [ ] 在dentry hash中记录错误
-- [ ] 实现dentry lru机制
+- [x] 实现dentry lru机制
 - [x] 设计一个dentry专用的哈希表
-- [ ] 在dentry中额外维护成员表
+- [x] 在dentry中额外维护成员表
 - [x] fdtable的size要能动态扩展
 - [ ] 实现io多路复用
 - [ ] 在file_open中做文件创建
@@ -41,4 +40,4 @@
 
 ## 小任务
 - [ ] 把readp和writep分离出去
-- [ ] file_llseek中没有用到kiocb
+- [x] file_llseek中没有用到kiocb

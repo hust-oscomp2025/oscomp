@@ -7,7 +7,7 @@
 #include <kernel/fs/inode.h>
 #include <kernel/fs/namespace.h>
 #include <kernel/fs/path.h>
-#include <kernel/fs/super_block.h>
+#include <kernel/fs/superblock.h>
 #include <kernel/fs/fdtable.h>
 #include <kernel/fs/kiocb.h>
 #include <kernel/fs/io_vector.h>
@@ -20,7 +20,7 @@
 // struct file;
 // struct inode;
 // struct dentry;
-// struct super_block;
+// struct superblock;
 struct vfsmount; /* Keep forward declaration for compatibility */
 // struct path;
 struct nameidata;

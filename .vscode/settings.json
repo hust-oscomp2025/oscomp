@@ -20,7 +20,7 @@
 		"spike_utils.h": "c",
 		"trapframe.h": "c",
 		"file_system_type.h": "c",
-		"super_block.h": "c",
+		"superblock.h": "c",
 		"sched.h": "c",
 		"inode.h": "c",
 		"page.h": "c",

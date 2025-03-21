@@ -20,7 +20,7 @@
 struct vfsmount* vfs_kern_mount(struct fs_type* type, int flags,
 				const char* name, void* data) {
 	struct vfsmount* mnt;
-	struct super_block* sb;
+	struct superblock* sb;
 	int error;
 	static int mount_id = 0;
 

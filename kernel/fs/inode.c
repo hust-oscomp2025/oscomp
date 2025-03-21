@@ -10,7 +10,7 @@ static int inode_key_equals(const void *k1, const void *k2);
 static void hash_inode(struct inode *inode);
 static void unhash_inode(struct inode *inode);
 static void wake_up_inode(struct inode *inode);
-static struct inode *iget_locked(struct super_block *sb, unsigned long ino);
+static struct inode *iget_locked(struct superblock *sb, unsigned long ino);
 static void evict_inode(struct inode* inode);
 static int generic_permission(struct inode* inode, int mask);
 
@@ -118,7 +118,7 @@ int inode_permission(struct inode* inode, int mask) {
  *
  * Returns the new inode or NULL if allocation failed.
  */
-struct inode* alloc_inode(struct super_block* sb) {
+struct inode* alloc_inode(struct superblock* sb) {
   struct inode* inode;
 
   if (sb->s_operations && sb->s_operations->alloc_inode) {
@@ -154,7 +154,7 @@ struct inode* alloc_inode(struct super_block* sb) {
  *
  * Returns the inode or NULL if an error occurs.
  */
-struct inode* get_inode(struct super_block* sb, unsigned long ino) {
+struct inode* get_inode(struct superblock* sb, unsigned long ino) {
   struct inode* inode;
 
   /* Look in the inode hash table first */
@@ -204,7 +204,7 @@ void put_inode(struct inode* inode) {
   if (unlikely(!inode))
     return;
 
-  struct super_block* sb = inode->i_superblock;
+  struct superblock* sb = inode->i_superblock;
   spinlock_lock(&inode->i_lock);
   /* Decrease reference count */
   if (atomic_dec_and_test(&inode->i_count)) {
@@ -337,7 +337,7 @@ void mark_inode_dirty(struct inode* inode) {
   if (!inode)
     return;
 
-  struct super_block* sb = inode->i_superblock;
+  struct superblock* sb = inode->i_superblock;
 
   /* Add to superblock's dirty list if not already there */
   if (!(inode->i_state & I_DIRTY) && sb) {
@@ -437,7 +437,7 @@ void __clear_inode(struct inode* inode) {
  *
  * Returns locked inode on success, NULL on allocation failure.
  */
-static struct inode *iget_locked(struct super_block *sb, unsigned long ino) {
+static struct inode *iget_locked(struct superblock *sb, unsigned long ino) {
 	struct inode *inode;
 	struct inode_key key = { .sb = sb, .ino = ino };
 	

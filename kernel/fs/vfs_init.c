@@ -4,7 +4,7 @@
 
 #include <kernel/fs/file_system_type.h>
 #include <kernel/fs/namespace.h>
-#include <kernel/fs/super_block.h>
+#include <kernel/fs/superblock.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/mm/kmalloc.h>
 #include <spike_interface/spike_utils.h>

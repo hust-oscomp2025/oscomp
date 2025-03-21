@@ -8,7 +8,7 @@
  
  #include <kernel/types.h>
  #include <kernel/fs/vfs.h>
- #include <kernel/fs/super_block.h>
+ #include <kernel/fs/superblock.h>
  
  /* 文件系统类型和魔数定义 */
  #define RAMFS_MAGIC     0x52414D46 /* "RAMF" */
@@ -26,8 +26,8 @@
  int ramfs_format_dev(struct device *dev);
  
  /* VFS接口函数 */
- struct super_block *ramfs_get_sb(struct device *dev);
- struct inode *ramfs_alloc_inode(struct super_block *sb);
+ struct superblock *ramfs_get_sb(struct device *dev);
+ struct inode *ramfs_alloc_inode(struct superblock *sb);
  int ramfs_write_inode(struct inode *inode);
  
  #endif /* _RAMFS_H */
@@ -45,7 +45,7 @@ static struct super_operations ramfs_super_operations = {
     .put_super = ramfs_put_super,
 };
 
-static int ramfs_fill_super(struct super_block *sb, void *data, int silent)
+static int ramfs_fill_super(struct superblock *sb, void *data, int silent)
 {
     struct inode *inode;
     

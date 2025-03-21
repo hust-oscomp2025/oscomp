@@ -371,7 +371,7 @@ ssize_t file_write(struct file* file, const char* buf, size_t count, loff_t* pos
  * Returns the new file position on success, or a negative error code on failure.
  */
 loff_t file_llseek(struct file* file, loff_t offset, int whence) {
-    struct kiocb kiocb;
+    //struct kiocb kiocb;
     loff_t new_pos;
     
     /* Basic validation */
@@ -383,7 +383,8 @@ loff_t file_llseek(struct file* file, loff_t offset, int whence) {
         return -ESPIPE;
     
     /* Initialize kiocb */
-    init_kiocb(&kiocb, file);
+    //init_kiocb(&kiocb, file);
+	// The only potential usage would be if the file system's specific llseek operation needed it
     
     /* Call file-specific llseek operation if available */
     if (file->f_operations && file->f_operations->llseek)
@@ -446,8 +447,9 @@ int file_sync(struct file* file, int datasync) {
     /* Call file-specific fsync operation if available */
     if (file->f_operations && file->f_operations->fsync) {
         /* Use the file's fsync operation with full file range */
-        struct kiocb kiocb;
-        init_kiocb(&kiocb, file);
+        //struct kiocb kiocb;
+        //init_kiocb(&kiocb, file);	
+		// currently unused
         return file->f_operations->fsync(file, 0, INT64_MAX, datasync);
     }
 

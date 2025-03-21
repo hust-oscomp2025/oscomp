@@ -109,7 +109,7 @@ void get_path_string(char *path, struct dentry *dentry) {
 //
 // allocate a vfs inode for an host fs file.
 //
-struct inode *hostfs_alloc_vinode(struct super_block *sb) {
+struct inode *hostfs_alloc_vinode(struct superblock *sb) {
   struct inode *vinode = default_alloc_vinode(sb);
   vinode->i_ino = -1; 
   vinode->i_private = NULL;
@@ -296,9 +296,9 @@ int hostfs_hook_close(struct inode *f_inode, struct dentry *dentry) {
 }
 
 /**** vfs-hostfs file system type interface functions ****/
-struct super_block *hostfs_get_superblock(struct device *dev) {
+struct superblock *hostfs_get_superblock(struct device *dev) {
   // set the data for the vfs super block
-  struct super_block *sb = kmalloc(sizeof(struct super_block));
+  struct superblock *sb = kmalloc(sizeof(struct superblock));
   sb->s_dev = dev;
 
   struct inode *root_inode = hostfs_alloc_vinode(sb);

@@ -12,7 +12,7 @@
 #include <util/string.h>
 
 #include <kernel/fs/address_space.h>
-#include <kernel/fs/super_block.h>
+#include <kernel/fs/superblock.h>
 #include <kernel/mm/mm_struct.h>
 #include <kernel/mm/mmap.h>
 #include <kernel/types.h>
@@ -202,9 +202,9 @@ int ramfs_format_dev(struct device *dev) {
 /**** 超级块操作 ****/
 
 /* 获取超级块 */
-struct super_block *ramfs_get_sb(struct device *dev) {
+struct superblock *ramfs_get_sb(struct device *dev) {
   // 创建超级块
-  struct super_block *sb = kmalloc(sizeof(struct super_block));
+  struct superblock *sb = kmalloc(sizeof(struct superblock));
   if (!sb) {
     panic("ramfs_get_sb: Failed to allocate superblock!\n");
   }

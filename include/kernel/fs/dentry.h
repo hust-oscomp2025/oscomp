@@ -35,7 +35,7 @@ struct dentry {
 	/* Dentry usage management */
 
 	/* Filesystem and operations */
-	struct super_block* d_superblock; /* Superblock of file */
+	struct superblock* d_superblock; /* Superblock of file */
 
 	/* D-cache management */
 	unsigned long d_time; /* Revalidation time */

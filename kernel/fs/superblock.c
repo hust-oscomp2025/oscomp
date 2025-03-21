@@ -12,7 +12,7 @@
 static struct list_head file_systems_list;
 static spinlock_t file_systems_lock;
 
-static struct super_block* __alloc_super(struct fs_type* type);
+static struct superblock* __alloc_super(struct fs_type* type);
 static int lookup_dev_id(const char* dev_name, dev_t* dev_id);
 
 /**
@@ -23,15 +23,15 @@ static int lookup_dev_id(const char* dev_name, dev_t* dev_id);
  *
  * Returns a new superblock or NULL on failure
  */
-static struct super_block* __alloc_super(struct fs_type* type) {
-	struct super_block* sb;
+static struct superblock* __alloc_super(struct fs_type* type) {
+	struct superblock* sb;
 
-	sb = kmalloc(sizeof(struct super_block));
+	sb = kmalloc(sizeof(struct superblock));
 	if (!sb)
 		return NULL;
 
 	/* Initialize to zeros */
-	memset(sb, 0, sizeof(struct super_block));
+	memset(sb, 0, sizeof(struct superblock));
 
 	/* Initialize lists */
 	INIT_LIST_HEAD(&sb->s_list_all_inodes);
@@ -71,8 +71,8 @@ static struct super_block* __alloc_super(struct fs_type* type) {
  *
  * Returns: pointer to superblock or NULL on failure
  */
-struct super_block* get_superblock(struct fs_type* type, dev_t dev_id, void* fs_data) {
-	struct super_block* sb = NULL;
+struct superblock* get_superblock(struct fs_type* type, dev_t dev_id, void* fs_data) {
+	struct superblock* sb = NULL;
 
 	if (!type)
 		return NULL;
@@ -121,7 +121,7 @@ struct super_block* get_superblock(struct fs_type* type, dev_t dev_id, void* fs_
  * Decrements the reference count and frees the superblock if
  * it reaches zero.
  */
-void drop_super(struct super_block* sb) {
+void drop_super(struct superblock* sb) {
 	if (!sb)
 		return;
 	if (atomic_dec_and_test(&sb->s_refcount)) {
@@ -136,7 +136,7 @@ void drop_super(struct super_block* sb) {
  * Releases all resources associated with a superblock.
  * Should only be called when reference count reaches zero.
  */
-static void deactivate_super(struct super_block* sb) {
+static void deactivate_super(struct superblock* sb) {
 	if (!sb)
 		return;
 
@@ -164,7 +164,7 @@ static void deactivate_super(struct super_block* sb) {
  * Increases the active reference count of a superblock,
  * indicating that it's actively being used.
  */
-void grab_super(struct super_block* sb) {
+void grab_super(struct superblock* sb) {
 	if (!sb)
 		return;
 
@@ -180,7 +180,7 @@ void grab_super(struct super_block* sb) {
  *
  * Decreases the active reference count of a superblock.
  */
-void deactivate_super_safe(struct super_block* sb) {
+void deactivate_super_safe(struct superblock* sb) {
 	if (!sb)
 		return;
 
@@ -200,7 +200,7 @@ void deactivate_super_safe(struct super_block* sb) {
  *
  * Returns 0 on success, negative error code on failure
  */
-int sync_filesystem(struct super_block* sb, int wait) {
+int sync_filesystem(struct superblock* sb, int wait) {
 	int ret = 0;
 	struct inode *inode, *next;
 
@@ -245,7 +245,7 @@ int sync_filesystem(struct super_block* sb, int wait) {
  * Generic implementation for unmounting a filesystem.
  * Releases all inodes and drops the superblock.
  */
-void generic_shutdown_super(struct super_block* sb) {
+void generic_shutdown_super(struct superblock* sb) {
 	struct inode *inode, *next;
 
 	if (!sb)
@@ -418,9 +418,9 @@ struct fs_type* get_fs_type(const char* name) {
  *
  * Returns the superblock on success, ERR_PTR on failure
  */
-struct super_block* mount_fs(struct fs_type* type, int flags, const char* dev_name,
+struct superblock* mount_fs(struct fs_type* type, int flags, const char* dev_name,
                              void* data) {
-	struct super_block* sb;
+	struct superblock* sb;
 	int error;
 	dev_t dev_id = 0; /* Default to 0 for virtual filesystems */
 
@@ -456,7 +456,7 @@ struct super_block* mount_fs(struct fs_type* type, int flags, const char* dev_na
 		else if (type->fs_mount_sb) {
 			/* This is a fallback - ideally all filesystems would
 			 * implement fs_fill_sb instead */
-			struct super_block* new_sb;
+			struct superblock* new_sb;
 			new_sb = type->fs_mount_sb(type, flags, dev_name, data);
 			if (IS_ERR(new_sb)) {
 				drop_super(sb);

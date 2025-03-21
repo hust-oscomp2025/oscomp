@@ -159,7 +159,7 @@ void put_mount(struct vfsmount* mnt) {
 
 	if (atomic_dec_and_test(&mnt->mnt_refcount)) {
 		/* Reference count reached zero, clean up the mount */
-		struct super_block* sb = mnt->mnt_superblock;
+		struct superblock* sb = mnt->mnt_superblock;
 
 		/* Remove from any lists */
 		spin_lock(&mount_lock);

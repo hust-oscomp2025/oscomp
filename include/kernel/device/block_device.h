@@ -10,7 +10,7 @@
 struct block_device {
     dev_t                   bd_dev;        /* Device identifier */
     struct inode           *bd_inode;      /* Inode of this device */
-    struct super_block     *bd_super;      /* Superblock mounted on this device */
+    struct superblock     *bd_super;      /* Superblock mounted on this device */
     
     unsigned int            bd_block_size; /* Block size in bytes */
     unsigned long           bd_nr_blocks;  /* Number of blocks in device */

@@ -11,7 +11,7 @@
 int register_hostfs();
 struct device *init_host_device(char *name);
 void get_path_string(char *path, struct dentry *dentry);
-struct inode *hostfs_alloc_vinode(struct super_block *sb);
+struct inode *hostfs_alloc_vinode(struct superblock *sb);
 int hostfs_write_back_vinode(struct inode *vinode);
 int hostfs_update_vinode(struct inode *vinode);
 
@@ -30,7 +30,7 @@ int hostfs_hook_open(struct inode *f_inode, struct dentry *f_dentry);
 int hostfs_hook_close(struct inode *f_inode, struct dentry *dentry);
 int hostfs_readdir(struct inode *dir_vinode, struct dir *dir, int *offset);
 struct inode *hostfs_mkdir(struct inode *parent, struct dentry *sub_dentry);
-struct super_block *hostfs_get_superblock(struct device *dev);
+struct superblock *hostfs_get_superblock(struct device *dev);
 
 extern const struct inode_operations hostfs_node_ops;
 

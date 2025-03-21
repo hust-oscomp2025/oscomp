@@ -17,7 +17,7 @@
 #include <spike_interface/spike_utils.h>
 
 struct dentry *vfs_root_dentry;              // system root direntry
-struct super_block *vfs_s_list[MAX_MOUNTS]; // system superblock list
+struct superblock *vfs_s_list[MAX_MOUNTS]; // system superblock list
 struct device *vfs_dev_list[MAX_VFS_DEV];    // system device list in vfs layer
 struct hash_table dentry_hash_table;
 struct hash_table vinode_hash_table;
@@ -87,7 +87,7 @@ int vfs_init() {
 //    that is, mount the device to "/DEVICE_NAME" (/DEVICE_NAME will be
 //    automatically created) folder.
 //
-struct super_block *vfs_mount(const char *dev_name, int mnt_type) {
+struct superblock *vfs_mount(const char *dev_name, int mnt_type) {
   // device pointer
   struct device *p_device = NULL;
 
@@ -102,7 +102,7 @@ struct super_block *vfs_mount(const char *dev_name, int mnt_type) {
 
   // add the super block into vfs_s_list
   struct file_system_type *fs_type = p_device->fs_type;
-  struct super_block *sb = fs_type->get_superblock(p_device);
+  struct superblock *sb = fs_type->get_superblock(p_device);
 
   // add the root vinode into vinode_hash_table
   hash_put_inode(sb->s_root->dentry_inode);
@@ -829,7 +829,7 @@ size_t inode_hash_func(void *key) {
 }
 
 // vinode hash table interface
-struct inode *hash_get_inode(struct super_block *sb, int inum) {
+struct inode *hash_get_inode(struct superblock *sb, int inum) {
   if (inum < 0)
     return NULL;
   struct inode_key key = {.sb = sb, .inum = inum};
@@ -863,7 +863,7 @@ int hash_erase_inode(struct inode *vinode) {
 //
 // shared (default) actions on allocating a vfs inode.
 //
-struct inode *default_alloc_vinode(struct super_block *sb) {
+struct inode *default_alloc_vinode(struct superblock *sb) {
   struct inode *vinode = kmalloc(sizeof(struct inode));
   if (!vinode) {
     return NULL;
