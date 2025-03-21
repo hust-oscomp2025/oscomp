@@ -1,0 +1,61 @@
+#ifndef _IO_VECTOR_H
+#define _IO_VECTOR_H
+
+#include <kernel/types.h>
+
+/**
+ * struct io_vector - Describes a memory buffer for vectored I/O
+ * @iov_base: Starting address of buffer
+ * @iov_len: Size of buffer in bytes
+ */
+struct io_vector {
+    void *iov_base;      /* Starting address */
+    size_t iov_len;      /* Number of bytes to transfer */
+};
+
+/**
+ * struct io_vector_iterator - Iterator for working with I/O vectors
+ */
+struct io_vector_iterator {
+	struct io_vector *iov_base;  /* 数组基地址 */
+    unsigned long index;         /* 当前索引 */
+    unsigned long nr_segs;  /* Number of segments */
+    size_t iov_offset;   /* Offset within current io_vector */
+    size_t count;        /* Total bytes remaining */
+};
+
+
+int setup_io_vector_iterator(struct io_vector_iterator *iter, const struct io_vector *vec, 
+	unsigned long vlen);
+
+
+
+#endif /* _IO_VECTOR_H */
+
+
+
+
+// 解耦为单独的 `IOVector` 类是个好主意。这个类应该提供以下方法：
+
+// ## IOVector 类核心方法
+
+// 1. **内存管理方法**
+//    - `allocate(size_t size)` - 分配指定大小的缓冲区
+//    - `attach(void* buffer, size_t size)` - 关联外部缓冲区
+//    - `release()` - 释放资源
+
+// 2. **I/O 操作方法**
+//    - `readFrom(struct file* file, loff_t* pos)` - 从文件读取数据
+//    - `writeTo(struct file* file, loff_t* pos)` - 写入数据到文件
+//    - `copy(IOVector* dest)` - 在向量间复制数据
+
+// 3. **迭代器支持**
+//    - `createIterator()` - 创建新迭代器
+//    - `resetIterator(IOVectorIterator* iter)` - 重置迭代器
+
+// 4. **状态查询**
+//    - `getTotalSize()` - 返回总数据大小
+//    - `getSegmentCount()` - 返回段数量
+//    - `isEmpty()` - 检查是否为空
+
+// 这种设计实现了关注点分离，让向量化 I/O 的实现独立于文件抽象，并可复用于其他 I/O 场景。

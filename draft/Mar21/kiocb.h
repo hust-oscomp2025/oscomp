@@ -19,7 +19,7 @@ struct io_vector {
  * struct io_vector_iterator - Iterator for working with I/O vectors
  */
 struct io_vector_iterator {
-    struct io_vector *iov;   /* Current io_vector */
+    struct io_vector *iovec;   /* Current io_vector */
     unsigned long nr_segs;  /* Number of segments */
     size_t iov_offset;   /* Offset within current io_vector */
     size_t count;        /* Total bytes remaining */

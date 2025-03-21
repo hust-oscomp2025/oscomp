@@ -31,7 +31,7 @@ int setup_io_vector_iterator(struct io_vector_iterator *iter, const struct io_ve
     if (!iter || !vec || vlen == 0)
         return -EINVAL;
     
-    iter->iov = (struct io_vector *)vec;
+    iter->iovec = (struct io_vector *)vec;
     iter->nr_segs = vlen;
     iter->iov_offset = 0;
     
