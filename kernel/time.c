@@ -59,10 +59,10 @@ struct timespec current_fs_time(struct super_block *sb)
         return now;
     
     /* Respect filesystem's time range */
-    if (now.tv_sec < sb->sb_time_min)
-        now.tv_sec = sb->sb_time_min;
-    else if (now.tv_sec > sb->sb_time_max)
-        now.tv_sec = sb->sb_time_max;
+    if (now.tv_sec < sb->s_time_min)
+        now.tv_sec = sb->s_time_min;
+    else if (now.tv_sec > sb->s_time_max)
+        now.tv_sec = sb->s_time_max;
     
     /* Apply filesystem-specific granularity */
     /* For most modern filesystems this will be 1ns (no change) */
@@ -71,7 +71,7 @@ struct timespec current_fs_time(struct super_block *sb)
     
     /* If filesystem has a specific time granularity, use it */
     /* This would usually be defined in the filesystem's superblock operations */
-    if (sb->sb_operations && sb->time_granularity)
+    if (sb->s_operations && sb->time_granularity)
         granularity = sb->time_granularity;
     
     return timespec_trunc(now, granularity);

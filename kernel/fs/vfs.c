@@ -44,7 +44,7 @@ struct vfsmount* vfs_kern_mount(struct fs_type* type, int flags,
 	memset(mnt, 0, sizeof(struct vfsmount));
 	atomic_set(&mnt->mnt_refcount, 1);
 	mnt->mnt_superblock = sb;
-	mnt->mnt_root = dget(sb->sb_global_root_dentry);
+	mnt->mnt_root = dget(sb->s_global_root_dentry);
 	mnt->mnt_flags = flags;
 	mnt->mnt_id = mount_id++;
 
@@ -54,9 +54,9 @@ struct vfsmount* vfs_kern_mount(struct fs_type* type, int flags,
 	INIT_LIST_HEAD(&mnt->mnt_node_namespace);
 
 	/* Add to superblock's mount list */
-	spin_lock(&sb->sb_list_mounts_lock);
-	list_add(&mnt->mnt_node_superblock, &sb->sb_list_mounts);
-	spin_unlock(&sb->sb_list_mounts_lock);
+	spin_lock(&sb->s_list_mounts_lock);
+	list_add(&mnt->mnt_node_superblock, &sb->s_list_mounts);
+	spin_unlock(&sb->s_list_mounts_lock);
 
 	return mnt;
 }

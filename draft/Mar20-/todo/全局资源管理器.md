@@ -29,70 +29,70 @@
 ## 成员变量解析
 
 ### 1. 身份与基本参数
-- **`sb_magic`（魔数）**：
+- **`s_magic`（魔数）**：
   - 唯一标识文件系统类型的数值
   - 与具体文件系统格式相关
   - 用于验证文件系统有效性
-- **`sb_device_id`（设备标识符）**：
+- **`s_device_id`（设备标识符）**：
   - 指向底层存储设备
   - 支持块设备关联
-- **`sb_blocksize`/`sb_blocksize_bits`（块大小）**：
+- **`s_blocksize`/`s_blocksize_bits`（块大小）**：
   - 定义文件系统的基本I/O单位
   - 影响文件系统性能和效率
 
 ### 2. 关键结构关联
-- **`sb_global_root_dentry`（根目录项）**：
+- **`s_global_root_dentry`（根目录项）**：
   - 指向文件系统根目录的dentry
   - 所有路径解析的起始点
   - 连接目录结构与文件系统
-- **`sb_fstype`（文件系统类型）**：
+- **`s_fstype`（文件系统类型）**：
   - 指向描述此文件系统类型的结构
   - 关联通用操作与具体实现
-- **`sb_fs_specific`（特定数据）**：
+- **`s_fs_specific`（特定数据）**：
   - 存储文件系统特有的信息
   - 允许文件系统扩展标准功能
 
 ### 3. inode管理列表
-- **`sb_list_all_inodes`（全部inode列表）**：
+- **`s_list_all_inodes`（全部inode列表）**：
   - 跟踪属于此超级块的所有inode
   - 便于整体操作如同步、卸载
-- **`sb_list_clean_inodes`（干净inode列表）**：
+- **`s_list_clean_inodes`（干净inode列表）**：
   - 管理未修改且可回收的inode
   - 支持内存管理策略
-- **`sb_list_dirty_inodes`（脏inode列表）**：
+- **`s_list_dirty_inodes`（脏inode列表）**：
   - 跟踪需要写回的inode
   - 优化批量同步操作
-- **`sb_list_io_inodes`（I/O中inode列表）**：
+- **`s_list_io_inodes`（I/O中inode列表）**：
   - 跟踪当前正在进行I/O操作的inode
   - 协调I/O完成事件
 
 ### 4. 统计与限制信息
-- **`sb_file_maxbytes`（最大文件大小）**：
+- **`s_file_maxbytes`（最大文件大小）**：
   - 文件系统支持的单个文件最大尺寸
   - 依赖于文件系统设计
-- **`sb_nblocks`（块数量）**：
+- **`s_nblocks`（块数量）**：
   - 文件系统总块数
   - 用于容量统计
-- **`sb_ninodes`（inode计数）**：
+- **`s_ninodes`（inode计数）**：
   - 跟踪已分配的inode数量
   - 支持配额和限制检查
 
 ### 5. 挂载与引用管理
-- **`sb_list_mounts`（挂载点列表）**：
+- **`s_list_mounts`（挂载点列表）**：
   - 跟踪此文件系统的所有挂载点
   - 支持多点挂载管理
-- **`sb_refcount`（引用计数）**：
+- **`s_refcount`（引用计数）**：
   - 跟踪超级块的使用情况
   - 控制释放时机
-- **`sb_flags`（标志）**：
+- **`s_flags`（标志）**：
   - 存储挂载选项和状态
   - 控制如只读模式等行为
 
 ### 6. 时间与操作表
-- **`sb_time_min`/`sb_time_max`（时间范围）**：
+- **`s_time_min`/`s_time_max`（时间范围）**：
   - 定义文件系统支持的时间戳范围
   - 处理时间表示限制
-- **`sb_operations`（操作方法表）**：
+- **`s_operations`（操作方法表）**：
   - 提供文件系统特定的方法实现
   - 定义如何创建、销毁inode等操作
   - 实现VFS与具体文件系统的分离
@@ -157,7 +157,7 @@
    - 实现文件系统冻结/解冻操作
 
 4. **并发控制**：
-   - `sb_lock`保护超级块核心字段
+   - `s_lock`保护超级块核心字段
    - 专用锁保护各种列表操作
    - 原子计数器管理引用
 
@@ -190,6 +190,6 @@
    - 提供特定文件系统的扩展选项
 
 5. **文件系统特有数据**：
-   - 通过`sb_fs_specific`存储私有信息
+   - 通过`s_fs_specific`存储私有信息
    - 支持文件系统特有功能
    - 保持VFS接口的通用性与扩展性

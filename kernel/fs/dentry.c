@@ -52,7 +52,7 @@ void init_dentry_lruList(void) {
  * @param alloc: 未找到时是否创建新dentry
  * @return: 匹配的dentry，引用计数加1，未找到或不符合要求时返回NULL
  */
-struct dentry* dentry_get(struct dentry* parent, const struct qstr* name, int is_dir, bool revalidate, bool alloc) {
+struct dentry* dentry_locate(struct dentry* parent, const struct qstr* name, int is_dir, bool revalidate, bool alloc) {
 	struct dentry* dentry = NULL;
 	bool type_match = true;
 
@@ -145,7 +145,7 @@ struct dentry* dentry_get(struct dentry* parent, const struct qstr* name, int is
 	return dentry;
 }
 
-struct dentry* dentry_getSelf(struct dentry* dentry){
+struct dentry* dentry_get(struct dentry* dentry){
 	if (!dentry)
 		return NULL;
 
@@ -451,7 +451,7 @@ static struct dentry* __dentry_alloc(struct dentry* parent, const struct qstr* n
 	dentry->d_name = qstr_create_with_length(name->name, name->len);
 
 	/* 设置父节点关系 */
-	dentry->d_parent = parent ? get_dentry(parent) : dentry; /* 根目录是自己的父节点 */
+	dentry->d_parent = parent ? dentry_get(parent) : dentry; /* 根目录是自己的父节点 */
 
 	if (parent) {
 		dentry->d_superblock = parent->d_superblock;
@@ -612,85 +612,176 @@ int dentry_revalidate(struct dentry *dentry, unsigned int flags)
 
 
 /**
- * d_follow_link - 解析符号链接
- * @link_dentry: 符号链接的dentry
+ * dentry_follow_link - Follow a symbolic link to its target
+ * @link_dentry: The symbolic link dentry to follow
  *
- * 解析符号链接，返回指向目标的dentry。
- * 如果目标也是符号链接，则递归解析（有最大深度限制）。
+ * This function resolves a symbolic link to its target by reading 
+ * the link content and traversing the path it points to.
+ * It handles both absolute and relative paths correctly and limits
+ * the recursion depth to prevent infinite loops.
  *
- * 返回: 目标dentry或错误指针
+ * Return: The target dentry with increased reference count, or ERR_PTR on error
  */
 struct dentry *dentry_follow_link(struct dentry *link_dentry)
 {
     struct dentry *target_dentry = NULL;
     char *link_value = NULL;
     int res, link_len;
-    int max_loops = 8; /* 防止循环链接的最大深度 */
+    int max_loops = 8; /* Maximum symlink recursion depth */
+    bool is_absolute;
     
+    /* Validate input parameters */
     if (!link_dentry || !link_dentry->d_inode)
         return ERR_PTR(-EINVAL);
     
-    /* 确保是符号链接 */
+    /* Ensure it's a symlink */
     if (!S_ISLNK(link_dentry->d_inode->i_mode))
         return ERR_PTR(-EINVAL);
     
-    /* 分配缓冲区存储链接内容 */
+    /* Allocate buffer for link content */
     link_value = kmalloc(PATH_MAX);
     if (!link_value)
         return ERR_PTR(-ENOMEM);
     
-    struct dentry *current_dentry = get_dentry(link_dentry);
+    /* Get a reference to the original link */
+    struct dentry *current_dentry = dentry_get(link_dentry);
+    
+    /* Track the starting point for relative path resolution */
+    struct dentry *base_dir = dentry_get(link_dentry->d_parent);
     
     while (max_loops-- > 0) {
-        /* 读取链接内容 */
+        /* Read the link content */
         if (!current_dentry->d_inode->i_op || !current_dentry->d_inode->i_op->readlink) {
-            dentry_put(current_dentry);
-            kfree(link_value);
-            return ERR_PTR(-EINVAL);
+            res = -EINVAL;
+            goto out_error;
         }
         
         link_len = current_dentry->d_inode->i_op->readlink(current_dentry, link_value, PATH_MAX - 1);
         if (link_len < 0) {
-            dentry_put(current_dentry);
-            kfree(link_value);
-            return ERR_PTR(link_len);
+            res = link_len;
+            goto out_error;
         }
         
-        /* 确保字符串以NULL结尾 */
+        /* Ensure the string is null-terminated */
         link_value[link_len] = '\0';
         
-        /* 释放当前dentry */
-        dentry_put(current_dentry);
+        /* Determine if the path is absolute or relative */
+        is_absolute = (link_value[0] == '/');
         
-        /* 解析链接内容到新dentry */
+        /* Release current dentry before resolving the next path */
+        dentry_put(current_dentry);
+        current_dentry = NULL;
+        
+        /* Parse the link path */
         struct path link_path;
-        res = path_create(link_value, LOOKUP_FOLLOW, &link_path);
-        if (res) {
-            kfree(link_value);
-            return ERR_PTR(res);
+        struct nameidata nd;
+        
+        /* Pseudocode: Initialize nameidata with appropriate context */
+        /*
+         * nameidata_init(&nd);
+         * nd.path.dentry = is_absolute ? root_dentry : base_dir;
+         * nd.path.mnt = current->fs->root.mnt;
+         * nd.flags = LOOKUP_FOLLOW;
+         */
+        
+        /* Pseudocode: Path lookup - would be implemented via path_lookup() in a real system */
+        /*
+         * res = path_lookup(link_value, &nd);
+         * if (res) goto out_error;
+         * link_path = nd.path;
+         */
+        
+        /* For demonstration purposes, we'll use the existing path_create function */
+        unsigned int lookup_flags = LOOKUP_FOLLOW;
+        if (!is_absolute) {
+            /* Pseudocode: For relative paths, we need to start from base_dir */
+            /*
+             * // Real implementation would use something like:
+             * res = vfs_path_lookup(base_dir, base_dir->d_sb->s_root.mnt,
+             *                      link_value, lookup_flags, &link_path);
+             */
+            
+            /* Since we're using path_create, we need to construct the full path */
+            char full_path[PATH_MAX*2];
+            char base_path[PATH_MAX];
+            
+            /* Get the path of the parent directory */
+            dentry_rawPath(base_dir, base_path, PATH_MAX);
+            
+            /* Construct full path by concatenating parent path and link content */
+            if (strlen(base_path) + strlen(link_value) + 2 > PATH_MAX*2) {
+                res = -ENAMETOOLONG;
+                goto out_error;
+            }
+            
+            /* Handle special case when base_path is root */
+            if (strcmp(base_path, "/") == 0)
+                snprintf(full_path, PATH_MAX*2, "/%s", link_value);
+            else
+                snprintf(full_path, PATH_MAX*2, "%s/%s", base_path, link_value);
+            
+            res = path_create(full_path, lookup_flags, &link_path);
+        } else {
+            /* Absolute path - just use path_create */
+            res = path_create(link_value, lookup_flags, &link_path);
         }
         
-        current_dentry = get_dentry(link_path.dentry);
+        if (res) {
+            goto out_error;
+        }
+        
+        /* Get a reference to the resolved dentry */
+        current_dentry = dentry_get(link_path.dentry);
+        
+        /* Clean up the path */
+        /*
+         * Pseudocode: Real implementation would have a proper path_put() function
+         * path_put(&link_path);
+         */
         path_destroy(&link_path);
         
-        /* 如果不是符号链接，完成解析 */
-        if (!current_dentry->d_inode || !S_ISLNK(current_dentry->d_inode->i_mode)) {
+        /* Check if the target exists */
+        if (!current_dentry->d_inode) {
+            res = -ENOENT;
+            goto out_error;
+        }
+        
+        /* If not a symlink, we're done */
+        if (!S_ISLNK(current_dentry->d_inode->i_mode)) {
             target_dentry = current_dentry;
+            current_dentry = NULL; /* Prevent it from being released */
             break;
         }
+        
+        /* For another symlink, update the base_dir for relative path resolution */
+        dentry_put(base_dir);
+        base_dir = dentry_get(current_dentry->d_parent);
     }
     
+    /* Check for too many levels of symlinks */
+    if (max_loops < 0) {
+        res = -ELOOP;
+        goto out_error;
+    }
+    
+    /* Success - free resources and return target */
     kfree(link_value);
-    
-    /* 检查是否超过最大递归深度 */
-    if (max_loops <= 0) {
-        if (current_dentry)
-            dentry_put(current_dentry);
-        return ERR_PTR(-ELOOP);
-    }
+    if (base_dir)
+        dentry_put(base_dir);
     
     return target_dentry;
+
+out_error:
+    /* Clean up on error */
+    kfree(link_value);
+    if (current_dentry)
+        dentry_put(current_dentry);
+    if (base_dir)
+        dentry_put(base_dir);
+    return ERR_PTR(res);
 }
+
+
 
 /**
  * dentry_rawPath - 构造dentry的完整路径
@@ -712,19 +803,17 @@ char *dentry_rawPath(struct dentry *dentry, char *buf, int buflen)
     char *end = buf + buflen - 1;
 	*end = '\0';
     char *start = end;
-    struct dentry *d = dentry_getSelf(dentry);
+    struct dentry *d = dentry_get(dentry);
     /* 回溯构建路径 */
     while (d) {
         /* 获取父dentry，需要处理根目录的情况 */
         spin_lock(&d->d_lock);
-        struct dentry *parent = d->d_parent;
         
         /* 如果是根目录，特殊处理 */
-        if (d == parent) {
+        if (d == d->d_parent) {
             /* 根目录路径为"/" */
             if (start == end)
                 --start;
-            
             *start = '/';
             spin_unlock(&d->d_lock);
             dentry_put(d);
@@ -733,7 +822,6 @@ char *dentry_rawPath(struct dentry *dentry, char *buf, int buflen)
         
         /* 获取名称长度 */
         int name_len = d->d_name->len;
-        
         /* 检查空间是否足够 */
         if (start - buf < name_len + 1) {
             spin_unlock(&d->d_lock);
@@ -750,12 +838,12 @@ char *dentry_rawPath(struct dentry *dentry, char *buf, int buflen)
         memcpy(start, d->d_name->name, name_len);
         
         /* 增加父dentry引用并释放当前锁 */
-        parent = get_dentry(parent);
         spin_unlock(&d->d_lock);
         
-        /* 释放当前dentry引用，移动到父级 */
+        /* 释放当前dentry引用，移动到父级 */\
+		struct dentry* parent = d->d_parent;
         dentry_put(d);
-        d = parent;
+        d = dentry_get(parent);
     }
     
     /* 如果路径为空（非常奇怪的情况），返回根路径 */

@@ -211,13 +211,13 @@ static int vfs_path_lookup(struct dentry* base_dentry,
 
     if (!base_mnt && base_dentry->d_superblock) {
       /* Fall back to first mount in superblock's mount list */
-      spin_lock(&base_dentry->d_superblock->sb_list_mounts_lock);
-      if (!list_empty(&base_dentry->d_superblock->sb_list_mounts)) {
-        struct vfsmount* mnt = list_first_entry(&base_dentry->d_superblock->sb_list_mounts,
+      spin_lock(&base_dentry->d_superblock->s_list_mounts_lock);
+      if (!list_empty(&base_dentry->d_superblock->s_list_mounts)) {
+        struct vfsmount* mnt = list_first_entry(&base_dentry->d_superblock->s_list_mounts,
                                                 struct vfsmount, mnt_node_superblock);
         base_mnt = mnt;
       }
-      spin_unlock(&base_dentry->d_superblock->sb_list_mounts_lock);
+      spin_unlock(&base_dentry->d_superblock->s_list_mounts_lock);
     }
   }
 
@@ -278,7 +278,7 @@ static int vfs_path_lookup(struct dentry* base_dentry,
       struct dentry* parent;
 
       /* Check if we're at the root already */
-      if (dentry == dentry->d_superblock->sb_global_root_dentry &&
+      if (dentry == dentry->d_superblock->s_global_root_dentry &&
           (!base_mnt || base_mnt->mnt_parent == base_mnt)) {
         /* Already at root - stay at root */
         component = next_slash;

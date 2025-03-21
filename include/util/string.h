@@ -16,4 +16,7 @@ long atol(const char* str);
 void *memmove(void* dst, const void* src, size_t n);
 char *safestrcpy(char* s, const char* t, int n);
 
+int snprintf(char* str, size_t size, const char* format, ...);
+
+
 #endif

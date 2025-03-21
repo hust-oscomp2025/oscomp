@@ -59,8 +59,8 @@ void init_dentry_lruList(void);
 unsigned int shrink_dentry_lru(unsigned int count);
 
 /*dentry生命周期*/
-struct dentry* dentry_get(struct dentry* parent, const struct qstr* name, int is_dir, bool revalidate, bool alloc);
-struct dentry* dentry_getSelf(struct dentry* dentry); // 主要用来获取父节点
+struct dentry* dentry_locate(struct dentry* parent, const struct qstr* name, int is_dir, bool revalidate, bool alloc);
+struct dentry* dentry_get(struct dentry* dentry); // 主要用来获取父节点
 int dentry_put(struct dentry* dentry);
 void dentry_prune(struct dentry *dentry);	/*unsafe*/
 int dentry_delete(struct dentry *dentry);
@@ -75,6 +75,7 @@ static inline bool dentry_isMountpoint(const struct dentry* dentry);
 
 /*名字和目录操作*/
 int dentry_rename(struct dentry* old_dentry, struct dentry* new_dentry);
+/*符号链接支持*/
 struct dentry* dentry_follow_link(struct dentry* link_dentry);
 char* dentry_rawPath(struct dentry* dentry, char* buf, int buflen);
 void dentry_prune(struct dentry *dentry); /*从父目录的子列表和哈希表中分离，但保留结构体和资源*/

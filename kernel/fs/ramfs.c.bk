@@ -43,7 +43,7 @@ struct ramfs_inode_info {
 };
 
 /* 文件系统特定的超级块数据 */
-struct ramfs_sb_info {
+struct ramfs_s_info {
   uint32 next_ino;          /* 下一个可用的inode编号 */
   uint32 inode_count;       /* inode计数 */
   struct inode *root_inode; /* 根目录inode */
@@ -213,11 +213,11 @@ struct super_block *ramfs_get_sb(struct device *dev) {
   sb->magic = RAMFS_MAGIC;
   sb->size = 0; // 内存文件系统不关心大小
   sb->nblocks = 0;
-  sb->sb_ninodes = 0;
+  sb->s_ninodes = 0;
   sb->s_dev = dev;
 
   // 创建超级块私有信息
-  struct ramfs_sb_info *sbi = kmalloc(sizeof(struct ramfs_sb_info));
+  struct ramfs_s_info *sbi = kmalloc(sizeof(struct ramfs_s_info));
   if (!sbi) {
     kfree(sb);
     panic("ramfs_get_sb: Failed to allocate superblock info!\n");
@@ -550,7 +550,7 @@ static ssize_t ramfs_dir_read(struct file *file, uaddr buf, size_t count,
 
 /* 创建新文件 */
 static struct inode *ramfs_create(struct inode *dir, struct dentry *dentry) {
-  struct ramfs_sb_info *sbi = (struct ramfs_sb_info *)dir->sb->s_fs_info;
+  struct ramfs_s_info *sbi = (struct ramfs_s_info *)dir->sb->s_fs_info;
 
   /* 分配新的inode编号 */
   uint32 new_ino = sbi->next_ino++;
@@ -717,7 +717,7 @@ static struct inode *ramfs_lookup(struct inode *dir, struct dentry *dentry) {
 
 /* 创建新目录 */
 static struct inode *ramfs_mkdir(struct inode *dir, struct dentry *dentry) {
-  struct ramfs_sb_info *sbi = (struct ramfs_sb_info *)dir->sb->s_fs_info;
+  struct ramfs_s_info *sbi = (struct ramfs_s_info *)dir->sb->s_fs_info;
 
   /* 分配新的inode编号 */
   uint32 new_ino = sbi->next_ino++;

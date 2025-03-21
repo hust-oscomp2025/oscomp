@@ -9,6 +9,7 @@
 #include <kernel/fs/path.h>
 #include <kernel/fs/super_block.h>
 #include <kernel/fs/fdtable.h>
+#include <kernel/fs/kiocb.h>
 
 #include <kernel/types.h>
 #include <util/list.h>
@@ -111,10 +112,7 @@ struct vfsmount* vfs_kern_mount(struct fs_type* type, int flags,
 				const char* name, void* data);
 
 /* File operations */
-ssize_t vfs_read(struct file*, char*, size_t, loff_t*);
-ssize_t vfs_write(struct file*, const char*, size_t, loff_t*);
-loff_t vfs_llseek(struct file*, loff_t, int);
-int vfs_fsync(struct file*, int);
+
 int vfs_stat(const char*, struct kstat*);
 int vfs_statfs(struct path*, struct kstatfs*);
 int vfs_utimes(const char*, struct timespec*, int);

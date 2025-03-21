@@ -139,9 +139,9 @@ struct vfsmount *vfs_kern_mount(struct fs_type *type, int flags,
   INIT_LIST_HEAD(&mnt->mnt_node_parent);
 
   /* Add to superblock's mount list */
-  spin_lock(&mnt->mnt_superblock->sb_list_mounts_lock);
-  list_add(&mnt->mnt_node_superblock, &mnt->mnt_superblock->sb_list_mounts);
-  spin_unlock(&mnt->mnt_superblock->sb_list_mounts_lock);
+  spin_lock(&mnt->mnt_superblock->s_list_mounts_lock);
+  list_add(&mnt->mnt_node_superblock, &mnt->mnt_superblock->s_list_mounts);
+  spin_unlock(&mnt->mnt_superblock->s_list_mounts_lock);
 
   /* Add to global mount list */
   spin_lock(&mount_lock);
@@ -175,9 +175,9 @@ void put_mount(struct vfsmount *mnt) {
     list_del(&mnt->mnt_node_global);
     spin_unlock(&mount_lock);
 
-    spin_lock(&mnt->mnt_superblock->sb_list_mounts_lock);
+    spin_lock(&mnt->mnt_superblock->s_list_mounts_lock);
     list_del(&mnt->mnt_node_superblock);
-    spin_unlock(&mnt->mnt_superblock->sb_list_mounts_lock);
+    spin_unlock(&mnt->mnt_superblock->s_list_mounts_lock);
 
     dentry_put(mnt->mnt_root);
     if (mnt->mnt_devname)

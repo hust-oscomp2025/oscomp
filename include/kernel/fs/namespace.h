@@ -59,7 +59,7 @@ struct vfsmount {
 
 	/* List management */
 	struct super_block* mnt_superblock;   /* Superblock of this mount */
-	struct list_node mnt_node_superblock; /* Link in sb->sb_list_mounts list */
+	struct list_node mnt_node_superblock; /* Link in sb->s_list_mounts list */
 
 	struct vfsmount* mnt_parent;        /* Parent mount point */
 	struct list_node mnt_node_parent;   /* Link in parent's mnt_list_children */

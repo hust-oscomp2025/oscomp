@@ -31,6 +31,18 @@ typedef signed short int16;
 typedef signed int int32;
 typedef signed long long int64;
 
+#define INT64_MAX 0x7fffffffffffffffLL
+#define INT64_MIN 0x8000000000000000LL
+
+#define INT32_MAX 0x7fffffff
+#define INT32_MIN 0x80000000
+
+#define UINT32_MAX 0xffffffff
+#define UINT32_MIN 0x0
+
+#define UINT64_MAX 0xffffffffffffffffUL
+#define UINT64_MIN 0x0UL
+
 #ifndef bool
 typedef int bool;
 #define true 1
@@ -43,8 +55,6 @@ typedef int bool;
 #define ROUNDUP(a, b) ((((a) - 1) / (b) + 1) * (b))
 #define ROUNDDOWN(a, b) ((a) / (b) * (b))
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define likely(x) __builtin_expect((x), 1)
 #define unlikely(x) __builtin_expect((x), 0)
 

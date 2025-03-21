@@ -53,7 +53,7 @@ int check_filesystem_busy(struct super_block *sb)
     struct inode *inode;
     
     /* 检查是否有活跃的inode */
-    list_for_each_entry(inode, &sb->s_inodes, i_sb_list) {
+    list_for_each_entry(inode, &sb->s_inodes, i_s_list) {
         /* 检查引用计数 */
         if (atomic_read(&inode->i_refcount) > 0) {
             busy++;
@@ -117,7 +117,7 @@ int get_busy_resources_info(struct super_block *sb, char *buffer, size_t size)
                    "文件系统忙，无法卸载。活跃资源:\n");
     
     /* 收集活跃inode信息 */
-    list_for_each_entry(inode, &sb->s_inodes, i_sb_list) {
+    list_for_each_entry(inode, &sb->s_inodes, i_s_list) {
         if (atomic_read(&inode->i_refcount) > 0) {
             pos += snprintf(buffer + pos, size - pos,
                           "inode %lu: 引用计数 %d\n", 

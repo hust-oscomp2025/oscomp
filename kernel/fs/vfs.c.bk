@@ -17,7 +17,7 @@
 #include <spike_interface/spike_utils.h>
 
 struct dentry *vfs_root_dentry;              // system root direntry
-struct super_block *vfs_sb_list[MAX_MOUNTS]; // system superblock list
+struct super_block *vfs_s_list[MAX_MOUNTS]; // system superblock list
 struct device *vfs_dev_list[MAX_VFS_DEV];    // system device list in vfs layer
 struct hash_table dentry_hash_table;
 struct hash_table vinode_hash_table;
@@ -100,7 +100,7 @@ struct super_block *vfs_mount(const char *dev_name, int mnt_type) {
   if (p_device == NULL)
     panic("vfs_mount: cannot find the device entry!\n");
 
-  // add the super block into vfs_sb_list
+  // add the super block into vfs_s_list
   struct file_system_type *fs_type = p_device->fs_type;
   struct super_block *sb = fs_type->get_superblock(p_device);
 
@@ -109,8 +109,8 @@ struct super_block *vfs_mount(const char *dev_name, int mnt_type) {
 
   int err = 1;
   for (int i = 0; i < MAX_MOUNTS; ++i) {
-    if (vfs_sb_list[i] == NULL) {
-      vfs_sb_list[i] = sb;
+    if (vfs_s_list[i] == NULL) {
+      vfs_s_list[i] = sb;
       err = 0;
       break;
     }
@@ -223,7 +223,7 @@ struct file *vfs_open(const char *path, int flags) {
 
   struct file *file = alloc_vfs_file(file_dentry, readable, writable, 0);
 
-  // additional open sb_operations for a specific file system
+  // additional open s_operations for a specific file system
   // hostfs needs to conduct actual file open.
   if (file_dentry->dentry_inode->i_op->viop_hook_open) {
     if (file_dentry->dentry_inode->i_op->viop_hook_open(
@@ -422,7 +422,7 @@ int vfs_close(struct file *file) {
   struct dentry *dentry = file->f_dentry;
   struct inode *inode = dentry->dentry_inode;
 
-  // additional close sb_operations for a specific file system
+  // additional close s_operations for a specific file system
   // hostfs needs to conduct actual file close.
   if (inode->i_op->viop_hook_close) {
     if (inode->i_op->viop_hook_close(inode, dentry) != 0) {
@@ -470,7 +470,7 @@ struct file *vfs_opendir(const char *path) {
   // allocate a vfs file with readable/non-writable flag.
   struct file *file = alloc_vfs_file(file_dentry, 1, 0, 0);
 
-  // additional open direntry sb_operations for a specific file system
+  // additional open direntry s_operations for a specific file system
   // rfs needs duild dir cache.
   if (file_dentry->dentry_inode->i_op->viop_hook_opendir) {
     if (file_dentry->dentry_inode->i_op->viop_hook_opendir(
@@ -543,11 +543,11 @@ int vfs_closedir(struct file *file) {
   }
 
   // even if a directory is no longer referenced, it will not be freed because
-  // it will serve as a cache for later lookup sb_operations on it or its
+  // it will serve as a cache for later lookup s_operations on it or its
   // descendants
   file->f_dentry->d_ref--;
 
-  // additional close direntry sb_operations for a specific file system
+  // additional close direntry s_operations for a specific file system
   // rfs needs reclaim dir cache.
   if (file->f_dentry->dentry_inode->i_op->viop_hook_closedir) {
     if (file->f_dentry->dentry_inode->i_op->viop_hook_closedir(

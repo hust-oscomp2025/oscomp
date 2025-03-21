@@ -53,7 +53,7 @@ enum wb_reason {
 
 /* Core writeback functions */
 void writeback_inodes_sb(struct super_block *, enum wb_reason);
-long writeback_inodes_sb_if_idle(struct super_block *, enum wb_reason);
+long writeback_inodes_s_if_idle(struct super_block *, enum wb_reason);
 int sync_filesystem(struct super_block *);
 
 #endif /* _WRITEBACK_H */

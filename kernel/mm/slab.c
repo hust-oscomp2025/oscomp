@@ -31,7 +31,7 @@ const size_t slab_sizes[SLAB_SIZES_COUNT] = {
 // Global array of slab caches
 static struct kmem_cache slab_caches[SLAB_SIZES_COUNT];
 
-/* Bitmap sb_operations */
+/* Bitmap s_operations */
 
 /**
  * @brief Set a bit in bitmap

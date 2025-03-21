@@ -57,7 +57,7 @@ void query_htif(__uint64_t fdt) {
   fdt_scan(fdt, &cb);
 }
 
-/////////////////////////    Spike HTIF basic sb_operations    //////////////////////////
+/////////////////////////    Spike HTIF basic s_operations    //////////////////////////
 volatile uint64_t tohost __attribute__((section(".htif")));
 volatile uint64_t fromhost __attribute__((section(".htif")));
 //__htif_base marks the beginning of .htif section (defined in kernel/kernel.lds)

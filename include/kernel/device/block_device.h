@@ -15,13 +15,13 @@ struct block_device {
     unsigned int            bd_block_size; /* Block size in bytes */
     unsigned long           bd_nr_blocks;  /* Number of blocks in device */
     
-    struct block_operations *bd_ops;       /* Block device sb_operations */
+    struct block_operations *bd_ops;       /* Block device s_operations */
     
     void                   *bd_private;    /* Private data for driver */
     spinlock_t              bd_lock;       /* Device lock */
 };
 
-/* Block device sb_operations */
+/* Block device s_operations */
 struct block_operations {
     /* Basic block I/O */
     int (*read_block)(struct block_device *bdev, sector_t sector, 
@@ -56,7 +56,7 @@ int register_blkdev(unsigned int major, const char *name,
                    struct block_operations *ops);
 int unregister_blkdev(unsigned int major, const char *name);
 
-/* Buffer sb_operations */
+/* Buffer s_operations */
 struct buffer_head *getblk(struct block_device *bdev, sector_t block, size_t size);
 struct buffer_head *bread(struct block_device *bdev, sector_t block, size_t size);
 void brelse(struct buffer_head *bh);

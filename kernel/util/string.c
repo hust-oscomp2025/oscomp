@@ -1,7 +1,7 @@
 // See LICENSE for license details.
 
-#include "string.h"
-
+#include <util/string.h>
+#include <stdarg.h>
 #include <ctype.h>
 #include <stdint.h>
 
@@ -187,4 +187,211 @@ char *strncpy(char *dest, const char *src, size_t n) {
 	}
 	
 	return dest;
+}
+
+
+/**
+ * snprintf - 格式化字符串并将结果写入缓冲区，同时确保不会溢出
+ * @str: 目标缓冲区
+ * @size: 缓冲区的大小（包括终止符'\0'）
+ * @format: 格式化字符串
+ * @...: 可变参数列表
+ *
+ * 将格式化字符串写入到指定缓冲区，最多写入size-1个字符，
+ * 并确保缓冲区以'\0'结尾。
+ *
+ * 返回值: 如果缓冲区足够大，返回写入的字符数（不包括终止符'\0'）；
+ *         否则返回格式化完成后本应该写入的字符数（不包括终止符'\0'）
+ */
+int snprintf(char* str, size_t size, const char* format, ...) {
+  va_list args;
+  int result;
+
+  // 如果缓冲区大小为0或为NULL，不进行任何写入
+  if (size == 0 || str == NULL) {
+    return 0;
+  }
+
+  va_start(args, format);
+  result = vsnprintf_internal(str, size, format, args);
+  va_end(args);
+
+  return result;
+}
+
+// 内部实现，处理格式化并写入字符
+static int vsnprintf_internal(char* str, size_t size, const char* format, va_list args) {
+  size_t count = 0;  // 已写入或需要写入的字符数
+  char* s;
+  int num, len;
+  char padding, temp[32];
+  unsigned int unum;
+  
+  if (size == 0) {
+    return 0;
+  }
+  
+  // 确保至少有一个字节用于终止符
+  size--;
+  
+  while (*format && count < size) {
+    if (*format != '%') {
+      // 普通字符直接写入
+      str[count++] = *format++;
+      continue;
+    }
+    
+    // 处理格式说明符
+    format++;
+    
+    // 处理填充（暂时只支持0填充）
+    padding = ' ';
+    if (*format == '0') {
+      padding = '0';
+      format++;
+    }
+    
+    // 处理不同类型的格式化
+    switch (*format) {
+      case 's':  // 字符串
+        s = va_arg(args, char*);
+        if (s == NULL) {
+          s = "(null)";
+        }
+        len = strlen(s);
+        // 复制字符串，但不超过剩余空间
+        while (*s && count < size) {
+          str[count++] = *s++;
+        }
+        // 即使无法完全写入，也要计算总长度
+        count += strlen(s);
+        break;
+        
+      case 'd':  // 有符号整数
+      case 'i':
+        num = va_arg(args, int);
+        
+        // 处理负数
+        if (num < 0) {
+          if (count < size) {
+            str[count++] = '-';
+          } else {
+            count++;
+          }
+          num = -num;
+        }
+        
+        // 转换为字符串
+        len = 0;
+        do {
+          temp[len++] = '0' + (num % 10);
+          num /= 10;
+        } while (num > 0);
+        
+        // 反向写入
+        while (len > 0 && count < size) {
+          str[count++] = temp[--len];
+        }
+        // 计算剩余未写入的字符
+        count += len;
+        break;
+        
+      case 'u':  // 无符号整数
+        unum = va_arg(args, unsigned int);
+        
+        // 转换为字符串
+        len = 0;
+        do {
+          temp[len++] = '0' + (unum % 10);
+          unum /= 10;
+        } while (unum > 0);
+        
+        // 反向写入
+        while (len > 0 && count < size) {
+          str[count++] = temp[--len];
+        }
+        // 计算剩余未写入的字符
+        count += len;
+        break;
+        
+      case 'x':  // 十六进制（小写）
+      case 'X':  // 十六进制（大写）
+        unum = va_arg(args, unsigned int);
+        
+        // 转换为字符串
+        len = 0;
+        do {
+          int digit = unum % 16;
+          if (digit < 10) {
+            temp[len++] = '0' + digit;
+          } else {
+            temp[len++] = (*format == 'x' ? 'a' : 'A') + (digit - 10);
+          }
+          unum /= 16;
+        } while (unum > 0);
+        
+        // 反向写入
+        while (len > 0 && count < size) {
+          str[count++] = temp[--len];
+        }
+        // 计算剩余未写入的字符
+        count += len;
+        break;
+        
+      case 'c':  // 字符
+        if (count < size) {
+          str[count++] = (char)va_arg(args, int);
+        } else {
+          count++;
+          va_arg(args, int);  // 跳过参数
+        }
+        break;
+        
+      case '%':  // 百分号
+        if (count < size) {
+          str[count++] = '%';
+        } else {
+          count++;
+        }
+        break;
+        
+      default:  // 不支持的格式，原样输出
+        if (count < size) {
+          str[count++] = *format;
+        } else {
+          count++;
+        }
+    }
+    
+    format++;
+  }
+  
+  // 添加终止符
+  if (size > 0) {
+    str[count < size ? count : size] = '\0';
+  }
+  
+  // 计算剩余格式字符串会产生的字符数
+  while (*format) {
+    if (*format == '%') {
+      format++;
+      if (*format == 's') {
+        s = va_arg(args, char*);
+        if (s) {
+          count += strlen(s);
+        }
+      } else if (*format == 'c' || *format == 'd' || *format == 'i' ||
+                *format == 'u' || *format == 'x' || *format == 'X') {
+        va_arg(args, int);  // 跳过参数
+        count++;
+      } else if (*format == '%') {
+        count++;
+      }
+    } else {
+      count++;
+    }
+    format++;
+  }
+  
+  return count;
 }

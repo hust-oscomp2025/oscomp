@@ -34,28 +34,28 @@ static struct super_block* __alloc_super(struct fs_type* type) {
 	memset(sb, 0, sizeof(struct super_block));
 
 	/* Initialize lists */
-	INIT_LIST_HEAD(&sb->sb_list_all_inodes);
-	spinlock_init(&sb->sb_list_all_inodes_lock);
+	INIT_LIST_HEAD(&sb->s_list_all_inodes);
+	spinlock_init(&sb->s_list_all_inodes_lock);
 
-	INIT_LIST_HEAD(&sb->sb_list_clean_inodes);
-	INIT_LIST_HEAD(&sb->sb_list_dirty_inodes);
-	INIT_LIST_HEAD(&sb->sb_list_io_inodes);
-	spinlock_init(&sb->sb_list_inode_states_lock);
+	INIT_LIST_HEAD(&sb->s_list_clean_inodes);
+	INIT_LIST_HEAD(&sb->s_list_dirty_inodes);
+	INIT_LIST_HEAD(&sb->s_list_io_inodes);
+	spinlock_init(&sb->s_list_inode_states_lock);
 
-	INIT_LIST_HEAD(&sb->sb_list_mounts);
+	INIT_LIST_HEAD(&sb->s_list_mounts);
 
-	INIT_LIST_HEAD(&sb->sb_node_fstype);
+	INIT_LIST_HEAD(&sb->s_node_fstype);
 
 	/* Initialize locks */
-	spinlock_init(&sb->sb_lock);
-	spinlock_init(&sb->sb_list_mounts_lock);
+	spinlock_init(&sb->s_lock);
+	spinlock_init(&sb->s_list_mounts_lock);
 
 	/* Set up reference counts */
-	sb->sb_refcount = 1; /* Initial reference */
+	sb->s_refcount = 1; /* Initial reference */
 	//sb->s_active = 0;  /* No active references yet */
 
 	/* Set filesystem type */
-	sb->sb_fstype = type;
+	sb->s_fstype = type;
 
 	return sb;
 }
@@ -78,39 +78,39 @@ struct super_block* get_superblock(struct fs_type* type, dev_t dev_id, void* fs_
 		return NULL;
 
 	/* Lock to protect the filesystem type's superblock list */
-	spin_lock(&type->fs_list_sb_lock);
+	spin_lock(&type->fs_list_s_lock);
 
 	/* Check if a superblock already exists for this device */
 	if (dev_id != 0) {
-		list_for_each_entry(sb, &type->fs_list_sb, sb_node_fstype) {
-			if (sb->sb_device_id == dev_id) {
+		list_for_each_entry(sb, &type->fs_list_sb, s_node_fstype) {
+			if (sb->s_device_id == dev_id) {
 				/* Found matching superblock - increment reference */
-				sb->sb_refcount++;
-				spin_unlock(&type->fs_list_sb_lock);
+				sb->s_refcount++;
+				spin_unlock(&type->fs_list_s_lock);
 				return sb;
 			}
 		}
 	}
 
 	/* No existing superblock found, allocate a new one */
-	spin_unlock(&type->fs_list_sb_lock);
+	spin_unlock(&type->fs_list_s_lock);
 	sb = __alloc_super(type);
 	if (!sb)
 		return NULL;
 
 	/* Set device ID */
-	sb->sb_device_id = dev_id;
+	sb->s_device_id = dev_id;
 
 	/* Store filesystem-specific data if provided */
 	if (fs_data) {
 		/* Note: Filesystem is responsible for managing this data */
-		sb->sb_fs_specific = fs_data;
+		sb->s_fs_specific = fs_data;
 	}
 
 	/* Add to the filesystem's list of superblocks */
-	spin_lock(&type->fs_list_sb_lock);
-	list_add(&sb->sb_node_fstype, &type->fs_list_sb);
-	spin_unlock(&type->fs_list_sb_lock);
+	spin_lock(&type->fs_list_s_lock);
+	list_add(&sb->s_node_fstype, &type->fs_list_sb);
+	spin_unlock(&type->fs_list_s_lock);
 
 	return sb;
 }
@@ -124,7 +124,7 @@ struct super_block* get_superblock(struct fs_type* type, dev_t dev_id, void* fs_
 void drop_super(struct super_block* sb) {
 	if (!sb)
 		return;
-	if (atomic_dec_and_test(&sb->sb_refcount)) {
+	if (atomic_dec_and_test(&sb->s_refcount)) {
 		deactivate_super(sb);
 	}
 }
@@ -141,17 +141,17 @@ static void deactivate_super(struct super_block* sb) {
 		return;
 
 	/* Call filesystem's put_super if defined */
-	if (sb->sb_operations && sb->sb_operations->put_super)
-		sb->sb_operations->put_super(sb);
+	if (sb->s_operations && sb->s_operations->put_super)
+		sb->s_operations->put_super(sb);
 
-	spinlock_lock(&sb->sb_fstype->fs_list_sb_lock);
+	spinlock_lock(&sb->s_fstype->fs_list_s_lock);
 	/* Remove from filesystem's list */
-	list_del(&sb->sb_node_fstype);
-	spinlock_unlock(&sb->sb_fstype->fs_list_sb_lock);
+	list_del(&sb->s_node_fstype);
+	spinlock_unlock(&sb->s_fstype->fs_list_s_lock);
 
 	/* Free any filesystem-specific info */
-	if (sb->sb_fs_specific)
-		kfree(sb->sb_fs_specific);
+	if (sb->s_fs_specific)
+		kfree(sb->s_fs_specific);
 
 	/* Free the superblock itself */
 	kfree(sb);
@@ -168,10 +168,10 @@ void grab_super(struct super_block* sb) {
 	if (!sb)
 		return;
 
-	spin_lock(&sb->sb_lock);
-	atomic_inc(&sb->sb_refcount);
+	spin_lock(&sb->s_lock);
+	atomic_inc(&sb->s_refcount);
 	//sb->s_active++;
-	spin_unlock(&sb->sb_lock);
+	spin_unlock(&sb->s_lock);
 }
 
 /**
@@ -184,11 +184,11 @@ void deactivate_super_safe(struct super_block* sb) {
 	if (!sb)
 		return;
 
-	spin_lock(&sb->sb_lock);
-	atomic_dec(&sb->sb_refcount);
+	spin_lock(&sb->s_lock);
+	atomic_dec(&sb->s_refcount);
 
 	//sb->s_active--;
-	spin_unlock(&sb->sb_lock);
+	spin_unlock(&sb->s_lock);
 }
 
 /**
@@ -208,32 +208,32 @@ int sync_filesystem(struct super_block* sb, int wait) {
 		return -EINVAL;
 
 	/* Call filesystem's sync_fs if defined */
-	if (sb->sb_operations && sb->sb_operations->sync_fs) {
-		ret = sb->sb_operations->sync_fs(sb, wait);
+	if (sb->s_operations && sb->s_operations->sync_fs) {
+		ret = sb->s_operations->sync_fs(sb, wait);
 		if (ret)
 			return ret;
 	}
 
 	/* Sync all dirty inodes */
-	spin_lock(&sb->sb_list_inode_states_lock);
-	list_for_each_entry_safe(inode, next, &sb->sb_list_dirty_inodes, i_state_list_node) {
-		if (sb->sb_operations && sb->sb_operations->write_inode) {
-			spin_unlock(&sb->sb_list_inode_states_lock);
-			ret = sb->sb_operations->write_inode(inode, wait);
-			spin_lock(&sb->sb_list_inode_states_lock);
+	spin_lock(&sb->s_list_inode_states_lock);
+	list_for_each_entry_safe(inode, next, &sb->s_list_dirty_inodes, i_state_list_node) {
+		if (sb->s_operations && sb->s_operations->write_inode) {
+			spin_unlock(&sb->s_list_inode_states_lock);
+			ret = sb->s_operations->write_inode(inode, wait);
+			spin_lock(&sb->s_list_inode_states_lock);
 
 			if (ret == 0 && wait) {
 				/* Move from dirty list to LRU list */
 				list_del(&inode->i_state_list_node);
 				inode->i_state &= ~I_DIRTY;
-				list_add(&inode->i_state_list_node, &sb->sb_list_clean_inodes);
+				list_add(&inode->i_state_list_node, &sb->s_list_clean_inodes);
 			}
 
 			if (ret)
 				break;
 		}
 	}
-	spin_unlock(&sb->sb_list_inode_states_lock);
+	spin_unlock(&sb->s_list_inode_states_lock);
 
 	return ret;
 }
@@ -255,29 +255,29 @@ void generic_shutdown_super(struct super_block* sb) {
 	sync_filesystem(sb, 1);
 
 	/* Free all inodes */
-	spin_lock(&sb->sb_list_all_inodes_lock);
-	list_for_each_entry_safe(inode, next, &sb->sb_list_all_inodes, i_sb_list_node) {
-		spin_unlock(&sb->sb_list_all_inodes_lock);
+	spin_lock(&sb->s_list_all_inodes_lock);
+	list_for_each_entry_safe(inode, next, &sb->s_list_all_inodes, i_s_list_node) {
+		spin_unlock(&sb->s_list_all_inodes_lock);
 
 		/* Forcibly evict the inode */
 		if (inode->i_state & I_DIRTY) {
-			if (sb->sb_operations && sb->sb_operations->write_inode)
-				sb->sb_operations->write_inode(inode, 1);
+			if (sb->s_operations && sb->s_operations->write_inode)
+				sb->s_operations->write_inode(inode, 1);
 		}
 
-		if (sb->sb_operations && sb->sb_operations->evict_inode)
-			sb->sb_operations->evict_inode(inode);
+		if (sb->s_operations && sb->s_operations->evict_inode)
+			sb->s_operations->evict_inode(inode);
 		else
 			clear_inode(inode);
 
-		spin_lock(&sb->sb_list_all_inodes_lock);
+		spin_lock(&sb->s_list_all_inodes_lock);
 	}
-	spin_unlock(&sb->sb_list_all_inodes_lock);
+	spin_unlock(&sb->s_list_all_inodes_lock);
 
 	/* Free root dentry */
-	if (sb->sb_global_root_dentry) {
-		dput(sb->sb_global_root_dentry);
-		sb->sb_global_root_dentry = NULL;
+	if (sb->s_global_root_dentry) {
+		dput(sb->s_global_root_dentry);
+		sb->s_global_root_dentry = NULL;
 	}
 
 	/* Decrease active count */
@@ -440,10 +440,10 @@ struct super_block* mount_fs(struct fs_type* type, int flags, const char* dev_na
 		return ERR_PTR(-ENOMEM);
 
 	/* Set flags */
-	sb->sb_flags = flags;
+	sb->s_flags = flags;
 
 	/* If this is a new superblock (no root yet), initialize it */
-	if (sb->sb_global_root_dentry == NULL) {
+	if (sb->s_global_root_dentry == NULL) {
 		/* Call fs_fill_sb if available */
 		if (type->fs_fill_sb) {
 			error = type->fs_fill_sb(sb, data, flags);

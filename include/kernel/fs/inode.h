@@ -119,12 +119,12 @@ struct inode {
 		struct radix_tree_root page_tree;             /* Page cache radix tree */
 		spinlock_t tree_lock;                         /* Lock for tree manipulation */
 		unsigned long nrpages;                        /* Number of total pages */
-		const struct address_space_operations* a_ops; /* sb_operations */
+		const struct address_space_operations* a_ops; /* s_operations */
 	}* i_mapping;                                     /* Associated address space */
 
 	/* Filesystem information */
 	struct super_block* i_superblock;   /* Superblock */
-	struct list_head i_sb_list_node;    /* Superblock list of inodes */
+	struct list_head i_s_list_node;    /* Superblock list of inodes */
 	struct list_head i_state_list_node; /* For ONE state list (LRU/dirty/IO) */
 
 	/* Operations */
@@ -182,7 +182,7 @@ int setattr_prepare(struct dentry* dentry, struct iattr* attr);
 int notify_change(struct dentry* dentry, struct iattr* attr);
 
 /*
- * Address space sb_operations (page cache)
+ * Address space s_operations (page cache)
  */
 struct address_space_operations {
 	int (*readpage)(struct file*, struct page*);
@@ -191,7 +191,7 @@ struct address_space_operations {
 	int (*writepages)(struct address_space*, struct writeback_control*);
 	void (*invalidatepage)(struct page*, unsigned int);
 	int (*releasepage)(struct page*, int);
-	int (*direct_IO)(int, struct kiocb*, const struct iovec*, loff_t, unsigned long);
+	int (*direct_IO)(int, struct kiocb*, const struct io_vector*, loff_t, unsigned long);
 };
 
 /*
@@ -230,7 +230,7 @@ struct inode_operations {
 	void (*truncate_blocks)(struct inode*, loff_t size);
 
 	/* Direct I/O support */
-	int (*direct_IO)(struct kiocb*, struct iov_iter*);
+	int (*direct_IO)(struct kiocb*, struct io_vector_iterator*);
 };
 
 /* Inode state flags */

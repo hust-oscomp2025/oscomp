@@ -40,7 +40,7 @@ struct file {
 		unsigned int prev_pos;
 	} f_read_ahead;               /* Read-ahead state */
 
-	const struct file_operations* f_operations; /* File sb_operations */
+	const struct file_operations* f_operations; /* File s_operations */
 };
 
 /*
@@ -54,8 +54,6 @@ struct file* file_get(struct file* file);
 void file_put(struct file* file);
 
 /*位置与访问管理*/
-int file_setPos(struct file* file, loff_t pos);
-inline loff_t file_getPos(struct file* file);
 int file_denyWrite(struct file* file);
 int file_allowWrite(struct file* file);
 inline bool file_readable(struct file* file);
@@ -64,6 +62,19 @@ inline bool file_writable(struct file* file);
 /*状态管理与通知*/
 int file_setAccessed(struct file *file);
 int file_setModified(struct file *file);
+
+/*标准vfs接口*/
+ssize_t vfs_read(struct file*, char*, size_t, loff_t*);
+ssize_t vfs_write(struct file*, const char*, size_t, loff_t*);
+loff_t vfs_llseek(struct file*, loff_t, int);	
+	// pos的变化与查询统一接口,setpos和getpos都支持
+int vfs_fsync(struct file*, int);
+/* Vectored I/O functions */
+ssize_t vfs_readv(struct file *file, const struct io_vector *vec, 
+	unsigned long vlen, loff_t *pos);
+	
+ssize_t vfs_writev(struct file *file, const struct io_vector *vec, 
+	 unsigned long vlen, loff_t *pos);
 
 
 /**
@@ -78,17 +89,17 @@ struct file_operations {
 	ssize_t (*write)(struct file*, const char*, size_t, loff_t*);
 
 	/* Vectored I/O */
-	ssize_t (*read_iter)(struct kiocb*, struct iov_iter*);
-	ssize_t (*write_iter)(struct kiocb*, struct iov_iter*);
+	ssize_t (*read_iter)(struct kiocb*, struct io_vector_iterator*);
+	ssize_t (*write_iter)(struct kiocb*, struct io_vector_iterator*);
 
-	/* Directory sb_operations */
+	/* Directory s_operations */
 	int (*iterate)(struct file*, struct dir_context*);
 	int (*iterate_shared)(struct file*, struct dir_context*);
 
 	/* Polling/selection */
 	__poll_t (*poll)(struct file*, struct poll_table_struct*);
 
-	/* Management sb_operations */
+	/* Management s_operations */
 	int (*open)(struct inode*, struct file*);
 	int (*flush)(struct file*);
 	int (*release)(struct inode*, struct file*);
@@ -97,11 +108,11 @@ struct file_operations {
 	/* Memory mapping */
 	int (*mmap)(struct file*, struct vm_area_struct*);
 
-	/* Special sb_operations */
+	/* Special s_operations */
 	long (*unlocked_ioctl)(struct file*, unsigned int, unsigned long);
 	int (*fasync)(int, struct file*, int);
 
-	/* Splice sb_operations */
+	/* Splice s_operations */
 	ssize_t (*splice_read)(struct file*, loff_t*, struct pipe_inode_info*, size_t, unsigned int);
 	ssize_t (*splice_write)(struct pipe_inode_info*, struct file*, loff_t*, size_t, unsigned int);
 
@@ -125,7 +136,7 @@ struct file_operations {
 #define O_NONBLOCK 00004000        /* Non-blocking I/O */
 #define O_DSYNC 00010000           /* Synchronize data */
 #define O_SYNC (O_DSYNC | O_RSYNC) /* Synchronize data and metadata */
-#define O_RSYNC 00040000           /* Synchronize read sb_operations */
+#define O_RSYNC 00040000           /* Synchronize read s_operations */
 #define O_DIRECT 00100000          /* Direct I/O */
 #define O_DIRECTORY 00200000       /* Must be a directory */
 #define O_NOFOLLOW 00400000        /* Don't follow symbolic links */
