@@ -52,8 +52,8 @@ After analyzing your filesystem framework, here's a recommended implementation s
 7. **Core VFS Operations**
    ```c
    // implement in kernel/fs/read_write.c
-   ssize_t vfs_read(struct file *file, char *buf, size_t count, loff_t *pos);
-   ssize_t vfs_write(struct file *file, const char *buf, size_t count, loff_t *pos);
+   ssize_t file_read(struct file *file, char *buf, size_t count, loff_t *pos);
+   ssize_t file_write(struct file *file, const char *buf, size_t count, loff_t *pos);
    ```
 
 ## Phase 3: First Filesystem - ramfs

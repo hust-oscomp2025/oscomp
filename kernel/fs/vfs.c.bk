@@ -240,13 +240,13 @@ struct file *vfs_open(const char *path, int flags) {
 // read content from "file" starting from file->offset, and store it in "buf".
 // return: the number of bytes actually read
 //
-ssize_t vfs_read(struct file *file, char *buf, size_t count) {
+ssize_t file_read(struct file *file, char *buf, size_t count) {
   if (!(file->f_mode & FMODE_READ)) {
-    sprint("vfs_read: file is not readable!\n");
+    sprint("file_read: file is not readable!\n");
     return -1;
   }
   if (file->f_dentry->dentry_inode->i_mode != S_IFREG) {
-    sprint("vfs_read: cannot read a directory!\n");
+    sprint("file_read: cannot read a directory!\n");
     return -1;
   }
   // actual reading.
@@ -257,13 +257,13 @@ ssize_t vfs_read(struct file *file, char *buf, size_t count) {
 // write content in "buf" to "file", at file->offset.
 // return: the number of bytes actually written
 //
-ssize_t vfs_write(struct file *file, const char *buf, size_t count) {
+ssize_t file_write(struct file *file, const char *buf, size_t count) {
   if (!(file->f_mode & FMODE_WRITE)) {
-    sprint("vfs_write: file is not writable!\n");
+    sprint("file_write: file is not writable!\n");
     return -1;
   }
   if (file->f_dentry->dentry_inode->i_mode != S_IFREG) {
-    sprint("vfs_read: cannot write a directory!\n");
+    sprint("file_read: cannot write a directory!\n");
     return -1;
   }
   // actual writing.
@@ -276,7 +276,7 @@ ssize_t vfs_write(struct file *file, const char *buf, size_t count) {
 //
 ssize_t vfs_lseek(struct file *file, ssize_t offset, int whence) {
   if (file->f_dentry->dentry_inode->i_mode != S_IFREG) {
-    sprint("vfs_read: cannot seek a directory!\n");
+    sprint("file_read: cannot seek a directory!\n");
     return -1;
   }
 
@@ -486,9 +486,9 @@ struct file *vfs_opendir(const char *path) {
 // read a direntry entry from a direntry specified by "file"
 // the read direntry entry is stored in "dir"
 //
-int vfs_readdir(struct file *file, struct dir *dir) {
+int file_readdir(struct file *file, struct dir *dir) {
   if (file->f_dentry->dentry_inode->i_mode != S_IFDIR) {
-    sprint("vfs_readdir: cannot read a file!\n");
+    sprint("file_readdir: cannot read a file!\n");
     return -1;
   }
   return viop_readdir(file->f_dentry->dentry_inode, dir, &(file->f_pos));

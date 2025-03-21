@@ -66,16 +66,16 @@ int file_setAccessed(struct file *file);
 int file_setModified(struct file *file);
 
 /*标准vfs接口*/
-ssize_t vfs_read(struct file*, char*, size_t, loff_t*);
-ssize_t vfs_write(struct file*, const char*, size_t, loff_t*);
-loff_t vfs_llseek(struct file*, loff_t, int);	
+ssize_t file_read(struct file*, char*, size_t, loff_t*);
+ssize_t file_write(struct file*, const char*, size_t, loff_t*);
+loff_t file_llseek(struct file*, loff_t, int);	
 	// pos的变化与查询统一接口,setpos和getpos都支持
-int vfs_fsync(struct file*, int);
+int file_sync(struct file*, int);
 /* Vectored I/O functions */
-ssize_t vfs_readv(struct file *file, const struct io_vector *vec, 
+ssize_t file_readv(struct file *file, const struct io_vector *vec, 
 	unsigned long vlen, loff_t *pos);
 	
-ssize_t vfs_writev(struct file *file, const struct io_vector *vec, 
+ssize_t file_writev(struct file *file, const struct io_vector *vec, 
 	 unsigned long vlen, loff_t *pos);
 
 

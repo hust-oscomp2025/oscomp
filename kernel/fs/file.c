@@ -301,82 +301,127 @@ void file_put(struct file* file) {
 	}
 }
 
-// Implement core read/write functions
-ssize_t vfs_read(struct file* file, char* buf, size_t count, loff_t* pos) {
-	if (!file || !file->f_operations || !file->f_operations->read)
-		return -EINVAL;
 
-	return file->f_operations->read(file, buf, count, pos);
+ssize_t file_read(struct file* file, char* buf, size_t count, loff_t* pos) {
+    struct kiocb kiocb;
+    ssize_t ret;
+    
+    if (!file)
+        return -EINVAL;
+    
+    /* Initialize the kiocb with the file */
+    init_kiocb(&kiocb, file);
+    
+    /* If a specific position was provided, use it */
+    if (pos && *pos != file->f_pos) {
+        kiocb_set_pos(&kiocb, *pos);
+        kiocb.ki_flags |= KIOCB_NOUPDATE_POS; /* Don't update file position */
+    }
+    
+    /* Perform the read operation */
+    ret = kiocb_read(&kiocb, buf, count);
+    
+    /* Update the position pointer if provided */
+    if (pos)
+        *pos = kiocb.ki_pos;
+    
+    return ret;
 }
 
-ssize_t vfs_write(struct file* file, const char* buf, size_t count, loff_t* pos) {
-	if (!file || !file->f_operations || !file->f_operations->write)
-		return -EINVAL;
 
-	return file->f_operations->write(file, buf, count, pos);
+
+ssize_t file_write(struct file* file, const char* buf, size_t count, loff_t* pos) {
+    struct kiocb kiocb;
+    ssize_t ret;
+    
+    if (!file)
+        return -EINVAL;
+    
+    /* Initialize the kiocb with the file */
+    init_kiocb(&kiocb, file);
+    
+    /* If a specific position was provided, use it */
+    if (pos && *pos != file->f_pos) {
+        kiocb_set_pos(&kiocb, *pos);
+        kiocb.ki_flags |= KIOCB_NOUPDATE_POS; /* Don't update file position */
+    }
+    
+    /* Perform the write operation */
+    ret = kiocb_write(&kiocb, buf, count);
+    
+    /* Update the position pointer if provided */
+    if (pos)
+        *pos = kiocb.ki_pos;
+    
+    return ret;
 }
+
 
 /**
- * vfs_llseek - Performs seek operation on a file
- * @file: File pointer
- * @offset: New position or offset from current position
- * @whence: One of SEEK_SET, SEEK_CUR, or SEEK_END
+ * file_llseek - Repositions the file offset 
+ * @file: File to seek within
+ * @offset: File offset to seek to
+ * @whence: Type of seek (SEEK_SET, SEEK_CUR, SEEK_END)
  *
- * This function adjusts a file's position according to the whence parameter:
+ * This function updates a file's position according to the whence parameter:
  * - SEEK_SET: Sets position to offset from start of file
  * - SEEK_CUR: Sets position to current position plus offset
  * - SEEK_END: Sets position to end of file plus offset
  *
  * Returns the new file position on success, or a negative error code on failure.
  */
-loff_t vfs_llseek(struct file* file, loff_t offset, int whence) {
-	loff_t pos;
-
-	/* Basic validation */
-	if (!file || !file->f_inode)
-		return -EINVAL;
-
-	/* Check if file is seekable */
-	if (!(file->f_mode & FMODE_LSEEK))
-		return -ESPIPE;
-
-	/* Call file-specific llseek operation if available */
-	if (file->f_operations && file->f_operations->llseek)
-		return file->f_operations->llseek(file, offset, whence);
-
-	/* Generic implementation for simple files */
-	spinlock_lock(&file->f_lock);
-
-	switch (whence) {
-	case SEEK_SET:
-		pos = offset;
-		break;
-	case SEEK_CUR:
-		pos = file->f_pos + offset;
-		break;
-	case SEEK_END:
-		pos = file->f_inode->i_size + offset;
-		break;
-	default:
-		spinlock_unlock(&file->f_lock);
-		return -EINVAL;
-	}
-
-	/* Validate the resulting position */
-	if (pos < 0) {
-		spinlock_unlock(&file->f_lock);
-		return -EINVAL;
-	}
-
-	/* Update file position */
-	file->f_pos = pos;
-	spinlock_unlock(&file->f_lock);
-
-	return pos;
+loff_t file_llseek(struct file* file, loff_t offset, int whence) {
+    struct kiocb kiocb;
+    loff_t new_pos;
+    
+    /* Basic validation */
+    if (!file || !file->f_inode)
+        return -EINVAL;
+    
+    /* Check if file is seekable */
+    if (!(file->f_mode & FMODE_LSEEK))
+        return -ESPIPE;
+    
+    /* Initialize kiocb */
+    init_kiocb(&kiocb, file);
+    
+    /* Call file-specific llseek operation if available */
+    if (file->f_operations && file->f_operations->llseek)
+        return file->f_operations->llseek(file, offset, whence);
+    
+    /* Generic implementation for simple files */
+    spinlock_lock(&file->f_lock);
+    
+    switch (whence) {
+    case SEEK_SET:
+        new_pos = offset;
+        break;
+    case SEEK_CUR:
+        new_pos = file->f_pos + offset;
+        break;
+    case SEEK_END:
+        new_pos = file->f_inode->i_size + offset;
+        break;
+    default:
+        spinlock_unlock(&file->f_lock);
+        return -EINVAL;
+    }
+    
+    /* Validate the resulting position */
+    if (new_pos < 0) {
+        spinlock_unlock(&file->f_lock);
+        return -EINVAL;
+    }
+    
+    /* Update file position */
+    file->f_pos = new_pos;
+    spinlock_unlock(&file->f_lock);
+    
+    return new_pos;
 }
 
 /**
- * vfs_fsync - Synchronize a file's in-core state with storage
+ * file_sync - Synchronize a file's in-core state with storage
  * @file: File to synchronize
  * @datasync: Only flush user data if non-zero (not metadata)
  *
@@ -386,135 +431,157 @@ loff_t vfs_llseek(struct file* file, loff_t offset, int whence) {
  *
  * Returns 0 on success or a negative error code on failure.
  */
-int vfs_fsync(struct file* file, int datasync) {
-	struct inode* inode;
-	int ret = 0;
+int file_sync(struct file* file, int datasync) {
+    struct inode* inode;
+    int ret = 0;
 
-	/* Basic validation */
-	if (!file)
-		return -EINVAL;
+    /* Basic validation */
+    if (!file)
+        return -EINVAL;
 
-	inode = file->f_inode;
-	if (!inode)
-		return -EINVAL;
+    inode = file->f_inode;
+    if (!inode)
+        return -EINVAL;
 
-	/* Call file-specific fsync operation if available */
-	if (file->f_operations && file->f_operations->fsync) {
-		/* Use the file's fsync operation with full file range */
-		return file->f_operations->fsync(file, 0, INT64_MAX, datasync);
-	}
+    /* Call file-specific fsync operation if available */
+    if (file->f_operations && file->f_operations->fsync) {
+        /* Use the file's fsync operation with full file range */
+        struct kiocb kiocb;
+        init_kiocb(&kiocb, file);
+        return file->f_operations->fsync(file, 0, INT64_MAX, datasync);
+    }
 
-	/* Generic implementation - sync the inode */
-	if (datasync)
-		ret = sync_inode(inode, 1); /* Only sync data blocks */
-	else
-		ret = sync_inode_metadata(inode, 1); /* Sync data and metadata */
+    /* Generic implementation - sync the inode */
+    if (datasync)
+        ret = sync_inode(inode, 1); /* Only sync data blocks */
+    else
+        ret = sync_inode_metadata(inode, 1); /* Sync data and metadata */
 
-	return ret;
+    return ret;
 }
 
 /**
- * vfs_readv - Read data from a file into multiple buffers
+ * file_readv - Read data from a file into multiple buffers
  * @file: File to read from
  * @vec: Array of io_vector structures
  * @vlen: Number of io_vector structures
  * @pos: Position in file to read from (updated on return)
  */
-ssize_t vfs_readv(struct file* file, const struct io_vector* vec, unsigned long vlen, loff_t* pos) {
-	struct kiocb kiocb;
-	struct io_vector_iterator iter;
-	ssize_t ret;
+ssize_t file_readv(struct file* file, const struct io_vector* vec, unsigned long vlen, loff_t* pos) {
+    struct kiocb kiocb;
+    struct io_vector_iterator iter;
+    ssize_t ret;
 
-	if (!file || !vec || !pos)
-		return -EINVAL;
+    if (!file || !vec || !pos)
+        return -EINVAL;
 
-	if (!(file->f_mode & FMODE_READ))
-		return -EBADF;
+    /* Initialize kiocb */
+    init_kiocb(&kiocb, file);
+    kiocb.ki_pos = *pos;
+    
+    /* If we're using a position different from the file's current position */
+    if (*pos != file->f_pos)
+        kiocb.ki_flags |= KIOCB_NOUPDATE_POS;
 
-	init_kiocb(&kiocb, file);
-	kiocb.ki_pos = *pos;
+    /* Setup the io_vector iterator */
+    ret = setup_io_vector_iterator(&iter, vec, vlen);
+    if (ret < 0)
+        return ret;
 
-	ret = setup_io_vector_iterator(&iter, vec, vlen);
-	if (ret < 0)
-		return ret;
+    /* Use optimized read_iter if available */
+    if (likely(file->f_operations && file->f_operations->read_iter)) {
+        ret = file->f_operations->read_iter(&kiocb, &iter);
+    } else if (file->f_operations && file->f_operations->read) {
+        /* Fall back to sequential reads */
+        ret = 0;
+        for (unsigned long i = 0; i < vlen; i++) {
+            ssize_t bytes;
+            bytes = file->f_operations->read(file, vec[i].iov_base, vec[i].iov_len, &kiocb.ki_pos);
+            if (bytes < 0) {
+                if (ret == 0)
+                    ret = bytes;
+                break;
+            }
+            ret += bytes;
+            if (bytes < vec[i].iov_len)
+                break; /* Short read */
+        }
+    } else {
+        ret = -EINVAL;
+    }
 
-	/* Use optimized read_iter if available */
-	if (file->f_operations && file->f_operations->read_iter) {
-		ret = file->f_operations->read_iter(&kiocb, &iter);
-	} else if (file->f_operations && file->f_operations->read) {
-		/* Fall back to sequential reads */
-		ret = 0;
-		for (unsigned long i = 0; i < vlen; i++) {
-			ssize_t bytes;
-			bytes = file->f_operations->read(file, vec[i].iov_base, vec[i].iov_len, &kiocb.ki_pos);
-			if (bytes < 0) {
-				if (ret == 0)
-					ret = bytes;
-				break;
-			}
-			ret += bytes;
-			if (bytes < vec[i].iov_len)
-				break; /* Short read */
-		}
-	} else {
-		ret = -EINVAL;
-	}
+    /* Update the position for the caller */
+    if (ret > 0)
+        *pos = kiocb.ki_pos;
 
-	if (ret > 0)
-		*pos = kiocb.ki_pos;
-
-	return ret;
+    return ret;
 }
 
+
+
 /**
- * vfs_writev - Write data from multiple buffers to a file
+ * file_writev - Write data from multiple buffers to a file
  * @file: File to write to
  * @vec: Array of io_vector structures
  * @vlen: Number of io_vector structures
  * @pos: Position in file to write to (updated on return)
  */
-ssize_t vfs_writev(struct file* file, const struct io_vector* vec, unsigned long vlen, loff_t* pos) {
-	struct kiocb kiocb;
-	struct io_vector_iterator iter;
-	ssize_t ret;
+ssize_t file_writev(struct file* file, const struct io_vector* vec, unsigned long vlen, loff_t* pos) {
+    struct kiocb kiocb;
+    struct io_vector_iterator iter;
+    ssize_t ret;
 
-	if (!file || !vec || !pos)
-		return -EINVAL;
+    if (!file || !vec || !pos)
+        return -EINVAL;
 
-	if (!(file->f_mode & FMODE_WRITE))
-		return -EBADF;
+    /* Initialize kiocb */
+    init_kiocb(&kiocb, file);
+    kiocb.ki_pos = *pos;
+    
+    /* If we're using a position different from the file's current position */
+    if (*pos != file->f_pos)
+        kiocb.ki_flags |= KIOCB_NOUPDATE_POS;
 
-	init_kiocb(&kiocb, file);
-	kiocb.ki_pos = *pos;
+    /* Setup the io_vector iterator */
+    ret = setup_io_vector_iterator(&iter, vec, vlen);
+    if (ret < 0)
+        return ret;
 
-	ret = setup_io_vector_iterator(&iter, vec, vlen);
-	if (ret < 0)
-		return ret;
+    /* Handle append mode */
+    if (file->f_flags & O_APPEND) {
+        kiocb.ki_flags |= KIOCB_APPEND;
+        kiocb.ki_pos = file->f_inode->i_size;
+    }
 
-	if (file->f_operations && file->f_operations->write_iter) {
-		ret = file->f_operations->write_iter(&kiocb, &iter);
-	} else if (file->f_operations && file->f_operations->write) {
-		ret = 0;
-		for (unsigned long i = 0; i < vlen; i++) {
-			ssize_t bytes;
-			bytes = file->f_operations->write(file, vec[i].iov_base, vec[i].iov_len, &kiocb.ki_pos);
-			if (bytes < 0) {
-				if (ret == 0)
-					ret = bytes;
-				break;
-			}
-			ret += bytes;
-			if (bytes < vec[i].iov_len)
-				break; /* Short write */
-		}
-	} else {
-		ret = -EINVAL;
-	}
+    /* Use optimized write_iter if available */
+    if (file->f_operations && file->f_operations->write_iter) {
+        ret = file->f_operations->write_iter(&kiocb, &iter);
+    } else if (file->f_operations && file->f_operations->write) {
+        /* Fall back to sequential writes */
+        ret = 0;
+        for (unsigned long i = 0; i < vlen; i++) {
+            ssize_t bytes;
+            bytes = file->f_operations->write(file, vec[i].iov_base, vec[i].iov_len, &kiocb.ki_pos);
+            if (bytes < 0) {
+                if (ret == 0)
+                    ret = bytes;
+                break;
+            }
+            ret += bytes;
+            if (bytes < vec[i].iov_len)
+                break; /* Short write */
+        }
+    } else {
+        ret = -EINVAL;
+    }
 
-	if (ret > 0) {
-		*pos = kiocb.ki_pos;
-		mark_inode_dirty(file->f_inode);
-	}
+    /* Update the position for the caller */
+    if (ret > 0) {
+        *pos = kiocb.ki_pos;
+        
+        /* Mark the inode as dirty if write was successful */
+        mark_inode_dirty(file->f_inode);
+    }
 
-	return ret;
+    return ret;
 }

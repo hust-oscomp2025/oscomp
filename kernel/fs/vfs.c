@@ -62,53 +62,6 @@ struct vfsmount* vfs_kern_mount(struct fs_type* type, int flags,
 }
 
 /**
- * vfs_read - Read data from a file
- * @file: File to read from
- * @buf: Buffer to read into
- * @count: Number of bytes to read
- * @pos: Position pointer
- *
- * Returns bytes read or negative error code
- */
-ssize_t vfs_read(struct file* file, char* buf, size_t count, loff_t* pos) {
-	if (!file || !file->f_operations)
-		return -EINVAL;
-
-	if (!file->f_operations->read)
-		return -EINVAL;
-
-	/* Check permission */
-	if (!(file->f_mode & FMODE_READ))
-		return -EBADF;
-
-	return file->f_operations->read(file, buf, count, pos);
-}
-
-/**
- * vfs_write - Write data to a file
- * @file: File to write to
- * @buf: Data to write
- * @count: Number of bytes to write
- * @pos: Position pointer
- *
- * Returns bytes written or negative error code
- */
-ssize_t vfs_write(struct file* file, const char* buf, size_t count,
-		  loff_t* pos) {
-	if (!file || !file->f_operations)
-		return -EINVAL;
-
-	if (!file->f_operations->write)
-		return -EINVAL;
-
-	/* Check permission */
-	if (!(file->f_mode & FMODE_WRITE))
-		return -EBADF;
-
-	return file->f_operations->write(file, buf, count, pos);
-}
-
-/**
  * vfs_mkdir - Create a directory
  * @dir: Parent directory's inode
  * @dentry: Dentry for the new directory

@@ -93,7 +93,7 @@ int do_read(int fd, char *buf, uint64 count) {
     panic("do_read: no readable file!\n");
 
   char buffer[count + 1];
-  int len = vfs_read(pfile, buffer, count);
+  int len = file_read(pfile, buffer, count);
   buffer[count] = '\0';
   strcpy(buf, buffer);
   return len;
@@ -109,7 +109,7 @@ int do_write(int fd, char *buf, uint64 count) {
   if (!(pfile->f_mode & FMODE_WRITE)) 
     panic("do_write: cannot write file!\n");
 
-  int len = vfs_write(pfile, buf, count);
+  int len = file_write(pfile, buf, count);
   return len;
 }
 
@@ -184,7 +184,7 @@ int do_opendir(char *pathname) {
 //
 int do_readdir(int fd, struct dir *dir) {
   struct file *pfile = get_opened_file(fd);
-  return vfs_readdir(pfile, dir);
+  return file_readdir(pfile, dir);
 }
 
 //

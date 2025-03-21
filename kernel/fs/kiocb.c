@@ -1,18 +1,15 @@
 #include <kernel/fs/kiocb.h>
 #include <kernel/fs/file.h>
-#include <kernel/fs/io_vector.h>
-#include <kernel/fs/inode.h>
-#include <util/atomic.h>
 #include <util/spinlock.h>
 
 /**
- * Initialize a kernel I/O control block
- * 
- * @param kiocb  The kiocb to initialize
- * @param file   The file associated with this I/O operation
- * 
- * This sets up the kiocb structure with the given file, initializing
+ * init_kiocb - Initialize a kernel I/O control block
+ * @kiocb: The kiocb to initialize
+ * @file: The file associated with this I/O operation
+ *
+ * Sets up the kiocb structure with the given file, initializing
  * all fields to appropriate default values.
+ * kiocb一般不需要分配内存，一般都直接声明在栈上。
  */
 void init_kiocb(struct kiocb *kiocb, struct file *file)
 {
@@ -21,431 +18,149 @@ void init_kiocb(struct kiocb *kiocb, struct file *file)
         
     kiocb->ki_filp = file;
     kiocb->ki_pos = file->f_pos;
-    kiocb->ki_complete = NULL;
-    kiocb->private = NULL;
     kiocb->ki_flags = 0;
+    
+    /* Set flags based on file mode */
+    if (file->f_flags & O_APPEND)
+        kiocb->ki_flags |= KIOCB_APPEND;
+    if (file->f_flags & O_DIRECT)
+        kiocb->ki_flags |= KIOCB_DIRECT;
+    if (file->f_flags & O_NONBLOCK)
+        kiocb->ki_flags |= KIOCB_NONBLOCK;
 }
 
 /**
- * Perform the actual read operation for a file
- * 
- * @param kiocb  The kiocb describing the I/O operation
- * @param buf    Buffer to read into
- * @param len    Number of bytes to read
- * 
- * @return       Number of bytes read or error code
- * 
- * This is the core implementation that VFS read operations would call
+ * kiocb_set_pos - Set the position for a kiocb
+ * @kiocb: The kiocb to modify
+ * @pos: The new position
+ *
+ * Sets the current position for I/O operations with this kiocb.
  */
-ssize_t kiocb_perform_read(struct kiocb *kiocb, char *buf, size_t len)
+void kiocb_set_pos(struct kiocb *kiocb, loff_t pos)
+{
+    if (kiocb)
+        kiocb->ki_pos = pos;
+}
+
+/**
+ * kiocb_read - Read data using a kiocb
+ * @kiocb: The kiocb describing the I/O
+ * @buf: Buffer to read into
+ * @len: Maximum number of bytes to read
+ *
+ * Performs a read operation starting at the kiocb's position.
+ * Returns the number of bytes read or a negative error code.
+ */
+ssize_t kiocb_read(struct kiocb *kiocb, char *buf, size_t len)
 {
     struct file *file;
-    ssize_t ret = -EINVAL;
+    ssize_t ret;
     
-    if (!kiocb || !buf || len == 0)
+    if (!kiocb || !buf || !len)
         return -EINVAL;
     
     file = kiocb->ki_filp;
     if (!file)
         return -EBADF;
     
-    /* Check if the file has read methods */
-    if (!(file->f_mode & FMODE_CAN_READ))
+    /* Check if file is readable */
+    if (!file_readable(file))
         return -EBADF;
     
-    /* If the file has specific read operations, use them */
+    /* If we have a file-specific read method, use it */
     if (file->f_operations && file->f_operations->read) {
         ret = file->f_operations->read(file, buf, len, &kiocb->ki_pos);
-    } else if (file->f_operations && file->f_operations->read_iter) {
-        /* Setup for vectored I/O if available */
-        struct io_vector_iterator iter;
-        struct io_vector vec;
-        
-        /* Set up a single vector for this buffer */
-        vec.iov_base = buf;
-        vec.iov_len = len;
-        
-        /* Initialize the iterator */
-        setup_io_vector_iterator(&iter, &vec, 1);
-        
-        /* Call the vectored read implementation */
-        ret = file->f_operations->read_iter(kiocb, &iter);
     } else {
-        /* No read method available */
         ret = -EINVAL;
     }
     
-    /* Update position if read was successful */
-    if (ret > 0) {
-        kiocb->ki_pos += ret;
-        
-        /* Update file position if this was a positioned read */
-        if (!(kiocb->ki_flags & KIOCB_NOUPDATE_POS))
-            file->f_pos = kiocb->ki_pos;
-    }
+    /* Update file position if read was successful */
+    if (ret > 0 && !(kiocb->ki_flags & KIOCB_NOUPDATE_POS))
+        file->f_pos = kiocb->ki_pos;
     
     return ret;
 }
 
 /**
- * Perform the actual write operation for a file
- * 
- * @param kiocb  The kiocb describing the I/O operation
- * @param buf    Buffer to write from
- * @param len    Number of bytes to write
- * 
- * @return       Number of bytes written or error code
- * 
- * This is the core implementation that VFS write operations would call
+ * kiocb_write - Write data using a kiocb
+ * @kiocb: The kiocb describing the I/O
+ * @buf: Buffer to write from
+ * @len: Number of bytes to write
+ *
+ * Performs a write operation starting at the kiocb's position.
+ * For append mode, the position is set to the end of the file.
+ * Returns the number of bytes written or a negative error code.
  */
-ssize_t kiocb_perform_write(struct kiocb *kiocb, const char *buf, size_t len)
+ssize_t kiocb_write(struct kiocb *kiocb, const char *buf, size_t len)
 {
     struct file *file;
-    ssize_t ret = -EINVAL;
+    ssize_t ret;
     
-    if (!kiocb || !buf || len == 0)
+    if (!kiocb || !buf || !len)
         return -EINVAL;
     
     file = kiocb->ki_filp;
     if (!file)
         return -EBADF;
     
-    /* Check if the file has write methods */
-    if (!(file->f_mode & FMODE_CAN_WRITE))
+    /* Check if file is writable */
+    if (!file_writable(file))
         return -EBADF;
     
     /* Handle append mode */
-    if (file->f_flags & O_APPEND)
+    if (kiocb->ki_flags & KIOCB_APPEND) {
+        spinlock_lock(&file->f_lock);
         kiocb->ki_pos = file->f_inode->i_size;
+        spinlock_unlock(&file->f_lock);
+    }
     
-    /* If the file has specific write operations, use them */
+    /* If we have a file-specific write method, use it */
     if (file->f_operations && file->f_operations->write) {
         ret = file->f_operations->write(file, buf, len, &kiocb->ki_pos);
-    } else if (file->f_operations && file->f_operations->write_iter) {
-        /* Setup for vectored I/O if available */
-        struct io_vector_iterator iter;
-        struct io_vector vec;
-        
-        /* Set up a single vector for this buffer */
-        vec.iov_base = (void *)buf;
-        vec.iov_len = len;
-        
-        /* Initialize the iterator */
-        setup_io_vector_iterator(&iter, &vec, 1);
-        
-        /* Call the vectored write implementation */
-        ret = file->f_operations->write_iter(kiocb, &iter);
     } else {
-        /* No write method available */
         ret = -EINVAL;
     }
     
-    /* Update position if write was successful */
-    if (ret > 0) {
-        kiocb->ki_pos += ret;
-        
-        /* Update file position if this wasn't a positioned write */
-        if (!(kiocb->ki_flags & KIOCB_NOUPDATE_POS))
-            file->f_pos = kiocb->ki_pos;
-            
-        /* Mark the inode as dirty */
-        if (file->f_inode)
-            mark_inode_dirty(file->f_inode);
-    }
-    
-    return ret;
-}
-
-/**
- * Perform vectored read operation using an io_vector
- * 
- * @param kiocb  The kiocb for the operation
- * @param iter   Iterator for the io_vectors
- * 
- * @return       Number of bytes read or error code
- * 
- * This is the implementation for readv that VFS would call
- */
-ssize_t kiocb_perform_readv(struct kiocb *kiocb, struct io_vector_iterator *iter)
-{
-    struct file *file;
-    ssize_t ret = -EINVAL;
-    
-    if (!kiocb || !iter)
-        return -EINVAL;
-    
-    file = kiocb->ki_filp;
-    if (!file)
-        return -EBADF;
-    
-    /* Check if the file has read methods */
-    if (!(file->f_mode & FMODE_CAN_READ))
-        return -EBADF;
-    
-    /* If the file has vectored read operation, use it */
-    if (file->f_operations && file->f_operations->read_iter) {
-        ret = file->f_operations->read_iter(kiocb, iter);
-    } else if (file->f_operations && file->f_operations->read) {
-        /* Fall back to single-buffer reads if vector ops not available */
-        /* Not implemented in this example as it would be complex */
-        ret = -ENOSYS;
-    } else {
-        /* No read method available */
-        ret = -EINVAL;
-    }
-    
-    /* Update position if read was successful */
-    if (ret > 0 && !(kiocb->ki_flags & KIOCB_NOUPDATE_POS)) {
-        kiocb->ki_pos += ret;
+    /* Update file position if write was successful */
+    if (ret > 0 && !(kiocb->ki_flags & KIOCB_NOUPDATE_POS))
         file->f_pos = kiocb->ki_pos;
-    }
+    
+    /* Mark inode as dirty if write was successful */
+    if (ret > 0 && file->f_inode)
+        mark_inode_dirty(file->f_inode);
     
     return ret;
 }
 
 /**
- * Perform vectored write operation using an io_vector
- * 
- * @param kiocb  The kiocb for the operation
- * @param iter   Iterator for the io_vectors
- * 
- * @return       Number of bytes written or error code
- * 
- * This is the implementation for writev that VFS would call
+ * kiocb_is_direct - Check if kiocb is for direct I/O
+ * @kiocb: The kiocb to check
+ *
+ * Returns true if this is a direct I/O operation.
  */
-ssize_t kiocb_perform_writev(struct kiocb *kiocb, struct io_vector_iterator *iter)
+int kiocb_is_direct(const struct kiocb *kiocb)
 {
-    struct file *file;
-    ssize_t ret = -EINVAL;
-    
-    if (!kiocb || !iter)
-        return -EINVAL;
-    
-    file = kiocb->ki_filp;
-    if (!file)
-        return -EBADF;
-    
-    /* Check if the file has write methods */
-    if (!(file->f_mode & FMODE_CAN_WRITE))
-        return -EBADF;
-    
-    /* Handle append mode */
-    if (file->f_flags & O_APPEND)
-        kiocb->ki_pos = file->f_inode->i_size;
-    
-    /* If the file has vectored write operation, use it */
-    if (file->f_operations && file->f_operations->write_iter) {
-        ret = file->f_operations->write_iter(kiocb, iter);
-    } else if (file->f_operations && file->f_operations->write) {
-        /* Fall back to single-buffer writes if vector ops not available */
-        /* Not implemented in this example as it would be complex */
-        ret = -ENOSYS;
-    } else {
-        /* No write method available */
-        ret = -EINVAL;
-    }
-    
-    /* Update position if write was successful */
-    if (ret > 0) {
-        kiocb->ki_pos += ret;
-        
-        /* Update file position if this wasn't a positioned write */
-        if (!(kiocb->ki_flags & KIOCB_NOUPDATE_POS))
-            file->f_pos = kiocb->ki_pos;
-            
-        /* Mark the inode as dirty */
-        if (file->f_inode)
-            mark_inode_dirty(file->f_inode);
-    }
-    
-    return ret;
-}
-
-
-/**
- * Callback type for I/O completion
- */
-typedef void (*ioCompletion_callback)(struct kiocb *, long);
-
-/**
- * Asynchronous I/O control
- * Handles asynchronous I/O operations and their completion
- */
-
-/**
- * Schedule an asynchronous I/O operation for execution
- * 
- * @param kiocb  The kiocb describing the operation
- * 
- * @return       0 on success, negative error code on failure
- * 
- * This function queues an I/O operation for asynchronous execution.
- * The kiocb must have ki_complete set to a valid completion handler.
- */
-int kiocb_submit_io(struct kiocb *kiocb)
-{
-    if (!kiocb || !kiocb->ki_filp)
-        return -EINVAL;
-        
-    if (!kiocb->ki_complete)
-        return -EINVAL;  /* Must have completion handler for async I/O */
-    
-    /* In a real implementation, this would queue the operation
-     * to be executed asynchronously by a worker thread or similar.
-     * For this example, we'll simulate by just setting a flag.
-     */
-    
-    /* Schedule the I/O for later execution */
-    /* This could involve adding to a work queue or similar */
-    
-    return 0;
+    return kiocb && (kiocb->ki_flags & KIOCB_DIRECT);
 }
 
 /**
- * Complete an asynchronous I/O operation
- * 
- * @param kiocb  The kiocb for the completed operation
- * @param res    The result of the operation (bytes processed or error code)
- * 
- * This function calls the completion handler for an asynchronous I/O
- * operation, passing the result.
+ * kiocb_is_append - Check if kiocb is for append mode
+ * @kiocb: The kiocb to check
+ *
+ * Returns true if this is an append operation.
  */
-void kiocb_complete_io(struct kiocb *kiocb, long res)
+int kiocb_is_append(const struct kiocb *kiocb)
 {
-    if (!kiocb || !kiocb->ki_complete)
-        return;
-        
-    /* Call the completion handler */
-    kiocb->ki_complete(kiocb, res);
+    return kiocb && (kiocb->ki_flags & KIOCB_APPEND);
 }
 
 /**
- * Check if an I/O operation would block
- * 
- * @param kiocb  The kiocb for the operation
- * 
- * @return       1 if the operation would block, 0 if it would not
- * 
- * This function checks if an I/O operation would block. If the
- * KIOCB_NOWAIT flag is set and the operation would block, it
- * returns -EAGAIN instead of blocking.
+ * kiocb_is_nonblock - Check if kiocb is for non-blocking I/O
+ * @kiocb: The kiocb to check
+ *
+ * Returns true if this is a non-blocking I/O operation.
  */
-int kiocb_would_block(struct kiocb *kiocb)
+int kiocb_is_nonblock(const struct kiocb *kiocb)
 {
-    struct file *file;
-    
-    if (!kiocb)
-        return 1;  /* Default to "would block" on invalid input */
-        
-    file = kiocb->ki_filp;
-    if (!file)
-        return 1;
-        
-    /* Check if the file supports non-blocking I/O */
-    if (file->f_flags & O_NONBLOCK)
-        return 0;  /* Non-blocking mode is enabled */
-        
-    /* In a real implementation, this would check resource availability,
-     * locks, and other conditions that might cause blocking.
-     * For this example, we'll just return a fixed value.
-     */
-    
-    return 0;  /* Assume it would not block */
+    return kiocb && (kiocb->ki_flags & KIOCB_NONBLOCK);
 }
-
-/**
- * Retry an I/O operation that was interrupted
- * 
- * @param kiocb  The kiocb for the operation
- * @param res    The result from the previous attempt
- * 
- * @return       Updated result (usually -ERESTARTSYS or the original error)
- * 
- * This function handles retrying I/O operations that were interrupted
- * by signals or other events.
- */
-long kiocb_retry_interrupted(struct kiocb *kiocb, long res)
-{
-    if (res != -EINTR && res != -ERESTARTSYS)
-        return res;  /* Not an interruption, don't retry */
-        
-    /* Check if retries are allowed for this operation */
-    if (kiocb->ki_flags & KIOCB_NOWAIT)
-        return res;  /* No wait requested, don't retry */
-        
-    /* In a real implementation, this would re-queue the operation
-     * or handle it according to signal handling policies.
-     */
-    
-    return -ERESTARTSYS;  /* Signal to caller that operation should be restarted */
-}
-
-/**
- * Perform direct I/O for a kiocb
- * 
- * @param kiocb  The kiocb for the operation
- * @param iov    I/O vector for the data
- * @param offset File offset to start I/O at
- * @param nr_segs Number of segments in the I/O vector
- * @param opc    Operation code (READ or WRITE)
- * 
- * @return       Number of bytes processed or error code
- * 
- * This function implements direct I/O (bypassing the page cache)
- * for files that support it.
- */
-ssize_t kiocb_direct_io(struct kiocb *kiocb, const struct io_vector *iov,
-                       loff_t offset, unsigned long nr_segs, int opc)
-{
-    struct file *file;
-    ssize_t ret = -EINVAL;
-    
-    if (!kiocb || !iov || nr_segs == 0)
-        return -EINVAL;
-        
-    file = kiocb->ki_filp;
-    if (!file || !file->f_inode)
-        return -EBADF;
-        
-    /* Check if the file supports direct I/O */
-    if (!(file->f_mode & FMODE_CAN_ODIRECT))
-        return -EINVAL;
-        
-    /* Call the file's direct_IO method if available */
-    if (file->f_mapping && file->f_mapping->a_ops && 
-        file->f_mapping->a_ops->direct_IO) {
-        ret = file->f_mapping->a_ops->direct_IO(opc, kiocb, iov, 
-                                             offset, nr_segs);
-    } else {
-        /* No direct I/O method available */
-        ret = -EINVAL;
-    }
-    
-    return ret;
-}
-
-/**
- * Initialize a kiocb for asynchronous operation
- * 
- * @param kiocb     The kiocb to initialize
- * @param file      The file for the operation
- * @param complete  The completion handler
- * @param data      Private data for the completion handler
- * 
- * This sets up a kiocb for asynchronous operation with the
- * given completion handler.
- */
-void init_async_kiocb(struct kiocb *kiocb, struct file *file,
-                     ioCompletion_callback complete, void *data)
-{
-    if (!kiocb || !file || !complete)
-        return;
-        
-    /* Initialize the basic kiocb first */
-    init_kiocb(kiocb, file);
-    
-    /* Set the completion handler and private data */
-    kiocb->ki_complete = complete;
-    kiocb->private = data;
-}
-

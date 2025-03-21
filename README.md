@@ -38,3 +38,7 @@
 - [ ] 在dentry.c中做完备的跨挂载点支持
 - [ ] dentry的符号链接解析器需要重做，（需要完善的path作为支持）
 - [ ] 实现通用的事件队列，并监听dentry的变化
+
+## 小任务
+- [ ] 把readp和writep分离出去
+- [ ] file_llseek中没有用到kiocb

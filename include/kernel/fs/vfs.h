@@ -10,6 +10,7 @@
 #include <kernel/fs/super_block.h>
 #include <kernel/fs/fdtable.h>
 #include <kernel/fs/kiocb.h>
+#include <kernel/fs/io_vector.h>
 
 #include <kernel/types.h>
 #include <util/list.h>
@@ -107,6 +108,14 @@ struct nameidata {
  */
 /* Initialization functions */
 int vfs_init(void);
+
+#define vfs_read file_read
+#define vfs_write file_write
+#define vfs_llseek file_llseek
+#define vfs_readv file_readv
+#define vfs_writev file_writev
+#define vfs_fsync file_sync
+
 
 struct vfsmount* vfs_kern_mount(struct fs_type* type, int flags,
 				const char* name, void* data);

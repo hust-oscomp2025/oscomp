@@ -2,55 +2,41 @@
 #define _KIOCB_H
 
 #include <kernel/types.h>
-#include <kernel/fs/io_vector.h>
-
-struct file;
-
+#include <kernel/fs/file.h>
 
 /**
  * struct kiocb - Kernel I/O control block
- * Used for both synchronous and asynchronous I/O
+ * @ki_filp: File for the I/O
+ * @ki_pos: Current file position
+ * @ki_flags: Operation flags
+ *
+ * This is a simplified version of the Kernel I/O Control Block,
+ * focused on synchronous operations only. It provides a clean
+ * abstraction for VFS I/O operations.
  */
 struct kiocb {
-    struct file *ki_filp;      /* File for the I/O */
-    loff_t ki_pos;             /* Current file position */
-    void (*ki_complete)(struct kiocb *, long);  /* I/O completion handler */
-    void *private;             /* Private data for completion handler */
-    int ki_flags;              /* Flags for I/O */
+    struct file *ki_filp;      /* File pointer */
+    loff_t ki_pos;             /* File position */
+    int ki_flags;              /* Operation flags */
 };
 
-
-
-// Initialization and setup
+/* Initialization and position */
 void init_kiocb(struct kiocb *kiocb, struct file *file);
-void init_async_kiocb(struct kiocb *kiocb, struct file *file,
-	ioCompletion_callback complete, void *data);
 void kiocb_set_pos(struct kiocb *kiocb, loff_t pos);
-void kiocb_set_flags(struct kiocb *kiocb, int flags);
 
-// Completion handling
-void kiocb_set_completion(struct kiocb *kiocb, void (*complete)(struct kiocb *, long), void *private);
-void kiocb_complete(struct kiocb *kiocb, long result);
+/* I/O operations */
+ssize_t kiocb_read(struct kiocb *kiocb, char *buf, size_t len);
+ssize_t kiocb_write(struct kiocb *kiocb, const char *buf, size_t len);
 
-// State management
-int kiocb_is_sync(const struct kiocb *kiocb);
-int kiocb_is_async(const struct kiocb *kiocb);
-int kiocb_is_error(const struct kiocb *kiocb);
+/* Flag operations */
+int kiocb_is_direct(const struct kiocb *kiocb);
+int kiocb_is_append(const struct kiocb *kiocb);
+int kiocb_is_nonblock(const struct kiocb *kiocb);
 
-// I/O operations
-ssize_t kiocb_perform_read(struct kiocb *kiocb, char *buf, size_t len);
-ssize_t kiocb_perform_write(struct kiocb *kiocb, const char *buf, size_t len);
-ssize_t kiocb_perform_readv(struct kiocb *kiocb, struct io_vector_iterator *iter);
-ssize_t kiocb_perform_writev(struct kiocb *kiocb, struct io_vector_iterator *iter);
-
-/* KI_OCB flags - used to control I/O behavior */
-#define KIOCB_NOUPDATE_POS  (1 << 0)   /* Don't update file position */
-#define KIOCB_SYNC          (1 << 1)   /* Synchronous I/O */
-#define KIOCB_DIRECT        (1 << 2)   /* Direct I/O, bypass page cache */
-#define KIOCB_NOWAIT        (1 << 3)   /* Don't block on locks or I/O */
-#define KIOCB_APPEND        (1 << 4)   /* File is opened in append mode */
-/* Operation codes for direct I/O */
-#define KIOCB_OP_READ   0
-#define KIOCB_OP_WRITE  1
+/* KIOCB operation flags */
+#define KIOCB_APPEND        (1 << 0)    /* File opened in append mode */
+#define KIOCB_DIRECT        (1 << 1)    /* Direct I/O - bypass page cache */
+#define KIOCB_NONBLOCK      (1 << 2)    /* Non-blocking mode */
+#define KIOCB_NOUPDATE_POS  (1 << 3)    /* Don't update file position */
 
 #endif /* _KIOCB_H */
