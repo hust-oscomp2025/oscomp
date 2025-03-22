@@ -103,7 +103,6 @@ enum fork_choice {
   FORK_COW,
 };
 
-// the extremely simple definition of process, used for begining labs of PKE
 struct task_struct {
   uint64 kstack; // 分配一个页面当内核栈，注意内核栈的范围是[kstack-PAGE_SIZE,
                  // kstack)

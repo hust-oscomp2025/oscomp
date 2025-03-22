@@ -20,8 +20,6 @@ struct fs_struct {
 	atomic_t count;            /* Reference count */
 };
 
-
-
 /* Filesystem info management */
 struct fs_struct *setup_fs_struct(void);
 struct fs_struct *copy_fs_struct(struct fs_struct *old_fs);

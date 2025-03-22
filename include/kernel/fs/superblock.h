@@ -1,10 +1,11 @@
-#ifndef superblock_H
-#define superblock_H
+#ifndef _SUPERBLOCK_H
+#define _SUPERBLOCK_H
+//#include <kernel/fs/fstype.h>
 #include <kernel/types.h>
 #include <util/list.h>
 #include <util/spinlock.h>
 
-struct fs_type;
+struct fsType;
 struct super_operations;
 struct dentry;
 
@@ -22,8 +23,8 @@ struct superblock {
 	struct dentry* s_global_root_dentry; // Root dentry
 
 	/* Filesystem information and operations */
-	struct fs_type* s_fstype;      // Filesystem type
-	struct list_node s_node_fstype; // Instances of this filesystem
+	struct fsType* s_fsType;      // Filesystem type
+	struct list_node s_node_fsType; // Instances of this filesystem
 
 	void* s_fs_specific; // Filesystem-specific information
 
@@ -68,31 +69,11 @@ struct superblock {
 
 /* Function prototypes */
 
-struct superblock* get_superblock(struct fs_type* type, void* data);
 void drop_super(struct superblock* sb);
 
-/* File system types */
-struct fs_type {
-	const char* fs_name;
-	int fs_flags;
 
-	/* Fill in a superblock */
-	int (*fs_fill_sb)(struct superblock* sb, void* data, int silent);
-	struct superblock* (*fs_mount_sb)(struct fs_type*, int, const char*, void*);
-	void (*fs_kill_sb)(struct superblock*);
 
-	/* Inside fs_type structure */
-	struct list_node fs_node_gfslist; /* Node for linking into global filesystem list */
-	                                 // spinlock_t fs_fslist_node_lock;
 
-	struct list_head fs_list_sb;
-	spinlock_t fs_list_s_lock;
-};
-
-int register_filesystem_types(void);
-int register_filesystem(struct fs_type*);
-int unregister_filesystem(struct fs_type*);
-struct fs_type* get_fs_type(const char* name);
 
 /**
  * User-facing filesystem statistics

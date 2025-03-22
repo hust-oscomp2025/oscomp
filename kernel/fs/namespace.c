@@ -1,10 +1,11 @@
 #include <kernel/fs/vfs.h>
 #include <kernel/sched/sched.h>
+#include <kernel/sched/fs_struct.h>
 #include <kernel/types.h>
 #include <util/hashtable.h>
 
 /* Global mount data structures */
-static struct hashtable mount_hash;
+static struct hashtable mount_hashtable;
 static struct list_head global_mounts_list;
 static spinlock_t mount_lock;
 static int mount_id_counter = 0;
@@ -32,7 +33,7 @@ int init_mount_hash(void) {
     INIT_LIST_HEAD(&global_mounts_list);
     
     /* Initialize the mount hash table */
-    ret = hashtable_setup(&mount_hash, MOUNT_HASH_SIZE, 70, 
+    ret = hashtable_setup(&mount_hashtable, MOUNT_HASH_SIZE, 70, 
                         mount_hash_func, mount_key_equals);
     if (ret < 0)
         return ret;
@@ -58,7 +59,7 @@ struct vfsmount* lookup_vfsmount(struct dentry* dentry) {
         return NULL;
     
     spin_lock(&mount_lock);
-    mnt = hashtable_lookup(&mount_hash, dentry);
+    mnt = hashtable_lookup(&mount_hashtable, dentry);
     if (mnt)
         get_mount(mnt);
     spin_unlock(&mount_lock);
@@ -209,7 +210,7 @@ struct vfsmount* lookup_vfsmount(struct dentry* dentry) {
         return NULL;
     
     spin_lock(&mount_lock);
-    mnt = hashtable_lookup(&mount_hash, dentry);
+    mnt = hashtable_lookup(&mount_hashtable, dentry);
     if (mnt)
         get_mount(mnt);
     spin_unlock(&mount_lock);
@@ -256,7 +257,7 @@ bool is_mounted(struct dentry* dentry) {
  * do_mount - Mount a filesystem
  * @dev_name: Device name
  * @path: Mount point path
- * @fstype: Filesystem type
+ * @fsType: Filesystem type
  * @flags: Mount flags
  * @data: Filesystem-specific data
  *
@@ -264,7 +265,7 @@ bool is_mounted(struct dentry* dentry) {
  *
  * Returns 0 on success, negative error code otherwise
  */
-int do_mount(const char* dev_name, const char* path, const char* fstype, unsigned long flags,
+int do_mount(const char* dev_name, const char* path, const char* fsType, unsigned long flags,
              void* data) {
 	struct vfsmount* mnt;
 	struct path target_path;
@@ -272,7 +273,7 @@ int do_mount(const char* dev_name, const char* path, const char* fstype, unsigne
 	int error;
 
 	/* Look up filesystem type */
-	type = get_fs_type(fstype);
+	type = fsType_lookup(fsType);
 	if (!type)
 		return -ENODEV;
 
@@ -306,7 +307,7 @@ int do_mount(const char* dev_name, const char* path, const char* fstype, unsigne
     list_add(&mnt->mnt_node_global, &global_mounts_list);
     
     /* Add to hash table using mountpoint dentry as key */
-    hashtable_insert(&mount_hash, mnt->mnt_mountpoint, mnt);
+    hashtable_insert(&mount_hashtable, mnt->mnt_mountpoint, mnt);
 
 	/* Add to current namespace */
 	if (current_task()->fs) {
@@ -357,7 +358,7 @@ int do_umount(struct vfsmount* mnt, int flags) {
 	}
 
     /* Remove from hash table */
-    hashtable_remove(&mount_hash, mnt->mnt_mountpoint);
+    hashtable_remove(&mount_hashtable, mnt->mnt_mountpoint);
 
 
 	/* Remove from global hash and parent */

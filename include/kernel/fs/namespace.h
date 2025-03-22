@@ -85,7 +85,7 @@ struct vfsmount {
 void init_mount_hash(void);
 
 /* Mount management */
-int do_mount(const char* dev_name, const char* path, const char* fstype, unsigned long flags,
+int do_mount(const char* dev_name, const char* path, const char* fsType, unsigned long flags,
              void* data);
 
 /* Unmount operations */

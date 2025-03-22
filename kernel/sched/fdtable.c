@@ -1,5 +1,5 @@
 #include <errno.h>
-#include <kernel/fs/fdtable.h>
+#include <kernel/sched/fdtable.h>
 #include <kernel/fs/file.h>
 #include <kernel/mm/kmalloc.h>
 #include <sys/poll.h>

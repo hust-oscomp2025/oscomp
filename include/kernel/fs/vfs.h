@@ -3,14 +3,13 @@
 
 #include <kernel/fs/dentry.h>
 #include <kernel/fs/file.h>
-#include <kernel/fs/fs_struct.h>
 #include <kernel/fs/inode.h>
 #include <kernel/fs/namespace.h>
 #include <kernel/fs/path.h>
 #include <kernel/fs/superblock.h>
-#include <kernel/fs/fdtable.h>
 #include <kernel/fs/kiocb.h>
 #include <kernel/fs/io_vector.h>
+#include <kernel/fs/fstype.h>
 
 #include <kernel/types.h>
 #include <util/list.h>
@@ -117,7 +116,7 @@ int vfs_init(void);
 #define vfs_fsync file_sync
 
 
-struct vfsmount* vfs_kern_mount(struct fs_type* type, int flags,
+struct vfsmount* vfs_kern_mount(struct fsType* type, int flags,
 				const char* name, void* data);
 
 /* File operations */

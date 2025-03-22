@@ -1,4 +1,4 @@
-#include <kernel/fs/fs_struct.h>
+#include <kernel/sched/fs_struct.h>
 #include <kernel/fs/namespace.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/mm/kmalloc.h>
