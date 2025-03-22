@@ -8,12 +8,9 @@
 
 #include <spike_interface/spike_utils.h>
 
-/* Head of the filesystem types list */
-static struct list_head file_systems_list;
-static spinlock_t file_systems_lock;
+
 
 static struct superblock* __alloc_super(struct fsType* type);
-static int lookup_dev_id(const char* dev_name, dev_t* dev_id);
 
 /**
  * __alloc_super - Allocate a new superblock from a fsType
@@ -234,148 +231,9 @@ void generic_shutdown_super(struct superblock* sb) {
 	drop_super(sb);
 }
 
-/**
- * Register built-in filesystem types
- * called by vfs_init
- */
-int fsType_register_all(void) {
-	INIT_LIST_HEAD(&file_systems_list);
-	spinlock_init(&file_systems_lock);
-	int err;
-	/* Register ramfs - our initial root filesystem */
-	extern struct fsType ramfs_fsType;
-	err = fsType_register(&ramfs_fsType);
-	if (err < 0)
-		return err;
-
-	/* Register other built-in filesystems */
-	extern struct fsType hostfs_fsType;
-	err = fsType_register(&hostfs_fsType);
-	if (err < 0)
-		return err;
-
-	return 0;
-}
-
-/**
- * fsType_register - Register a new filesystem type
- * @fs: The filesystem type structure to register
- *
- * Adds a filesystem to the kernel's list of filesystems that can be mounted.
- * Returns 0 on success, error code on failure.
- * fs是下层文件系统静态定义的，所以不需要分配内存
- */
-int fsType_register(struct fsType* fs) {
-	struct fsType* p;
-
-	if (!fs || !fs->fs_name)
-		return -EINVAL;
-
-	/* Initialize filesystem type */
-	INIT_LIST_HEAD(&fs->fs_node_gfslist);
-	INIT_LIST_HEAD(&fs->fs_list_sb);
-
-	/* Acquire lock for list manipulation */
-	spinlock_init(&file_systems_lock);
-
-	/* Check if filesystem already registered */
-	list_for_each_entry(p, &file_systems_list, fs_node_gfslist) {
-		if (strcmp(p->fs_name, fs->fs_name) == 0) {
-			/* Already registered */
-			release_spinlock(&file_systems_lock);
-			sprint("VFS: Filesystem %s already registered\n", fs->fs_name);
-			return -EBUSY;
-		}
-	}
-
-	/* Add filesystem to the list (at the beginning for simplicity) */
-	list_add(&fs->fs_node_gfslist, &file_systems_list);
-
-	spinlock_unlock(&file_systems_lock);
-	sprint("VFS: Registered filesystem %s\n", fs->fs_name);
-	return 0;
-}
-
-/**
- * fsType_unregister - Remove a filesystem type from the kernel's list
- * @fs: The filesystem type structure to unregister
- *
- * Removes a filesystem from the kernel's list of available filesystems.
- * Returns 0 on success, error code on failure.
- */
-int fsType_unregister(struct fsType* fs) {
-	struct fsType* p;
-
-	if (!fs || !fs->fs_name)
-		return -EINVAL;
-
-	/* Acquire lock for list manipulation */
-	acquire_spinlock(&file_systems_lock);
-
-	/* Find filesystem in the list */
-	list_for_each_entry(p, &file_systems_list, fs_node_gfslist) {
-		if (p == fs) {
-			/* Found it - remove from the list */
-			list_del(&p->fs_node_gfslist);
-			release_spinlock(&file_systems_lock);
-			sprint("VFS: Unregistered filesystem %s\n", p->fs_name);
-			return 0;
-		}
-	}
-
-	release_spinlock(&file_systems_lock);
-	sprint("VFS: Filesystem %s not registered\n", fs->fs_name);
-	return -ENOENT;
-}
-
-/**
- * fsType_lookup - Find a filesystem type by name
- * @name: The filesystem name to find
- *
- * Searches the list of registered filesystems for one with the given name.
- * Returns a pointer to the filesystem type structure or NULL if not found.
- */
-struct fsType* fsType_lookup(const char* name) {
-	struct fsType* fs;
-
-	if (!name)
-		return NULL;
-
-	acquire_spinlock(&file_systems_lock);
-
-	list_for_each_entry(fs, &file_systems_list, fs_node_gfslist) {
-		if (strcmp(fs->fs_name, name) == 0) {
-			release_spinlock(&file_systems_lock);
-			return fs;
-		}
-	}
-
-	release_spinlock(&file_systems_lock);
-	return NULL;
-}
 
 
-/**
- * lookup_dev_id - Get device ID from device name
- * @dev_name: Name of the device
- * @dev_id: Output parameter for device ID
- *
- * Returns 0 on success, negative error code on failure
- */
-static int lookup_dev_id(const char* dev_name, dev_t* dev_id) {
-	/* Implementation would look up the device in the device registry */
-	/* For now, we'll just use a simple hash function */
-	if (!dev_name || !dev_id)
-		return -EINVAL;
 
-	*dev_id = 0;
-	while (*dev_name) {
-		*dev_id = (*dev_id * 31) + *dev_name++;
-	}
 
-	/* Ensure non-zero value for real devices */
-	if (*dev_id == 0)
-		*dev_id = 1;
 
-	return 0;
-}
+

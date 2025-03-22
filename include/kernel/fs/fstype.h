@@ -12,7 +12,7 @@ struct fsType {
 
 	/* Fill in a superblock */
 	int (*fs_fill_sb)(struct superblock* sb, void* data, int silent);
-	struct superblock* (*fs_mount_sb)(struct fsType*, int, const char*, void*);
+	struct superblock* (*fs_mount_sb)(struct fsType*, int, const char* mount_path, void*);
 	void (*fs_kill_sb)(struct superblock*);
 
 	/* Inside fsType structure */

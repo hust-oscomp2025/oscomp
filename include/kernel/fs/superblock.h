@@ -15,7 +15,8 @@ struct superblock {
 
 	/* Filesystem identification */
 	unsigned int s_magic;             // Magic number identifying filesystem
-	dev_t s_device_id;                // Device identifier
+	dev_t s_device_id;                
+		// Device identifier, 目前简单通过对挂载路径做哈希得到
 	unsigned long s_blocksize;      // Block size in bytes
 	unsigned long s_blocksize_bits; // Block size bits (log2 of blocksize)
 
