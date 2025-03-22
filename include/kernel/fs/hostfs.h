@@ -26,7 +26,7 @@ int hostfs_lseek(struct inode *f_inode, ssize_t new_offset, int whence,
                   int *offset);
 int hostfs_link(struct inode *parent, struct dentry *sub_dentry, struct inode *link_node);
 int hostfs_unlink(struct inode *parent, struct dentry *sub_dentry, struct inode *unlink_node);
-int hostfs_hook_open(struct inode *f_inode, struct dentry *f_dentry);
+int hostfs_hook_open(struct inode *f_inode, struct dentry *dentry);
 int hostfs_hook_close(struct inode *f_inode, struct dentry *dentry);
 int hostfs_readdir(struct inode *dir_vinode, struct dir *dir, int *offset);
 struct inode *hostfs_mkdir(struct inode *parent, struct dentry *sub_dentry);

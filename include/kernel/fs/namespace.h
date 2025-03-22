@@ -77,6 +77,7 @@ struct vfsmount {
 	const char* mnt_devname; /* Device name */
 };
 
+
 /*
  * Mount registry and management
  */

@@ -46,7 +46,7 @@ struct superblock* fsType_createMount(struct fsType* type, int flags, const char
 	if (sb->s_global_root_dentry == NULL) {
 		/* Call fs_fill_sb if available */
 		if (type->fs_fill_sb) {
-			error = type->fs_fill_sb(sb, data, flags);
+			error = fsType_fill_sb(type, sb, data, flags);
 			if (error) {
 				drop_super(sb);
 				return ERR_PTR(error);
@@ -56,8 +56,7 @@ struct superblock* fsType_createMount(struct fsType* type, int flags, const char
 		else if (type->fs_mount_sb) {
 			/* This is a fallback - ideally all filesystems would
 			 * implement fs_fill_sb instead */
-			struct superblock* new_sb;
-			new_sb = type->fs_mount_sb(type, flags, mount_path, data);
+			struct superblock* new_sb = fsType_mount_sb(type, flags, mount_path, data);
 			if (IS_ERR(new_sb)) {
 				drop_super(sb);
 				return new_sb;
@@ -169,14 +168,14 @@ int fsType_register(struct fsType* fs) {
 		return -EINVAL;
 
 	/* Initialize filesystem type */
-	INIT_LIST_HEAD(&fs->fs_node_gfslist);
+	INIT_LIST_HEAD(&fs->fs_globalFsListNode);
 	INIT_LIST_HEAD(&fs->fs_list_sb);
 
 	/* Acquire lock for list manipulation */
 	spinlock_init(&file_systems_lock);
 
 	/* Check if filesystem already registered */
-	list_for_each_entry(p, &file_systems_list, fs_node_gfslist) {
+	list_for_each_entry(p, &file_systems_list, fs_globalFsListNode) {
 		if (strcmp(p->fs_name, fs->fs_name) == 0) {
 			/* Already registered */
 			release_spinlock(&file_systems_lock);
@@ -186,7 +185,7 @@ int fsType_register(struct fsType* fs) {
 	}
 
 	/* Add filesystem to the list (at the beginning for simplicity) */
-	list_add(&fs->fs_node_gfslist, &file_systems_list);
+	list_add(&fs->fs_globalFsListNode, &file_systems_list);
 
 	spinlock_unlock(&file_systems_lock);
 	sprint("VFS: Registered filesystem %s\n", fs->fs_name);
@@ -211,10 +210,10 @@ int fsType_unregister(struct fsType* fs) {
 	acquire_spinlock(&file_systems_lock);
 
 	/* Find filesystem in the list */
-	list_for_each_entry(p, &file_systems_list, fs_node_gfslist) {
+	list_for_each_entry(p, &file_systems_list, fs_globalFsListNode) {
 		if (p == fs) {
 			/* Found it - remove from the list */
-			list_del(&p->fs_node_gfslist);
+			list_del(&p->fs_globalFsListNode);
 			release_spinlock(&file_systems_lock);
 			sprint("VFS: Unregistered filesystem %s\n", p->fs_name);
 			return 0;
@@ -241,7 +240,7 @@ struct fsType* fsType_lookup(const char* name) {
 
 	acquire_spinlock(&file_systems_lock);
 
-	list_for_each_entry(fs, &file_systems_list, fs_node_gfslist) {
+	list_for_each_entry(fs, &file_systems_list, fs_globalFsListNode) {
 		if (strcmp(fs->fs_name, name) == 0) {
 			release_spinlock(&file_systems_lock);
 			return fs;
@@ -277,3 +276,16 @@ static int __lookup_dev_id(const char* dev_name, dev_t* dev_id) {
 
 	return 0;
 }
+
+const char *fsType_error_string(int error_code) {
+    if (error_code >= 0 || -error_code >= ARRAY_SIZE(fs_err_msgs))
+        return "Unknown error";
+    return fs_err_msgs[-error_code];
+}
+
+
+/* Add to fstype.c */
+const char* fs_err_msgs[] = {
+    [ENODEV] = "Filesystem not found", [EBUSY] = "Filesystem already registered", [EINVAL] = "Invalid parameters",
+    // Add more error messages
+};
