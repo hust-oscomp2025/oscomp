@@ -84,9 +84,9 @@ struct dir_context;
 struct kstat;
 struct iattr;
 struct fiemap_extent_info;
-struct address_space_operations;
+struct addrSpace_ops;
 struct inode_operations;
-struct radix_tree_root;
+struct radixTreeRoot;
 
 /* Inode hash key - combination of superblock and inode number */
 struct inode_key {
@@ -114,13 +114,7 @@ struct inode {
 	blkcnt_t i_blocks;       /* Number of blocks allocated */
 
 	/* Memory management */
-	struct address_space {
-		// struct inode *host;               /* Owning inode */
-		struct radix_tree_root page_tree;             /* Page cache radix tree */
-		spinlock_t tree_lock;                         /* Lock for tree manipulation */
-		unsigned long nrpages;                        /* Number of total pages */
-		const struct address_space_operations* a_ops; /* s_operations */
-	}* i_mapping;                                     /* Associated address space */
+	struct addrSpace * i_mapping;                                     /* Associated address space */
 
 	/* Filesystem information */
 	struct superblock* i_superblock;   /* Superblock */
@@ -181,18 +175,6 @@ int inode_permission(struct inode* inode, int mask);
 int setattr_prepare(struct dentry* dentry, struct iattr* attr);
 int notify_change(struct dentry* dentry, struct iattr* attr);
 
-/*
- * Address space s_operations (page cache)
- */
-struct address_space_operations {
-	int (*readpage)(struct file*, struct page*);
-	int (*writepage)(struct page*, struct writeback_control*);
-	int (*readpages)(struct file*, struct address_space*, struct list_head*, unsigned);
-	int (*writepages)(struct address_space*, struct writeback_control*);
-	void (*invalidatepage)(struct page*, unsigned int);
-	int (*releasepage)(struct page*, int);
-	int (*direct_IO)(int, struct kiocb*, const struct io_vector*, loff_t, unsigned long);
-};
 
 /*
  * Inode operations

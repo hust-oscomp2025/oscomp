@@ -25,7 +25,7 @@ struct file {
 	unsigned int f_flags; /* Kernel internal flags */
 
 	/* Memory management */
-	//struct address_space* f_mapping; /* Page cache mapping */
+	//struct addrSpace* f_mapping; /* Page cache mapping */
 	// 直接在inode里边
 
 	/* Private data */

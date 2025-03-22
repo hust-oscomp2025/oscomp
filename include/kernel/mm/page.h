@@ -9,7 +9,7 @@
 #include <kernel/mm/pagetable.h>
 
 // Forward declarations
-struct address_space;
+struct addrSpace;
 
 /**
  * 物理页结构体 - Linux风格的页描述符
@@ -18,7 +18,7 @@ struct page {
   uint64 flags;       // 页标志
 
 	// 文件页缓存
-  struct address_space *mapping; // 所属的address_space
+  struct addrSpace *mapping; // 所属的address_space
   atomic_t _refcount;						 // 引用计数
   uint64 index;									 // 在映射文件中的页索引
 
