@@ -10,7 +10,7 @@
 #include <kernel/fs/kiocb.h>
 #include <kernel/fs/io_vector.h>
 #include <kernel/fs/fstype.h>
-#include <kernel/fs/addrSpace.h>
+#include <kernel/fs/address_space.h>
 
 #include <kernel/types.h>
 #include <util/list.h>

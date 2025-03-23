@@ -18,17 +18,17 @@ struct addrSpace {
 
 struct addrSpace* addrSpace_create(struct inode* inode);
 
-void address_space_init(struct addrSpace* mapping, const struct addrSpace_ops* ops);
-struct page* find_get_page(struct addrSpace* mapping, unsigned long index);
-int add_to_page_cache(struct addrSpace* mapping, struct page* page, unsigned long index);
-int remove_from_page_cache(struct addrSpace *mapping, struct page *page);
-int set_page_dirty_in_address_space(struct addrSpace *mapping, struct page *page);
-unsigned int find_get_pages_dirty(struct addrSpace* mapping, struct page** pages, unsigned int nr_pages, unsigned long start);
-int clear_page_dirty_in_address_space(struct addrSpace *mapping, struct page *page);
-int write_back_address_space(struct addrSpace *mapping);
-int invalidate_page(struct addrSpace *mapping, struct page *page);
-struct page* find_or_create_page(struct addrSpace* mapping, unsigned long index, unsigned int gfp_mask);
-struct page* read_mapping_page(struct addrSpace* mapping, unsigned long index);
+struct page* addrSpace_getPage(struct addrSpace* mapping, unsigned long index);
+struct page* addrSpace_acquirePage(struct addrSpace* mapping, unsigned long index, unsigned int gfp_mask);
+int addrSpace_addPage(struct addrSpace* mapping, struct page* page, unsigned long index);
+int addrSpace_putPage(struct addrSpace *mapping, struct page *page);
+int addrSpace_setPageDirty(struct addrSpace *mapping, struct page *page);
+unsigned int addrSpace_getDirtyPages(struct addrSpace* mapping, struct page** pages, unsigned int nr_pages, unsigned long start);
+int addrSpace_removeDirtyTag(struct addrSpace *mapping, struct page *page);
+int addrSpace_writeBack(struct addrSpace *mapping);
+int addrSpace_invalidate(struct addrSpace *mapping, struct page *page);
+
+struct page* addrSpace_readPage(struct addrSpace* mapping, unsigned long index);
 
 /*
  * Address space s_operations (page cache)
