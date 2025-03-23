@@ -24,7 +24,14 @@
 		"sched.h": "c",
 		"inode.h": "c",
 		"page.h": "c",
-		"hashtable.h": "c"
+		"hashtable.h": "c",
+		"ext4_trans.h": "c",
+		"ext4_blockdev.h": "c",
+		"ext4_types.h": "c",
+		"ext4_bcache.h": "c",
+		"tree.h": "c",
+		"queue.h": "c",
+		"ext4_debug.h": "c"
 	},
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyFunction": true,
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyType": true,
