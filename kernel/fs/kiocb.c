@@ -127,7 +127,7 @@ ssize_t kiocb_write(struct kiocb *kiocb, const char *buf, size_t len)
     
     /* Mark inode as dirty if write was successful */
     if (ret > 0 && file->f_inode)
-        mark_inode_dirty(file->f_inode);
+        inode_setDirty(file->f_inode);
     
     return ret;
 }

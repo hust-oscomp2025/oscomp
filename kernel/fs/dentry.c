@@ -879,7 +879,7 @@ int dentry_permission(struct dentry *dentry, int mask)
         return -ENOENT;  /* 负向dentry没有inode */
     
     /* 回退到inode权限检查 */
-    return inode_permission(inode, mask);
+    return inode_checkPermission(inode, mask);
 }
 
 /**
@@ -939,7 +939,7 @@ int dentry_setxattr(struct dentry *dentry, const char *name, const void *value, 
         return -ENOENT;
     
     /* 检查写入权限 */
-    int err = inode_permission(inode, MAY_WRITE);
+    int err = inode_checkPermission(inode, MAY_WRITE);
     if (err)
         return err;
     
@@ -952,7 +952,7 @@ int dentry_setxattr(struct dentry *dentry, const char *name, const void *value, 
     
     if (err == 0) {
         /* 属性修改，标记inode为脏 */
-        mark_inode_dirty(inode);
+        inode_setDirty(inode);
         
         /* 如果文件系统支持，更新ctime */
         inode->i_ctime = current_time(inode->i_superblock);
@@ -984,7 +984,7 @@ int dentry_removexattr(struct dentry *dentry, const char *name)
         return -ENOENT;
     
     /* 检查写入权限 */
-    error = inode_permission(inode, MAY_WRITE);
+    error = inode_checkPermission(inode, MAY_WRITE);
     if (error)
         return error;
     
@@ -997,7 +997,7 @@ int dentry_removexattr(struct dentry *dentry, const char *name)
     
     if (error == 0) {
         /* 属性修改，标记inode为脏 */
-        mark_inode_dirty(inode);
+        inode_setDirty(inode);
         
         /* 如果文件系统支持，更新ctime */
         inode->i_ctime = current_time(inode->i_superblock);

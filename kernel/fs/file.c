@@ -114,7 +114,7 @@ int __file_free(struct file* filp) {
 
 	/* Release inode reference */
 	if (filp->f_inode)
-		put_inode(filp->f_inode);
+		inode_put(filp->f_inode);
 
 	/* Log the file close if debugging enabled */
 	if (fd >= 0) {
@@ -167,7 +167,7 @@ static struct file* __file_open(struct dentry* dentry, struct vfsmount* mnt, int
 	file->f_path.mnt = get_mount(mnt);
 	/* Set inode if available */
 	assert(dentry->d_inode); // 我们的设计确保所有文件系统都有inode和对应的操作
-	file->f_inode = grab_inode(dentry->d_inode);
+	file->f_inode = inode_get(dentry->d_inode);
 	file->f_operations = dentry->d_inode->i_fop;
 	file->f_mode = file_mode;
 	file->f_flags = flags;
@@ -192,7 +192,7 @@ static struct file* __file_open(struct dentry* dentry, struct vfsmount* mnt, int
 		if (error) {
 			/* Clean up on error */
 			path_destroy(&file->f_path);
-			put_inode(file->f_inode);
+			inode_put(file->f_inode);
 			kfree(file);
 			return ERR_PTR(error);
 		}
@@ -455,9 +455,9 @@ int file_sync(struct file* file, int datasync) {
 
     /* Generic implementation - sync the inode */
     if (datasync)
-        ret = sync_inode(inode, 1); /* Only sync data blocks */
+        ret = inode_sync(inode, 1); /* Only sync data blocks */
     else
-        ret = sync_inode_metadata(inode, 1); /* Sync data and metadata */
+        ret = inode_sync_metadata(inode, 1); /* Sync data and metadata */
 
     return ret;
 }
@@ -582,7 +582,7 @@ ssize_t file_writev(struct file* file, const struct io_vector* vec, unsigned lon
         *pos = kiocb.ki_pos;
         
         /* Mark the inode as dirty if write was successful */
-        mark_inode_dirty(file->f_inode);
+        inode_setDirty(file->f_inode);
     }
 
     return ret;

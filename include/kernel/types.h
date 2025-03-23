@@ -67,6 +67,7 @@ typedef uint64 uaddr;
 // Physical/virtual addresses (64-bit on your architecture)
 typedef uint64 paddr_t; // Physical address
 typedef uint64 vaddr_t; // Virtual address
+typedef uint64 time64_t; // 64-bit time value
 
 // User/kernel space pointers (for clarity in interfaces)
 typedef void* kptr_t;	     // Kernel pointer
@@ -87,6 +88,12 @@ typedef void* __user uptr_t; // User space pointer
 struct timespec {
     time_t  tv_sec;     /* seconds */
     long    tv_nsec;    /* nanoseconds */
+};
+
+// timespec64 structure if not already defined
+struct timespec64 {
+    time64_t tv_sec;        /* seconds */
+    long     tv_nsec;       /* nanoseconds */
 };
 
 /* 
@@ -114,6 +121,21 @@ struct itimerspec {
     struct timespec it_value;       /* initial expiration */
 };
 
+//vma
+/* Virtual memory fault return type */
+typedef unsigned int vm_fault_t;
+/* VM fault status codes */
+#define VM_FAULT_OOM        0x000001
+#define VM_FAULT_SIGBUS     0x000002
+#define VM_FAULT_MAJOR      0x000004
+#define VM_FAULT_WRITE      0x000008  /* Write access, not read */
+#define VM_FAULT_HWPOISON   0x000010
+#define VM_FAULT_RETRY      0x000020
+#define VM_FAULT_NOPAGE     0x000040  /* No page was found */
+#define VM_FAULT_LOCKED     0x000080
+#define VM_FAULT_DONE_COW   0x000100
+#define VM_FAULT_NEEDDSYNC  0x000200
+
 // file system type
 /*
  * File type and permission bits
@@ -121,10 +143,11 @@ struct itimerspec {
 
 #define MAX_FILE_NAME_LEN 256
 typedef uint64 loff_t;
-typedef uint32 fmode_t;
+
 typedef uint64_t sector_t; /* 64-bit sector number */
 /* File permissions and type mode */
 typedef unsigned int __poll_t;
+
 
 struct dir {
 	char name[MAX_FILE_NAME_LEN];
@@ -138,5 +161,58 @@ struct istat {
 	int st_nlinks;
 	int st_blocks;
 };
+
+/* Mount flags */
+#define MS_RDONLY 1        // Mount read-only
+#define MS_NOSUID 2        // Ignore suid and sgid bits
+#define MS_NODEV 4         // Disallow access to device special files
+#define MS_NOEXEC 8        // Disallow program execution
+#define MS_SYNCHRONOUS 16  // Writes are synced at once
+#define MS_REMOUNT 32      // Remount with different flags
+#define MS_MANDLOCK 64     // Allow mandatory locks on this FS
+#define MS_DIRSYNC 128     // Directory modifications are synchronous
+#define MS_NOATIME 1024    // Do not update access times
+#define MS_NODIRATIME 2048 // Do not update directory access times
+
+/*
+ * File mode fmode_t flags
+ */
+typedef uint32 fmode_t;
+/* Access modes */
+#define FMODE_READ (1U << 0)  /* File is open for reading */
+#define FMODE_WRITE (1U << 1) /* File is open for writing */
+#define FMODE_EXEC (1U << 5)  /* File is executable */
+
+/* Seeking flags */
+#define FMODE_LSEEK (1U << 2)  /* File is seekable */
+#define FMODE_PREAD (1U << 3)  /* File supports pread */
+#define FMODE_PWRITE (1U << 4) /* File supports pwrite */
+
+/* Special access flags */
+#define FMODE_ATOMIC_POS (1U << 12) /* File needs atomic access to position */
+#define FMODE_RANDOM (1U << 13)     /* File will be accessed randomly */
+#define FMODE_PATH (1U << 14)       /* O_PATH flag - minimal file access */
+#define FMODE_STREAM (1U << 16)     /* File is stream-like */
+
+/* Permission indicators */
+#define FMODE_WRITER (1U << 17)    /* Has write access to underlying fs */
+#define FMODE_CAN_READ (1U << 18)  /* Has read methods */
+#define FMODE_CAN_WRITE (1U << 19) /* Has write methods */
+
+/* State flags */
+#define FMODE_OPENED (1U << 20)  /* File has been opened */
+#define FMODE_CREATED (1U << 21) /* File was created */
+
+/* Optimization flags */
+#define FMODE_NOWAIT (1U << 22)      /* Return -EAGAIN if I/O would block */
+#define FMODE_CAN_ODIRECT (1U << 24) /* Supports direct I/O */
+#define FMODE_BUF_RASYNC (1U << 28)  /* Supports async buffered reads */
+#define FMODE_BUF_WASYNC (1U << 29)  /* Supports async buffered writes */
+
+
+
+/* File permission and type bits */
+typedef unsigned short umode_t;
+
 
 #endif

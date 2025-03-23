@@ -1,7 +1,8 @@
 #ifndef INODE_H
 #define INODE_H
 
-#include <kernel/fs/vfs.h>
+//#include <kernel/fs/vfs.h>
+#include <kernel/mm/vma.h>
 #include <kernel/types.h>
 #include <util/atomic.h>
 #include <util/list.h>
@@ -74,9 +75,9 @@ struct iattr {
 	uid_t ia_uid;
 	gid_t ia_gid;
 	loff_t ia_size;
-	struct timespec ia_atime;
-	struct timespec ia_mtime;
-	struct timespec ia_ctime;
+	struct timespec64 ia_atime;
+	struct timespec64 ia_mtime;
+	struct timespec64 ia_ctime;
 };
 
 /* Forward declarations */
@@ -87,13 +88,6 @@ struct fiemap_extent_info;
 struct addrSpace_ops;
 struct inode_operations;
 struct radixTreeRoot;
-
-/* Inode hash key - combination of superblock and inode number */
-struct inode_key {
-	struct superblock* sb;
-	unsigned long ino;
-};
-
 /*
  * Inode structure - core of the filesystem
  */
@@ -107,9 +101,11 @@ struct inode {
 
 	/* File attributes */
 	loff_t i_size;           /* File size in bytes */
-	struct timespec i_atime; /* Last access time */
-	struct timespec i_mtime; /* Last modification time */
-	struct timespec i_ctime; /* Last status change time */
+    // Replace existing timestamp fields with nanosecond precision
+    struct timespec64 i_atime; /* Last access time */
+    struct timespec64 i_mtime; /* Last modification time */
+    struct timespec64 i_ctime; /* Last status change time */
+    struct timespec64 i_btime; /* Creation time (birth time) */
 	unsigned int i_nlink;    /* Number of hard links */
 	blkcnt_t i_blocks;       /* Number of blocks allocated */
 
@@ -118,8 +114,11 @@ struct inode {
 
 	/* Filesystem information */
 	struct superblock* i_superblock;   /* Superblock */
-	struct list_head i_s_list_node;    /* Superblock list of inodes */
-	struct list_head i_state_list_node; /* For ONE state list (LRU/dirty/IO) */
+	struct list_node i_s_list_node;    /* Superblock list of inodes */
+	struct list_node i_state_list_node; /* For ONE state list (LRU/dirty/IO) */
+
+	/* Add hash table support */
+	struct list_node i_hash_node;  /* For hash table linkage */
 
 	/* Operations */
 	const struct inode_operations* i_op; /* Inode operations */
@@ -144,6 +143,13 @@ struct inode {
 
 	/* Block mapping */
 	sector_t* i_data; /* Block mapping array */
+    // // Quota fields
+    // struct quota_info {
+    //     spinlock_t dq_lock;
+    //     struct dquot *dq_user;     /* User quota */
+    //     struct dquot *dq_group;    /* Group quota */
+    //     struct dquot *dq_project;  /* Project quota */
+    // } i_quota;
 };
 
 /*
@@ -151,29 +157,38 @@ struct inode {
  */
 int inode_cache_init(void);
 
-struct inode* alloc_inode(struct superblock* sb);
+struct inode* inode_create(struct superblock* sb);
 
 /* Reference counting */
-struct inode* grab_inode(struct inode* inode);
-void put_inode(struct inode* inode);
+struct inode* inode_get(struct inode* inode);
+void inode_put(struct inode* inode);
 
 /* Inode lookup and creation */
-struct inode* get_inode(struct superblock* sb, unsigned long ino);
+struct inode* inode_acquire(struct superblock* sb, unsigned long ino);
 
 /* Inode state management */
-void mark_inode_dirty(struct inode* inode);
-void unlock_new_inode(struct inode* inode);
+void inode_setDirty(struct inode* inode);
 
-int sync_inode(struct inode* inode, int wait);
-int sync_inode_metadata(struct inode* inode, int wait);
+int inode_sync(struct inode* inode, int wait);
+int inode_sync_metadata(struct inode* inode, int wait);
 /* Permission checking */
 // int generic_permission(struct inode *inode, int mask);
 
 /* Utility functions */
-int is_bad_inode(struct inode* inode);
-int inode_permission(struct inode* inode, int mask);
+int inode_isBad(struct inode* inode);
+int inode_checkPermission(struct inode* inode, int mask);
 int setattr_prepare(struct dentry* dentry, struct iattr* attr);
 int notify_change(struct dentry* dentry, struct iattr* attr);
+
+// Add to inode.h or extend existing declarations
+#define XATTR_CREATE 0x1    /* Create attribute if it doesn't exist */
+#define XATTR_REPLACE 0x2   /* Replace attribute if it exists */
+
+// Implementation functions for extended attributes
+int inode_setxattr(struct inode* inode, const char* name, const void* value, size_t size, int flags);
+ssize_t inode_getxattr(struct inode* inode, const char* name, void* value, size_t size);
+ssize_t inode_listxattr(struct inode* inode, char* list, size_t size);
+int inode_removexattr(struct inode* inode, const char* name);
 
 
 /*
@@ -213,6 +228,18 @@ struct inode_operations {
 
 	/* Direct I/O support */
 	int (*direct_IO)(struct kiocb*, struct io_vector_iterator*);
+    // ACL operations
+    struct posix_acl* (*get_acl)(struct inode*, int);
+    int (*set_acl)(struct inode*, struct posix_acl*, int);
+    // Memory mapping operations
+    vm_fault_t (*page_fault)(struct vm_area_struct *, struct vm_fault *);
+    unsigned long (*get_unmapped_area)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
+
+    // POSIX specific operations
+    int (*atomic_open)(struct inode *, struct dentry *, struct file *, unsigned open_flag, umode_t create_mode);
+    int (*tmpfile)(struct inode *, struct dentry *, umode_t);
+    int (*dentry_open)(struct dentry *, struct file *, const struct cred *);
+
 };
 
 /* Inode state flags */
@@ -235,6 +262,7 @@ struct inode_operations {
 #define MAY_ACCESS 0x0010 /* Check for existence */
 #define MAY_OPEN 0x0020   /* Check permission for open */
 #define MAY_CHDIR 0x0040  /* Check permission to use as working directory */
+#define MAY_EXEC_MMAP 0x0080 /* Check exec permission for mmap PROT_EXEC */
 
 /* Combined permissions for common operations */
 #define MAY_LOOKUP (MAY_EXEC)                 /* For path traversal */
@@ -242,6 +270,29 @@ struct inode_operations {
 #define MAY_READ_WRITE (MAY_READ | MAY_WRITE) /* For both read and write */
 #define MAY_CREATE (MAY_WRITE | MAY_EXEC)     /* For creating new files */
 #define MAY_DELETE (MAY_WRITE | MAY_EXEC)     /* For deleting files */
+
+// ACL types
+#define ACL_TYPE_ACCESS   (0x0000)  /* POSIX access ACL */
+#define ACL_TYPE_DEFAULT  (0x0001)  /* POSIX default ACL */
+
+/* Complete set of file type macros */
+#define S_IFMT  00170000   /* bit mask for the file type bit field */
+#define S_IFSOCK 0140000   /* socket */
+#define S_IFLNK  0120000   /* symbolic link */
+#define S_IFREG  0100000   /* regular file */
+#define S_IFBLK  0060000   /* block device */
+#define S_IFDIR  0040000   /* directory */
+#define S_IFCHR  0020000   /* character device */
+#define S_IFIFO  0010000   /* FIFO */
+
+/* File type check macros */
+#define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)
+#define S_ISLNK(m)  (((m) & S_IFMT) == S_IFLNK)
+#define S_ISREG(m)  (((m) & S_IFMT) == S_IFREG)
+#define S_ISBLK(m)  (((m) & S_IFMT) == S_IFBLK)
+#define S_ISDIR(m)  (((m) & S_IFMT) == S_IFDIR)
+#define S_ISCHR(m)  (((m) & S_IFMT) == S_IFCHR)
+#define S_ISFIFO(m) (((m) & S_IFMT) == S_IFIFO)
 
 #endif /* INODE_H */
 

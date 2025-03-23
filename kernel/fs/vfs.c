@@ -102,7 +102,7 @@ int vfs_mkdir(struct inode* dir, struct dentry* dentry, fmode_t mode) {
 		return -EEXIST;
 
 	/* Check directory permissions */
-	error = inode_permission(dir, MAY_WRITE | MAY_EXEC);
+	error = inode_checkPermission(dir, MAY_WRITE | MAY_EXEC);
 	if (error)
 		return error;
 
@@ -126,7 +126,7 @@ int vfs_rmdir(struct inode* dir, struct dentry* dentry) {
 		return -EPERM;
 
 	/* Check directory permissions */
-	error = inode_permission(dir, MAY_WRITE | MAY_EXEC);
+	error = inode_checkPermission(dir, MAY_WRITE | MAY_EXEC);
 	if (error)
 		return error;
 
@@ -160,7 +160,7 @@ int vfs_link(struct dentry* old_dentry, struct inode* dir, struct dentry* new_de
 		return -EEXIST;
 
 	/* Check permissions */
-	error = inode_permission(dir, MAY_WRITE);
+	error = inode_checkPermission(dir, MAY_WRITE);
 	if (error)
 		return error;
 

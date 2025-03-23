@@ -232,7 +232,7 @@ int addrSpace_writeBack(struct addrSpace *mapping) {
  *
  * Returns 0 on success, -EBUSY if the page is dirty
  */
-int addrSpace_invalidate(struct addrSpace* mapping, struct page* page);
+int addrSpace_invalidate(struct addrSpace* mapping, struct page* page)
 {
 	int ret = 0;
 
@@ -336,7 +336,8 @@ struct page* addrSpace_readPage(struct addrSpace* mapping, unsigned long index) 
 
 	/* Read the page data */
 	if (mapping->a_ops && mapping->a_ops->readpage) {
-		struct file dummy_file = {.f_mapping = mapping};
+		struct inode dummy_inode = {.i_mapping = mapping};
+		struct file dummy_file = {.f_inode = &dummy_inode};
 
 		lock_page(page);
 		ret = mapping->a_ops->readpage(&dummy_file, page);

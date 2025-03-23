@@ -108,7 +108,7 @@ struct dentry_operations {
 	int (*d_free)(const struct dentry*);
 
 	/* Called to release dentry's inode */
-	void (*d_put_inode)(struct dentry*, struct inode*);
+	void (*d_inode_put)(struct dentry*, struct inode*);
 
 	/* Called to create the relative path of a dentry */
 	char* (*d_dname)(struct dentry*, char*, int);

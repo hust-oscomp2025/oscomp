@@ -5,37 +5,48 @@
 #include <util/string.h>
 
 static void __clear_inode(struct inode* inode);
-static unsigned int inode_hash_func(const void *key, unsigned int size);
-static int inode_key_equals(const void *k1, const void *k2);
+static void* __inode_get_key(struct list_node* node);
+static unsigned int __inode_hash_func(const void *key, unsigned int size);
+static int __inode_key_equals(const void *k1, const void *k2);
 static void hash_inode(struct inode *inode);
 static void unhash_inode(struct inode *inode);
 static void wake_up_inode(struct inode *inode);
-static struct inode *iget_locked(struct superblock *sb, unsigned long ino);
+static struct inode *__inode_acquireLocked(struct superblock *sb, unsigned long ino);
 static void evict_inode(struct inode* inode);
 static int generic_permission(struct inode* inode, int mask);
+static void __unlock_new_inode(struct inode *inode);
+
+/* Global inode hash table */
+struct hashtable inode_hashtable;
+
+struct inode_key{
+	struct superblock* sb;
+	unsigned long ino;
+}
+
 
 
 /**
- * inode_cache_init - Initialize the inode cache
- *
- * Sets up the inode cache hash table and related structures.
+ * Initialize the inode cache and hash table
  */
 int inode_cache_init(void) {
-  int err;
+    int err;
 
-  sprint("Initializing inode cache\n");
+    sprint("Initializing inode cache\n");
 
-  /* Initialize hash table */
-  err = hashtable_setup(&inode_hashtable, 1024, 75, inode_hash_func,
-                       inode_key_equals);
-  if (err != 0) {
-    sprint("Failed to initialize inode hashtable: %d\n", err);
-    return;
-  }
+    /* Initialize hash table with our callbacks */
+    err = hashtable_setup(&inode_hashtable, 1024, 75, 
+                         __inode_hash_func, 
+                         __inode_get_key,
+                         __inode_key_equals);
+    if (err != 0) {
+        sprint("Failed to initialize inode hashtable: %d\n", err);
+        return err;
+    }
 
-  sprint("Inode cache initialized\n");
+    sprint("Inode cache initialized\n");
+    return 0;
 }
-
 
 /**
  * generic_permission - Check for access rights on a Unix-style file system
@@ -78,7 +89,7 @@ static int generic_permission(struct inode* inode, int mask) {
 }
 
 /**
- * inode_permission - Check for access rights to a given inode
+ * inode_checkPermission - Check for access rights to a given inode
  * @inode: inode to check permission on
  * @mask: access mode to check for
  *
@@ -88,7 +99,7 @@ static int generic_permission(struct inode* inode, int mask) {
  *
  * Returns 0 if access is allowed, negative error code otherwise.
  */
-int inode_permission(struct inode* inode, int mask) {
+int inode_checkPermission(struct inode* inode, int mask) {
   int retval;
 
   if (!inode)
@@ -110,15 +121,15 @@ int inode_permission(struct inode* inode, int mask) {
 }
 
 /**
- * alloc_inode - Allocate a new inode for a specific filesystem
+ * inode_create - Allocate a new inode for a specific filesystem
  * @sb: superblock the inode belongs to
  *
  * Allocates and initializes a new inode. If the superblock has
- * an alloc_inode operation, use that; otherwise allocate a generic inode.
+ * an inode_create operation, use that; otherwise allocate a generic inode.
  *
  * Returns the new inode or NULL if allocation failed.
  */
-struct inode* alloc_inode(struct superblock* sb) {
+struct inode* inode_create(struct superblock* sb) {
   struct inode* inode;
 
   if (sb->s_operations && sb->s_operations->alloc_inode) {
@@ -145,7 +156,7 @@ struct inode* alloc_inode(struct superblock* sb) {
 }
 
 /**
- * get_inode - Get a fully initialized inode
+ * inode_acquire - Get a fully initialized inode
  * @sb: superblock to get inode from
  * @ino: inode number to look up
  *
@@ -154,11 +165,11 @@ struct inode* alloc_inode(struct superblock* sb) {
  *
  * Returns the inode or NULL if an error occurs.
  */
-struct inode* get_inode(struct superblock* sb, unsigned long ino) {
+struct inode* inode_acquire(struct superblock* sb, unsigned long ino) {
   struct inode* inode;
 
   /* Look in the inode hash table first */
-  inode = iget_locked(sb, ino);
+  inode = __inode_acquireLocked(sb, ino);
   if (!inode)
     return NULL;
 
@@ -172,21 +183,21 @@ struct inode* get_inode(struct superblock* sb, unsigned long ino) {
   }
 
   /* Mark inode as initialized and wake up waiters */
-  unlock_new_inode(inode);
+  __unlock_new_inode(inode);
 
   return inode;
 }
 
 /**
- * grab_inode - Increment inode reference count
+ * inode_get - Increment inode reference count
  * @inode: inode to grab
  *
  * Increments the reference count on an inode if it's valid.
  *
  * Returns the inode with incremented count, or NULL if the inode is invalid.
  */
-struct inode* grab_inode(struct inode* inode) {
-  if (!inode || is_bad_inode(inode))
+struct inode* inode_get(struct inode* inode) {
+  if (!inode || inode_isBad(inode))
     return NULL;
 
   atomic_inc(&inode->i_count);
@@ -194,13 +205,13 @@ struct inode* grab_inode(struct inode* inode) {
 }
 
 /**
- * put_inode - Release a reference to an inode
+ * inode_put - Release a reference to an inode
  * @inode: inode to put
  *
  * Decrements the reference count on an inode. If the count reaches zero,
  * the inode is added to the LRU list waiting for recycle.
  */
-void put_inode(struct inode* inode) {
+void inode_put(struct inode* inode) {
   if (unlikely(!inode))
     return;
 
@@ -224,12 +235,12 @@ void put_inode(struct inode* inode) {
 }
 
 /**
- * is_bad_inode - Check if an inode is invalid
+ * inode_isBad - Check if an inode is invalid
  * @inode: inode to check
  *
  * Returns true if the specified inode has been marked as bad.
  */
-int is_bad_inode(struct inode* inode) {
+int inode_isBad(struct inode* inode) {
   return (!inode || inode->i_op == NULL);
 }
 
@@ -252,7 +263,7 @@ int setattr_prepare(struct dentry* dentry, struct iattr* attr) {
 
   /* Check for permission to change attributes */
   if (attr->ia_valid & ATTR_MODE) {
-    error = inode_permission(inode, MAY_WRITE);
+    error = inode_checkPermission(inode, MAY_WRITE);
     if (error)
       return error;
   }
@@ -266,7 +277,7 @@ int setattr_prepare(struct dentry* dentry, struct iattr* attr) {
 
   /* Check if size can be changed */
   if (attr->ia_valid & ATTR_SIZE) {
-    error = inode_permission(inode, MAY_WRITE);
+    error = inode_checkPermission(inode, MAY_WRITE);
     if (error)
       return error;
 
@@ -321,19 +332,19 @@ int notify_change(struct dentry* dentry, struct iattr* attr) {
     inode->i_ctime = attr->ia_ctime;
 
   /* Mark the inode as dirty */
-  mark_inode_dirty(inode);
+  inode_setDirty(inode);
 
   return 0;
 }
 
 /**
- * mark_inode_dirty - Mark an inode as needing writeback
+ * inode_setDirty - Mark an inode as needing writeback
  * @inode: inode to mark dirty
  *
  * Adds the inode to the superblock's list of dirty inodes
  * that need to be written back to disk.
  */
-void mark_inode_dirty(struct inode* inode) {
+void inode_setDirty(struct inode* inode) {
   if (!inode)
     return;
 
@@ -427,7 +438,7 @@ void __clear_inode(struct inode* inode) {
 
 
 /**
- * iget_locked - Get inode from cache or allocate a new one
+ * __inode_acquireLocked - Get inode from cache or allocate a new one
  * @sb: superblock to get inode from
  * @ino: inode number to look up
  *
@@ -437,7 +448,7 @@ void __clear_inode(struct inode* inode) {
  *
  * Returns locked inode on success, NULL on allocation failure.
  */
-static struct inode *iget_locked(struct superblock *sb, unsigned long ino) {
+static struct inode *__inode_acquireLocked(struct superblock *sb, unsigned long ino) {
 	struct inode *inode;
 	struct inode_key key = { .sb = sb, .ino = ino };
 	
@@ -463,29 +474,32 @@ static struct inode *iget_locked(struct superblock *sb, unsigned long ino) {
 	
 	return inode;
 }
+
+
 /**
  * Hash function for inode keys
+ * Uses both superblock pointer and inode number to generate a hash
  */
-static unsigned int inode_hash_func(const void *key, unsigned int size) {
-  const struct inode_key *ikey = (const struct inode_key *)key;
-  unsigned long val = (unsigned long)ikey->sb ^ ikey->ino;
-
-  /* Mix the bits to distribute values better */
-  val = (val * 11400714819323198485ULL) >> 32; /* Fast hash multiply */
-  return (unsigned int)val;
+static unsigned int __inode_hash_func(const void* key, unsigned int size) {
+    const struct inode_key *ikey = key;
+    
+    /* Combine superblock pointer and inode number */
+    unsigned long val = (unsigned long)ikey->sb ^ ikey->ino;
+    
+    /* Mix the bits for better distribution */
+    val = (val * 11400714819323198485ULL) >> 32;  /* Fast hash multiply */
+    return (unsigned int)val;
 }
-
-
 
 /**
  * Compare two inode keys for equality
  */
-static int inode_key_equals(const void *k1, const void *k2) {
-  const struct inode_key *key1 = (const struct inode_key *)k1;
-  const struct inode_key *key2 = (const struct inode_key *)k2;
+static int __inode_key_equals(const void* k1, const void* k2) {
+    const struct inode_key *key1 = k1, *key2 = k2;
 
-  return (key1->sb == key2->sb && key1->ino == key2->ino);
+    return (key1->sb == key2->sb && key1->ino == key2->ino);
 }
+
 
 
 /**
@@ -531,13 +545,13 @@ static void unhash_inode(struct inode *inode) {
 
 
 /**
- * unlock_new_inode - Unlock a newly allocated inode
+ * __unlock_new_inode - Unlock a newly allocated inode
  * @inode: inode to unlock
  *
  * Clears the I_NEW state bit and wakes up any processes
  * waiting on this inode to be initialized.
  */
-void unlock_new_inode(struct inode *inode) {
+static void __unlock_new_inode(struct inode *inode) {
 	if (!inode)
 			return;
 			
@@ -551,7 +565,7 @@ void unlock_new_inode(struct inode *inode) {
 
 
 /**
- * sync_inode - Write an inode to disk
+ * inode_sync - Write an inode to disk
  * @inode: inode to write
  * @wait: whether to wait for I/O to complete
  *
@@ -560,7 +574,7 @@ void unlock_new_inode(struct inode *inode) {
  *
  * Returns 0 on success or negative error code.
  */
-int sync_inode(struct inode *inode, int wait) {
+int inode_sync(struct inode *inode, int wait) {
 	int ret = 0;
 	
 	if (!inode)
@@ -592,19 +606,19 @@ int sync_inode(struct inode *inode, int wait) {
 }
 
 /**
-* sync_inode_metadata - Sync only inode metadata to disk
+* inode_sync_metadata - Sync only inode metadata to disk
 * @inode: inode to sync
 * @wait: whether to wait for I/O to complete
 *
-* Like sync_inode(), but only writes inode metadata, not data blocks.
+* Like inode_sync(), but only writes inode metadata, not data blocks.
 * Used when only attributes have changed.
 *
 * Returns 0 on success or negative error code.
 */
-int sync_inode_metadata(struct inode *inode, int wait) {
-	/* For now, just delegate to sync_inode */
+int inode_sync_metadata(struct inode *inode, int wait) {
+	/* For now, just delegate to inode_sync */
 	/* In a more complete implementation, this would only sync metadata */
-	return sync_inode(inode, wait);
+	return inode_sync(inode, wait);
 }
 
 /**
@@ -617,4 +631,28 @@ int sync_inode_metadata(struct inode *inode, int wait) {
 static void wake_up_inode(struct inode *inode) {
 	/* In a full implementation, this would use wait queues */
 	/* For now, we'll assume no waiters or that it's handled elsewhere */
+}
+
+
+// Enhanced permission checking function
+int inode_checkPermission(struct inode *inode, int mask) {
+    // Enhanced implementation...
+    // Consider credentials, ACLs, capability-based security
+}
+
+/**
+ * Get key from an inode hash node
+ * This function extracts the key (superblock + inode number) from a list node
+ */
+static void* __inode_get_key(struct list_node* node) {
+    struct inode* inode = container_of(node, struct inode, i_hash_node);
+    static struct {
+        struct superblock* sb;
+        unsigned long ino;
+    } key;
+    
+    key.sb = inode->i_superblock;
+    key.ino = inode->i_ino;
+    
+    return &key;
 }
