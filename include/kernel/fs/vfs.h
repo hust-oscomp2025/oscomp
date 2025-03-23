@@ -11,6 +11,7 @@
 #include <kernel/fs/io_vector.h>
 #include <kernel/fs/fstype.h>
 #include <kernel/fs/address_space.h>
+#include <kernel/fs/writeback.h>
 
 #include <kernel/types.h>
 #include <util/list.h>

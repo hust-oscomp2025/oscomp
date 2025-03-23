@@ -4,6 +4,9 @@
 #include <util/radix_tree.h>
 #include <util/spinlock.h>
 #include <kernel/fs/vfs.h>
+
+int __addrSpace_writeback(struct addrSpace *mapping, struct writeback_control *wbc);
+static void __init_writeback_control(struct writeback_control *wbc, unsigned int sync_mode);
 /**
  * addrSpace_create - Create a new address space for an inode
  * @inode: Inode to associate with the address space
@@ -204,63 +207,20 @@ int addrSpace_removeDirtyTag(struct addrSpace* mapping, struct page* page) {
 }
 
 /**
- * Write back all dirty pages in the addrSpace
+ * Modified addrSpace_writeBack function to use the internal implementation
  * @mapping: The addrSpace to write back
  *
  * Returns 0 on success, negative error code on failure
  */
-int addrSpace_writeBack(struct addrSpace* mapping) {
-	struct page* pages[16]; /* Process 16 pages in each batch */
-	unsigned int nr_pages;
-	unsigned long index = 0;
-	int ret = 0;
-
-	if (!mapping || !mapping->a_ops || !mapping->a_ops->writepage)
-		return -EINVAL;
-
-	/* Process batches of dirty pages until no more are found */
-	do {
-		unsigned int i;
-		struct writeback_control wbc = {0};
-
-		nr_pages = addrSpace_getDirtyPages(mapping, pages, 16, index);
-
-		for (i = 0; i < nr_pages; i++) {
-			struct page* page = pages[i];
-
-			/* Update the next index to search from */
-			if (page->index > index)
-				index = page->index;
-
-			/* Skip this page if it's no longer dirty */
-			if (!test_page_dirty(page)) {
-				put_page(page);
-				continue;
-			}
-
-			/* Lock the page for writeback */
-			if (trylock_page(page)) {
-				/* Write the page */
-				ret = mapping->a_ops->writepage(page, &wbc);
-
-				/* Clear the dirty tag if successful */
-				if (ret == 0)
-					addrSpace_removeDirtyTag(mapping, page);
-
-				unlock_page(page);
-			}
-
-			put_page(page);
-
-			if (ret < 0)
-				break; /* Stop on error */
-		}
-
-		index++; /* Move to the next index */
-	} while (nr_pages > 0 && ret == 0);
-
-	return ret;
+int addrSpace_writeBack(struct addrSpace *mapping) {
+    struct writeback_control wbc;
+    
+    init_writeback_control(&wbc, WB_SYNC_ALL);
+    wbc.reason = WB_REASON_SYNC;
+    
+    return __addrSpace_writeback(mapping, &wbc);
 }
+
 
 /**
  * Invalidate a single page in the addrSpace
@@ -389,4 +349,119 @@ struct page* addrSpace_readPage(struct addrSpace* mapping, unsigned long index) 
 	/* Reading failed */
 	put_page(page);
 	return NULL;
+}
+
+
+/**
+ * Internal function to perform page writeback with a specific control struct
+ * @mapping: The addrSpace to write back
+ * @wbc: Writeback control parameters
+ *
+ * Returns 0 on success, negative error code on failure
+ */
+int __addrSpace_writeback(struct addrSpace *mapping, struct writeback_control *wbc) {
+    struct page *pages[16]; /* Process 16 pages in each batch */
+    unsigned int nr_pages;
+    unsigned long index = 0;
+    int ret = 0;
+    long nr_to_write = wbc->nr_to_write;
+
+    if (!mapping || !mapping->a_ops || !mapping->a_ops->writepage)
+        return -EINVAL;
+
+    /* Process batches of dirty pages until no more are found or quota reached */
+    do {
+        unsigned int i;
+
+        nr_pages = addrSpace_getDirtyPages(mapping, pages, 16, index);
+
+        for (i = 0; i < nr_pages; i++) {
+            struct page *page = pages[i];
+
+            /* Update the next index to search from */
+            if (page->index > index)
+                index = page->index;
+
+            /* Skip this page if it's no longer dirty */
+            if (!test_page_dirty(page)) {
+                put_page(page);
+                continue;
+            }
+            
+            /* Skip if outside the requested range */
+            loff_t page_offset = (loff_t)page->index << PAGE_SHIFT;
+            if (page_offset >= wbc->range_end || 
+                (page_offset + PAGE_SIZE) <= wbc->range_start) {
+                put_page(page);
+                continue;
+            }
+
+            /* Lock the page for writeback */
+            if (trylock_page(page)) {
+                /* Write the page */
+                ret = mapping->a_ops->writepage(page, wbc);
+
+                /* Clear the dirty tag if successful */
+                if (ret == 0)
+                    addrSpace_removeDirtyTag(mapping, page);
+
+                unlock_page(page);
+            }
+
+            put_page(page);
+
+            if (ret < 0)
+                break; /* Stop on error */
+                
+            /* Count this page against our quota */
+            if (--nr_to_write <= 0)
+                break;
+        }
+
+        index++; /* Move to the next index */
+        
+        /* Stop if we've reached our quota or encountered an error */
+        if (nr_to_write <= 0 || ret < 0)
+            break;
+            
+    } while (nr_pages > 0);
+
+    /* Update how many pages we still need to write */
+    wbc->nr_to_write = nr_to_write;
+    
+    return ret;
+}
+
+
+/**
+ * Write back dirty pages in a specific range
+ * @mapping: The addrSpace to write back
+ * @start: Start offset
+ * @end: End offset
+ * @sync_mode: Whether to wait for I/O completion
+ *
+ * Returns 0 on success, negative error code on failure
+ */
+int addrSpace_writeback_range(struct addrSpace *mapping, loff_t start, loff_t end, int sync_mode) {
+    struct writeback_control wbc;
+    
+    // Initialize writeback control
+    init_writeback_control(&wbc, sync_mode);
+    wbc.range_start = start;
+    wbc.range_end = end;
+    
+    return __addrSpace_writeback(mapping, &wbc);
+}
+
+/**
+ * Initialize a writeback_control structure with default values
+ * @wbc: The writeback_control structure to initialize
+ * @sync_mode: Synchronization mode (WB_SYNC_ALL or WB_SYNC_NONE)
+ */
+static void __init_writeback_control(struct writeback_control *wbc, unsigned int sync_mode) {
+    memset(wbc, 0, sizeof(struct writeback_control));
+    wbc->nr_to_write = INT32_MAX;  // Write as many pages as possible
+    wbc->sync_mode = sync_mode;   // Set synchronization mode
+    wbc->range_start = 0;         // Start from beginning
+    wbc->range_end = INT64_MAX;   // To the end
 }

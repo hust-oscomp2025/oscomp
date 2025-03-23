@@ -26,6 +26,7 @@ int addrSpace_setPageDirty(struct addrSpace *mapping, struct page *page);
 unsigned int addrSpace_getDirtyPages(struct addrSpace* mapping, struct page** pages, unsigned int nr_pages, unsigned long start);
 int addrSpace_removeDirtyTag(struct addrSpace *mapping, struct page *page);
 int addrSpace_writeBack(struct addrSpace *mapping);
+int addrSpace_writeback_range(struct addrSpace *mapping, loff_t start, loff_t end, int sync_mode);
 int addrSpace_invalidate(struct addrSpace *mapping, struct page *page);
 
 struct page* addrSpace_readPage(struct addrSpace* mapping, unsigned long index);

@@ -55,5 +55,6 @@ enum wb_reason {
 void writeback_inodes_sb(struct superblock *, enum wb_reason);
 long writeback_inodes_s_if_idle(struct superblock *, enum wb_reason);
 int sync_filesystem(struct superblock *);
+void init_writeback_control(struct writeback_control *wbc, unsigned int sync_mode);
 
 #endif /* _WRITEBACK_H */
