@@ -94,8 +94,8 @@ static void deactivate_super(struct superblock* sb) {
 	spinlock_unlock(&sb->s_fsType->fs_list_s_lock);
 
 	/* Free any filesystem-specific info */
-	if (sb->s_fs_specific)
-		kfree(sb->s_fs_specific);
+	if (sb->s_fs_info)
+		kfree(sb->s_fs_info);
 
 	/* Free the superblock itself */
 	kfree(sb);

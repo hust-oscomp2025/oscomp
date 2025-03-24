@@ -32,7 +32,12 @@
 		"tree.h": "c",
 		"queue.h": "c",
 		"ext4_debug.h": "c",
-		"ext4_inode.h": "c"
+		"ext4_inode.h": "c",
+		"ext4.h": "c",
+		"ext4_xattr.h": "c",
+		"ext4_super.h": "c",
+		"ext4_fs.h": "c",
+		"ext4_dir.h": "c"
 	},
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyFunction": true,
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyType": true,

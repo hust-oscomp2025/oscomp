@@ -119,7 +119,7 @@ struct superblock* fsType_acquireSuperblock(struct fsType* type, dev_t dev_id, v
 	/* Store filesystem-specific data if provided */
 	if (fs_data) {
 		/* Note: Filesystem is responsible for managing this data */
-		sb->s_fs_specific = fs_data;
+		sb->s_fs_info = fs_data;
 	}
 
 	/* Add to the filesystem's list of superblocks */

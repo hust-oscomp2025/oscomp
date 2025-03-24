@@ -27,7 +27,7 @@ struct superblock {
 	struct fsType* s_fsType;      // Filesystem type
 	struct list_node s_node_fsType; // Instances of this filesystem
 
-	void* s_fs_specific; // Filesystem-specific information
+	void* s_fs_info; // Filesystem-specific information
 
 	/* Master list - all inodes belong to this superblock */
 	struct list_head s_list_all_inodes; // List of inodes belonging to this sb

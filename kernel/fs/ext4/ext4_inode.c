@@ -3,16 +3,12 @@
 #include <kernel/fs/vfs/inode.h>
 #include <kernel/mm/kmalloc.h>
 
-#include <vendor/lwext4/include/ext4.h>
-#include <vendor/lwext4/include/ext4_inode.h>
-#include <vendor/lwext4/include/ext4_xattr.h>
-#include <vendor/lwext4/include/ext4_super.h>
-#include <vendor/lwext4/include/ext4_fs.h>
-#include <vendor/lwext4/include/ext4_dir.h>
-
-
-
-
+#include <kernel/fs/lwext4/ext4.h>
+#include <kernel/fs/lwext4/ext4_inode.h>
+#include <kernel/fs/lwext4/ext4_xattr.h>
+#include <kernel/fs/lwext4/ext4_super.h>
+#include <kernel/fs/lwext4/ext4_fs.h>
+#include <kernel/fs/lwext4/ext4_dir.h>
 
 /* Forward declarations for file and dir operations */
 extern const struct file_operations ext4_file_operations;
@@ -37,6 +33,56 @@ static ssize_t ext4_getxattr(struct dentry *dentry, const char *name, void *buff
 static ssize_t ext4_listxattr(struct dentry *dentry, char *buffer, size_t size);
 static int ext4_removexattr(struct dentry *dentry, const char *name);
 
+static inline void ext4_timestamp_to_timespec64(uint32_t timestamp, struct timespec64 *ts);
+
+/**
+ * ext4_file_inode_operations - Operations for regular files
+ */
+const struct inode_operations ext4_file_inode_operations = {
+    .permission     = ext4_permission,
+    .setattr        = ext4_setattr,
+    .getattr        = ext4_getattr,
+    .setxattr       = ext4_setxattr,
+    .getxattr       = ext4_getxattr,
+    .listxattr      = ext4_listxattr,
+    .removexattr    = ext4_removexattr,
+};
+
+/**
+ * ext4_dir_inode_operations - Operations for directories
+ */
+const struct inode_operations ext4_dir_inode_operations = {
+    .create         = ext4_create,
+    .lookup         = ext4_lookup,
+    .link           = ext4_link,
+    .unlink         = ext4_unlink,
+    .symlink        = ext4_symlink,
+    .mkdir          = ext4_mkdir,
+    .rmdir          = ext4_rmdir,
+    .rename         = ext4_rename,
+    .permission     = ext4_permission,
+    .setattr        = ext4_setattr,
+    .getattr        = ext4_getattr,
+    .setxattr       = ext4_setxattr,
+    .getxattr       = ext4_getxattr,
+    .listxattr      = ext4_listxattr,
+    .removexattr    = ext4_removexattr,
+};
+
+/**
+ * ext4_symlink_inode_operations - Operations for symbolic links
+ */
+const struct inode_operations ext4_symlink_inode_operations = {
+    .readlink       = ext4_readlink,
+    .permission     = ext4_permission,
+    .setattr        = ext4_setattr,
+    .getattr        = ext4_getattr,
+    .setxattr       = ext4_setxattr,
+    .getxattr       = ext4_getxattr,
+    .listxattr      = ext4_listxattr,
+    .removexattr    = ext4_removexattr,
+};
+
 /**
  * ext4_inode_init - Initialize a VFS inode from an ext4 inode
  * @sb: The superblock
@@ -57,15 +103,18 @@ int ext4_inode_init(struct superblock *sb, struct inode *inode, uint32_t ino) {
     
     /* Initialize the VFS inode from ext4 inode */
     inode->i_ino = ino;
-    inode->i_sb = sb;
-    inode->i_mode = ext4_inode_get_mode(fs->sb, inode_ref.inode);
+    inode->i_superblock = sb;
+    inode->i_mode = ext4_inode_get_mode(sb, inode_ref.inode);
     inode->i_uid = ext4_inode_get_uid(inode_ref.inode);
     inode->i_gid = ext4_inode_get_gid(inode_ref.inode);
-    inode->i_size = ext4_inode_get_size(fs->sb, inode_ref.inode);
-    inode->i_atime = ext4_inode_get_access_time(inode_ref.inode);
-    inode->i_mtime = ext4_inode_get_modif_time(inode_ref.inode);
-    inode->i_ctime = ext4_inode_get_change_inode_time(inode_ref.inode);
-    inode->i_blocks = ext4_inode_get_blocks_count(fs->sb, inode_ref.inode);
+    inode->i_size = ext4_inode_get_size(sb, inode_ref.inode);
+
+    /* Convert uint32 timestamps to timespec64 format */
+    ext4_timestamp_to_timespec64(ext4_inode_get_access_time(inode_ref.inode), &inode->i_atime);
+    ext4_timestamp_to_timespec64(ext4_inode_get_modif_time(inode_ref.inode), &inode->i_mtime);
+    ext4_timestamp_to_timespec64(ext4_inode_get_change_inode_time(inode_ref.inode), &inode->i_ctime);
+
+    inode->i_blocks = ext4_inode_get_blocks_count(sb, inode_ref.inode);
     inode->i_nlink = ext4_inode_get_links_cnt(inode_ref.inode);
     
     /* Set appropriate operations based on file type */
@@ -102,13 +151,13 @@ int ext4_inode_init(struct superblock *sb, struct inode *inode, uint32_t ino) {
  * Returns: 0 on success, negative error code on failure
  */
 int ext4_read_inode(struct inode *inode) {
-    if (!inode || !inode->i_sb)
+    if (!inode || !inode->i_superblock)
         return -EINVAL;
     
-    return ext4_inode_init(inode->i_sb, inode, inode->i_ino);
+    return ext4_inode_init(inode->i_superblock, inode, inode->i_ino);
 }
 static int get_ext4_inode_ref(struct inode *inode, struct ext4_inode_ref *ref) {
-    struct ext4_fs *fs = inode->i_sb->s_fs_info;
+    struct ext4_fs *fs = inode->i_superblock->s_fs_info;
     return ext4_fs_get_inode_ref(fs, inode->i_ino, ref);
 }
 
@@ -142,7 +191,7 @@ static struct inode *ext4_lookup(struct inode *dir, struct dentry *dentry, unsig
     
     /* Call ext4 directory find entry function */
     ret = ext4_dir_find_entry(&result, &dir_ref, dentry->d_name->name, 
-                               dentry->d_name->len);
+                              dentry->d_name->len);
     
     /* Release directory reference */
     put_ext4_inode_ref(&dir_ref);
@@ -155,7 +204,7 @@ static struct inode *ext4_lookup(struct inode *dir, struct dentry *dentry, unsig
     }
     
     /* Found the entry, now get the inode */
-    inode = inode_get(dir->i_sb, result.dentry->inode);
+    inode = inode_acquire(dir->i_superblock, result.dentry->inode);
     
     /* Clean up the search result */
     ext4_dir_destroy_result(&dir_ref, &result);
@@ -189,7 +238,7 @@ static int ext4_create(struct inode *dir, struct dentry *dentry, mode_t mode) {
     }
     
     /* Set mode (permissions) for the new inode */
-    ext4_inode_set_mode(dir_ref.fs->sb, inode_ref.inode, mode);
+    ext4_inode_set_mode(&dir_ref.fs->sb, inode_ref.inode, mode);
     
     /* Add entry to directory */
     ret = ext4_dir_add_entry(&dir_ref, dentry->d_name->name, dentry->d_name->len, &inode_ref);
@@ -201,7 +250,7 @@ static int ext4_create(struct inode *dir, struct dentry *dentry, mode_t mode) {
     }
     
     /* Create VFS inode and add to dentry */
-    inode = inode_create(dir->i_sb, inode_ref.index);
+    inode = inode_acquire(dir->i_superblock, inode_ref.index);
     if (!inode) {
         ext4_fs_free_inode(&inode_ref);
         put_ext4_inode_ref(&dir_ref);
@@ -210,7 +259,7 @@ static int ext4_create(struct inode *dir, struct dentry *dentry, mode_t mode) {
     
     /* Initialize the VFS inode */
     inode->i_mode = mode;
-    inode->i_op = &ext4_inode_operations;
+    inode->i_op = &ext4_file_inode_operations;
     inode->i_fop = &ext4_file_operations;
     
     /* Link the dentry to the inode */
@@ -343,7 +392,7 @@ static int ext4_symlink(struct inode *dir, struct dentry *dentry, const char *sy
     }
     
     /* Set mode for the symlink */
-    ext4_inode_set_mode(dir_ref.fs->sb, inode_ref.inode, S_IFLNK | 0777);
+    ext4_inode_set_mode(&dir_ref.fs->sb, inode_ref.inode, S_IFLNK | 0777);
     
     /* Add entry to directory */
     ret = ext4_dir_add_entry(&dir_ref, dentry->d_name->name, dentry->d_name->len, &inode_ref);
@@ -386,7 +435,7 @@ static int ext4_symlink(struct inode *dir, struct dentry *dentry, const char *sy
     }
     
     /* Create VFS inode and add to dentry */
-    inode = inode_create(dir->i_sb, inode_ref.index);
+    inode = inode_acquire(dir->i_superblock, inode_ref.index);
     if (!inode) {
         ext4_fs_free_inode(&inode_ref);
         put_ext4_inode_ref(&dir_ref);
@@ -436,7 +485,7 @@ static int ext4_mkdir(struct inode *dir, struct dentry *dentry, mode_t mode) {
     }
     
     /* Set mode for the new directory */
-    ext4_inode_set_mode(dir_ref.fs->sb, inode_ref.inode, mode);
+    ext4_inode_set_mode(&dir_ref.fs->sb, inode_ref.inode, mode);
     
     /* Initialize directory structure (create "." and "..") */
 #if CONFIG_DIR_INDEX_ENABLE
@@ -490,7 +539,7 @@ static int ext4_mkdir(struct inode *dir, struct dentry *dentry, mode_t mode) {
     }
     
     /* Create VFS inode and add to dentry */
-    inode = inode_create(dir->i_sb, inode_ref.index);
+    inode = inode_acquire(dir->i_superblock, inode_ref.index);
     if (!inode) {
         ext4_fs_free_inode(&inode_ref);
         put_ext4_inode_ref(&dir_ref);
@@ -825,4 +874,19 @@ static int ext4_rename(struct inode *old_dir, struct dentry *old_dentry,
     put_ext4_inode_ref(&old_dir_ref);
     
     return 0;
+}
+
+
+/**
+ * ext4_timestamp_to_timespec64 - Convert ext4 timestamp to timespec64
+ * @timestamp: ext4 timestamp (uint32)
+ * @ts: pointer to timespec64 structure to fill
+ *
+ * Converts an ext4 timestamp value to the VFS timespec64 format
+ */
+static inline void ext4_timestamp_to_timespec64(uint32_t timestamp, struct timespec64 *ts)
+{
+    /* Unix epoch time is stored in seconds */
+    ts->tv_sec = timestamp;
+    ts->tv_nsec = 0;
 }
