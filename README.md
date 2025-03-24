@@ -14,13 +14,13 @@
 
 ### 目前正在着手的任务
 - [x] 在内核页表中分配一整段虚拟内存
-- [ ] 完善inode  
-- [ ] 重写inode hash
+- [x] 完善inode  
+- [x] 重写inode hash
 - [ ] 在路径遍历中处理挂载点
 - [ ] 尚未实现vfs文件系统、设备、虚拟标准输入输出表述符、主要系统调用。
 - [ ] 在file_open中做文件创建
-- [ ] 在file_close中处理f_private字段
-- [ ] 用嵌入式哈希表重写inode hash
+- [ ] 在`__file_free`中处理f_private字段
+- [x] 用嵌入式哈希表重写inode hash
 
 
 
