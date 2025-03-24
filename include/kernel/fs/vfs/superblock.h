@@ -123,6 +123,8 @@ struct super_operations {
 	/* Filesystem-specific clear operations */
 	void (*__clear_inode)(struct inode* inode);
 	int (*show_options)(struct seq_file* seq, struct dentry* root);
+
+	int (*get_block)(struct inode* inode, sector_t iblock, struct buffer_head* bh_result, int create);
 };
 
 #endif

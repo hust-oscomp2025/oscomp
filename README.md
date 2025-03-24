@@ -21,7 +21,7 @@
 - [ ] 在file_open中做文件创建
 - [ ] 在`__file_free`中处理f_private字段
 - [x] 用嵌入式哈希表重写inode hash
-- [ ] 实现ext4 inode虚函数表
+- [x] 实现ext4 inode虚函数表
 
 
 

@@ -78,6 +78,50 @@ struct vm_area_struct {
   spinlock_t vma_lock; // VMA锁
 };
 
+/* VM fault类型及常量定义 */
+typedef int vm_fault_t;
+
+#define VM_FAULT_NOPAGE     0x00 /* 页面故障已成功处理 */
+#define VM_FAULT_MINOR      0x01 /* 次要页面故障 */
+#define VM_FAULT_MAJOR      0x02 /* 主要页面故障 */
+#define VM_FAULT_RETRY      0x04 /* 重试页面故障 */
+#define VM_FAULT_ERROR      0x08 /* 页面故障处理中发生错误 */
+#define VM_FAULT_BADMAP     0x10 /* 错误的映射 */
+#define VM_FAULT_BADACCESS  0x20 /* 错误的访问权限 */
+#define VM_FAULT_SIGBUS     0x40 /* 总线错误信号 */
+#define VM_FAULT_OOM        0x80 /* 内存不足 */
+
+/**
+ * 虚拟内存故障信息结构
+ * 在页面故障发生时传递相关信息
+ */
+struct vm_fault {
+    /* 发生故障的虚拟地址 */
+    uint64 address;
+
+    /* 标志位 */
+    unsigned int flags;
+    #define FAULT_FLAG_WRITE  0x01 /* 写访问故障 */
+    #define FAULT_FLAG_USER   0x02 /* 用户空间访问故障 */
+    #define FAULT_FLAG_REMOTE 0x04 /* 远程故障 */
+    #define FAULT_FLAG_MKWRITE 0x08 /* 写时复制 */
+    #define FAULT_FLAG_ALLOW_RETRY 0x10 /* 允许重试 */
+    #define FAULT_FLAG_RETRY_NOWAIT 0x20 /* 不等待重试 */
+    #define FAULT_FLAG_KILLABLE 0x40 /* 可被信号杀死 */
+
+    /* 页表项 */
+    pte_t *pte;  /* 指向故障页表项的指针 */
+
+    /* 页偏移 */
+    uint64 pgoff;
+
+    /* 故障结果页 */
+    struct page *page;
+
+    /* 缺页中间状态 */
+    int result;
+};
+
 struct vm_area_struct *vm_area_setup(struct mm_struct *mm, uint64 addr,
                                      uint64 len, enum vma_type type, int prot,
                                      uint64 flags);
@@ -86,4 +130,24 @@ void free_vma(struct vm_area_struct *vma);
 
 int populate_vma(struct vm_area_struct *vma, uint64 addr, size_t length,
                  int prot);
+
+/**
+ * @brief 通用页面故障处理函数
+ * 
+ * @param vma 虚拟内存区域结构
+ * @param vmf 页面故障信息
+ * @return vm_fault_t 故障处理结果
+ */
+vm_fault_t handle_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf);
+
+/**
+ * @brief 插入页面到虚拟内存区域
+ * 
+ * @param vma 虚拟内存区域结构
+ * @param addr 虚拟地址
+ * @param page 要插入的页面
+ * @return int 成功返回0，失败返回错误码
+ */
+int vm_insert_page(struct vm_area_struct *vma, uint64 addr, struct page *page);
+
 #endif

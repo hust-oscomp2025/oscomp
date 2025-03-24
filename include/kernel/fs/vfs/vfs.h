@@ -12,6 +12,8 @@
 #include <kernel/fs/vfs/fstype.h>
 #include <kernel/fs/vfs/address_space.h>
 #include <kernel/fs/vfs/writeback.h>
+#include <kernel/fs/vfs/fiemap.h>
+#include <kernel/fs/vfs/buffer_head.h>
 
 #include <kernel/types.h>
 #include <util/list.h>
