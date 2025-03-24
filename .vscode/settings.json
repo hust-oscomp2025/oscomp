@@ -31,7 +31,8 @@
 		"ext4_bcache.h": "c",
 		"tree.h": "c",
 		"queue.h": "c",
-		"ext4_debug.h": "c"
+		"ext4_debug.h": "c",
+		"ext4_inode.h": "c"
 	},
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyFunction": true,
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyType": true,
