@@ -159,6 +159,30 @@ struct file_operations {
 #define READ_AHEAD_SOCKET       8       /* 套接字预读大小 */
 #define READ_AHEAD_TTY          4       /* 终端预读大小 */
 
+/**
+ * struct kstat - Kernel file stat structure
+ * Holds all the filesystem metadata information about a file
+ */
+struct kstat {
+    uint64_t     dev;     /* Device ID containing file */
+    uint64_t     ino;     /* File inode number */
+    fmode_t      mode;    /* File mode and type */
+    uint32_t     nlink;   /* Number of hard links */
+    uid_t        uid;     /* User ID of owner */
+    gid_t        gid;     /* Group ID of owner */
+    uint64_t     rdev;    /* Device ID (if special file) */
+    uint64_t     size;    /* File size in bytes */
+    uint32_t     blksize; /* Block size for filesystem I/O */
+    uint64_t     blocks;  /* Number of 512B blocks allocated */
+    
+    /* Time values with nanosecond precision */
+    struct timespec64 atime; /* Last access time */
+    struct timespec64 mtime; /* Last modification time */
+    struct timespec64 ctime; /* Last status change time */
+    struct timespec64 btime; /* Creation (birth) time */
+};
+
+
 
 
 #endif /* _FILE_H */
