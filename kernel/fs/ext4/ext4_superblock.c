@@ -3,10 +3,10 @@
 #include <kernel/fs/vfs/superblock.h>
 #include <kernel/mm/kmalloc.h>
 
-#include <vendor/lwext4/include/ext4.h>
-#include <vendor/lwext4/include/ext4_inode.h>
-#include <vendor/lwext4/include/ext4_super.h>
-#include <vendor/lwext4/include/ext4_fs.h>
+#include <kernel/fs/lwext4/ext4.h>
+#include <kernel/fs/lwext4/ext4_inode.h>
+#include <kernel/fs/lwext4/ext4_super.h>
+#include <kernel/fs/lwext4/ext4_fs.h>
 
 /* Forward declarations */
 static int ext4_read_inode(struct inode *inode);
@@ -33,7 +33,7 @@ const struct superblock_operations ext4_superblock_operations = {
 static int ext4_read_inode(struct inode *inode) {
     /* This is implemented in ext4_inode_operations.c */
     extern int ext4_inode_init(struct superblock *sb, struct inode *inode, uint32_t ino);
-    return ext4_inode_init(inode->i_sb, inode, inode->i_ino);
+    return ext4_inode_init(inode->i_superblock, inode, inode->i_ino);
 }
 
 /**
@@ -45,19 +45,20 @@ static int ext4_read_inode(struct inode *inode) {
  */
 static int ext4_write_inode(struct inode *inode, int wait) {
     struct ext4_inode_ref inode_ref;
-    struct ext4_fs *fs = inode->i_sb->s_fs_info;
+    struct ext4_fs *e_fs = inode->i_superblock->s_fs_info;
+	struct ext4_sblock *e_sb = &e_fs->sb;
     int ret;
     
-    if (!inode || !fs)
+    if (!inode || !e_fs)
         return -EINVAL;
     
     /* Get the ext4 inode reference */
-    ret = ext4_fs_get_inode_ref(fs, inode->i_ino, &inode_ref);
+    ret = ext4_fs_get_inode_ref(e_fs, inode->i_ino, &inode_ref);
     if (ret != 0)
         return ret;
     
     /* Update the ext4 inode from VFS inode */
-    ext4_inode_set_mode(fs->sb, inode_ref.inode, inode->i_mode);
+    ext4_inode_set_mode(e_sb, inode_ref.inode, inode->i_mode);
     ext4_inode_set_uid(inode_ref.inode, inode->i_uid);
     ext4_inode_set_gid(inode_ref.inode, inode->i_gid);
     ext4_inode_set_size(inode_ref.inode, inode->i_size);
@@ -68,7 +69,7 @@ static int ext4_write_inode(struct inode *inode, int wait) {
     
     /* Sync the inode if requested */
     if (wait) {
-        ret = ext4_fs_sync_inode(fs, inode_ref.inode);
+        ret = ext4_fs_sync_inode(e_fs, inode_ref.inode);
     }
     
     /* Release the ext4 inode reference */

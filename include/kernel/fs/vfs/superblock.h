@@ -6,7 +6,7 @@
 #include <util/spinlock.h>
 
 struct fsType;
-struct super_operations;
+struct superblock_operations;
 struct dentry;
 
 /* Superblock structure representing a mounted filesystem */
@@ -65,7 +65,7 @@ struct superblock {
 	time_t s_time_max; // Latest time the fs can represent
 	                   // 取决于文件系统自身的属性，例如ext4的时间戳范围是1970-2106
 
-	const struct super_operations* s_operations; // Superblock operations
+	const struct superblock_operations* s_operations; // Superblock operations
 };
 
 /* Function prototypes */
@@ -95,7 +95,7 @@ struct statfs {
 // ... existing code ...
 
 /* Superblock operations supported by all filesystems */
-struct super_operations {
+struct superblock_operations {
 	/* Inode lifecycle management */
 	struct inode* (*alloc_inode)(struct superblock* sb);
 	void (*destroy_inode)(struct inode* inode);
