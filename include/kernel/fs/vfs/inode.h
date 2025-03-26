@@ -10,6 +10,9 @@
 
 extern struct hashtable inode_hashtable;
 
+/* File permission and type bits */
+typedef unsigned short umode_t;
+
 /* File types */
 #define S_IFMT 0170000   /* Mask for file type */
 #define S_IFREG 0100000  /* Regular file */
@@ -275,15 +278,6 @@ struct inode_operations {
 #define ACL_TYPE_ACCESS   (0x0000)  /* POSIX access ACL */
 #define ACL_TYPE_DEFAULT  (0x0001)  /* POSIX default ACL */
 
-/* Complete set of file type macros */
-#define S_IFMT  00170000   /* bit mask for the file type bit field */
-#define S_IFSOCK 0140000   /* socket */
-#define S_IFLNK  0120000   /* symbolic link */
-#define S_IFREG  0100000   /* regular file */
-#define S_IFBLK  0060000   /* block device */
-#define S_IFDIR  0040000   /* directory */
-#define S_IFCHR  0020000   /* character device */
-#define S_IFIFO  0010000   /* FIFO */
 
 /* File type check macros */
 #define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)

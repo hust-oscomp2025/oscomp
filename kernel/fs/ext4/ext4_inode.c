@@ -56,7 +56,6 @@ static int ext4_vfs_atomic_open(struct inode *inode, struct dentry *dentry,
                              umode_t create_mode);
 static int ext4_vfs_tmpfile(struct inode *inode, struct dentry *dentry, umode_t mode);
 
-static inline void ext4_timestamp_to_timespec64(uint32_t timestamp, struct timespec64 *ts);
 
 /**
  * ext4_file_inode_operations - Operations for regular files
@@ -922,19 +921,6 @@ static int ext4_vfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 }
 
 
-/**
- * ext4_timestamp_to_timespec64 - Convert ext4 timestamp to timespec64
- * @timestamp: ext4 timestamp (uint32)
- * @ts: pointer to timespec64 structure to fill
- *
- * Converts an ext4 timestamp value to the VFS timespec64 format
- */
-static inline void ext4_timestamp_to_timespec64(uint32_t timestamp, struct timespec64 *ts)
-{
-    /* Unix epoch time is stored in seconds */
-    ts->tv_sec = timestamp;
-    ts->tv_nsec = 0;
-}
 
 
 

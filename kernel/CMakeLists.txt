@@ -34,6 +34,16 @@ target_include_directories(riscv-pke PRIVATE
 
 )
 
+# 添加 lwext4 静态库
+add_library(lwext4 STATIC IMPORTED)
+set_target_properties(lwext4 PROPERTIES IMPORTED_LOCATION ${CMAKE_SOURCE_DIR}/kernel/lib/liblwext4.a)
+# 链接 lwext4 静态库
+target_link_libraries(riscv-pke PRIVATE lwext4)
+
+
+
+
+
 # 设置链接脚本
 set_target_properties(riscv-pke PROPERTIES LINK_FLAGS "-T ${CMAKE_SOURCE_DIR}/kernel/kernel.lds")
 

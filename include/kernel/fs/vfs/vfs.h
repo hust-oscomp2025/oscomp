@@ -14,6 +14,7 @@
 #include <kernel/fs/vfs/writeback.h>
 #include <kernel/fs/vfs/fiemap.h>
 #include <kernel/fs/vfs/buffer_head.h>
+#include <kernel/fs/vfs/vfsmount.h>
 
 #include <kernel/types.h>
 #include <util/list.h>
@@ -120,7 +121,7 @@ int vfs_init(void);
 #define vfs_fsync file_sync
 
 
-struct vfsmount* vfs_kern_mount(struct fsType* type, int flags,
+struct vfsmount* vfs_kern_mount(struct fstype* type, int flags,
 				const char* name, void* data);
 
 /* File operations */

@@ -65,12 +65,12 @@ typedef int bool;
 typedef uint64 uaddr;
 
 // Physical/virtual addresses (64-bit on your architecture)
-typedef uint64 paddr_t; // Physical address
-typedef uint64 vaddr_t; // Virtual address
+typedef uint64 paddr_t;  // Physical address
+typedef uint64 vaddr_t;  // Virtual address
 typedef uint64 time64_t; // 64-bit time value
 
 // User/kernel space pointers (for clarity in interfaces)
-typedef void* kptr_t;	     // Kernel pointer
+typedef void* kptr_t;        // Kernel pointer
 typedef void* __user uptr_t; // User space pointer
 
 // fs相关
@@ -81,60 +81,85 @@ typedef void* __user uptr_t; // User space pointer
 
 /* Basic time types and structures */
 
-/* 
+/*
  * Time value with nanosecond resolution
  * Represents time as seconds and nanoseconds since the Epoch (1970-01-01 00:00:00 +0000)
  */
 struct timespec {
-    time_t  tv_sec;     /* seconds */
-    long    tv_nsec;    /* nanoseconds */
+	time_t tv_sec; /* seconds */
+	long tv_nsec;  /* nanoseconds */
 };
 
 // timespec64 structure if not already defined
 struct timespec64 {
-    time64_t tv_sec;        /* seconds */
-    long     tv_nsec;       /* nanoseconds */
+	time64_t tv_sec; /* seconds */
+	long tv_nsec;    /* nanoseconds */
 };
 
-/* 
+/*
  * Time value with microsecond resolution
  * Used in many system calls that pre-date nanosecond precision
  */
 struct timeval {
-    time_t      tv_sec;     /* seconds */
-    suseconds_t tv_usec;    /* microseconds */
+	time_t tv_sec;       /* seconds */
+	suseconds_t tv_usec; /* microseconds */
 };
 
 /*
  * POSIX-compatible time zone structure
  */
 struct timezone {
-    int tz_minuteswest;     /* minutes west of Greenwich */
-    int tz_dsttime;         /* type of DST correction */
+	int tz_minuteswest; /* minutes west of Greenwich */
+	int tz_dsttime;     /* type of DST correction */
 };
 
 /*
  * Timer interval specification
  */
 struct itimerspec {
-    struct timespec it_interval;    /* timer interval */
-    struct timespec it_value;       /* initial expiration */
+	struct timespec it_interval; /* timer interval */
+	struct timespec it_value;    /* initial expiration */
 };
 
-//vma
+/*ERRNO TYPES*/
+#define MAX_ERRNO 4095L
+#define IS_ERR_VALUE(x) ((unsigned long)(x) >= (unsigned long)-MAX_ERRNO)
+
+#define ERR_PTR(err) ((void*)((long)(err)))
+#define PTR_ERR(ptr) ((long)(ptr))
+#define IS_ERR(ptr) IS_ERR_VALUE((unsigned long)(ptr))
+// clang-format off
+#define CHECK_PTR(ptr, errno_val) \
+    do { if (unlikely(!(ptr) || IS_ERR(ptr))) return (errno_val); } while (0)
+
+#define IS_INVALID(ptr) (!(ptr) || IS_ERR(ptr))
+
+#define CHECK_PTRS(errno_val, ...)                         \
+		do {                                                                \
+			void* __ptrs[] = { (void*)__VA_ARGS__ };                        \
+			for (size_t __i = 0; __i < sizeof(__ptrs)/sizeof(void*); ++__i) { \
+				if (IS_INVALID(__ptrs[__i]))                                \
+					return (errno_val);                                     \
+			}                                                               \
+		} while (0)
+#define CHECK_RET(ret, errno_val) \
+	do { if (unlikely((ret) < 0)) return (errno_val); } while (0)
+// clang-format on
+
+// vma
 /* Virtual memory fault return type */
 typedef unsigned int vm_fault_t;
 /* VM fault status codes */
-#define VM_FAULT_OOM        0x000001
-#define VM_FAULT_SIGBUS     0x000002
-#define VM_FAULT_MAJOR      0x000004
-#define VM_FAULT_WRITE      0x000008  /* Write access, not read */
-#define VM_FAULT_HWPOISON   0x000010
-#define VM_FAULT_RETRY      0x000020
-#define VM_FAULT_NOPAGE     0x000040  /* No page was found */
-#define VM_FAULT_LOCKED     0x000080
-#define VM_FAULT_DONE_COW   0x000100
-#define VM_FAULT_NEEDDSYNC  0x000200
+#define VM_FAULT_OOM 0x000001
+#define VM_FAULT_SIGBUS 0x000002
+#define VM_FAULT_MAJOR 0x000004
+#define VM_FAULT_WRITE 0x000008 /* Write access, not read */
+#define VM_FAULT_HWPOISON 0x000010
+#define VM_FAULT_RETRY 0x000020
+#define VM_FAULT_NOPAGE 0x000040 /* No page was found */
+#define VM_FAULT_LOCKED 0x000080
+#define VM_FAULT_DONE_COW 0x000100
+#define VM_FAULT_NEEDDSYNC 0x000200
 
 // file system type
 /*
@@ -147,7 +172,6 @@ typedef uint64 loff_t;
 typedef uint64_t sector_t; /* 64-bit sector number */
 /* File permissions and type mode */
 typedef unsigned int __poll_t;
-
 
 struct dir {
 	char name[MAX_FILE_NAME_LEN];
@@ -162,57 +186,13 @@ struct istat {
 	int st_blocks;
 };
 
-/* Mount flags */
-#define MS_RDONLY 1        // Mount read-only
-#define MS_NOSUID 2        // Ignore suid and sgid bits
-#define MS_NODEV 4         // Disallow access to device special files
-#define MS_NOEXEC 8        // Disallow program execution
-#define MS_SYNCHRONOUS 16  // Writes are synced at once
-#define MS_REMOUNT 32      // Remount with different flags
-#define MS_MANDLOCK 64     // Allow mandatory locks on this FS
-#define MS_DIRSYNC 128     // Directory modifications are synchronous
-#define MS_NOATIME 1024    // Do not update access times
-#define MS_NODIRATIME 2048 // Do not update directory access times
-
-/*
- * File mode fmode_t flags
- */
-typedef uint32 fmode_t;
-/* Access modes */
-#define FMODE_READ (1U << 0)  /* File is open for reading */
-#define FMODE_WRITE (1U << 1) /* File is open for writing */
-#define FMODE_EXEC (1U << 5)  /* File is executable */
-
-/* Seeking flags */
-#define FMODE_LSEEK (1U << 2)  /* File is seekable */
-#define FMODE_PREAD (1U << 3)  /* File supports pread */
-#define FMODE_PWRITE (1U << 4) /* File supports pwrite */
-
-/* Special access flags */
-#define FMODE_ATOMIC_POS (1U << 12) /* File needs atomic access to position */
-#define FMODE_RANDOM (1U << 13)     /* File will be accessed randomly */
-#define FMODE_PATH (1U << 14)       /* O_PATH flag - minimal file access */
-#define FMODE_STREAM (1U << 16)     /* File is stream-like */
-
-/* Permission indicators */
-#define FMODE_WRITER (1U << 17)    /* Has write access to underlying fs */
-#define FMODE_CAN_READ (1U << 18)  /* Has read methods */
-#define FMODE_CAN_WRITE (1U << 19) /* Has write methods */
-
-/* State flags */
-#define FMODE_OPENED (1U << 20)  /* File has been opened */
-#define FMODE_CREATED (1U << 21) /* File was created */
-
-/* Optimization flags */
-#define FMODE_NOWAIT (1U << 22)      /* Return -EAGAIN if I/O would block */
-#define FMODE_CAN_ODIRECT (1U << 24) /* Supports direct I/O */
-#define FMODE_BUF_RASYNC (1U << 28)  /* Supports async buffered reads */
-#define FMODE_BUF_WASYNC (1U << 29)  /* Supports async buffered writes */
+typedef long __fsword_t;
+typedef unsigned long fsblkcnt_t;
+typedef struct { int __val[2]; } __fsid_t;
 
 
-
-/* File permission and type bits */
-typedef unsigned short umode_t;
+#define READ    0
+#define WRITE   1
 
 
 #endif

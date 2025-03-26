@@ -67,22 +67,22 @@
  * Holds all the filesystem metadata information about a file
  */
 struct kstat {
-    uint64_t     st_dev;     /* Device ID containing file */
-    uint64_t     st_ino;     /* File inode number */
-    fmode_t      st_mode;    /* File mode and type */
-    uint32_t     st_nlink;   /* Number of hard links */
-    uid_t        st_uid;     /* User ID of owner */
-    gid_t        st_gid;     /* Group ID of owner */
-    uint64_t     st_rdev;    /* Device ID (if special file) */
-    uint64_t     st_size;    /* File size in bytes */
-    uint32_t     st_blksize; /* Block size for filesystem I/O */
-    uint64_t     st_blocks;  /* Number of 512B blocks allocated */
+    uint64     dev;     /* Device ID containing file */
+    uint64     ino;     /* File inode number */
+    fmode_t      mode;    /* File mode and type */
+    uint32     nlink;   /* Number of hard links */
+    uid_t        uid;     /* User ID of owner */
+    gid_t        gid;     /* Group ID of owner */
+    uint64     rdev;    /* Device ID (if special file) */
+    uint64     size;    /* File size in bytes */
+    uint32     blksize; /* Block size for filesystem I/O */
+    uint64     blocks;  /* Number of 512B blocks allocated */
     
     /* Time values with nanosecond precision */
-    struct timespec64 st_atime; /* Last access time */
-    struct timespec64 st_mtime; /* Last modification time */
-    struct timespec64 st_ctime; /* Last status change time */
-    struct timespec64 st_btime; /* Creation (birth) time */
+    struct timespec64 atime; /* Last access time */
+    struct timespec64 mtime; /* Last modification time */
+    struct timespec64 ctime; /* Last status change time */
+    struct timespec64 btime; /* Creation (birth) time */
 };
 
 /**
@@ -104,16 +104,16 @@ struct statfs {
  * Used by the VFS layer for all filesystem operations
  */
 struct kstatfs {
-    uint64_t f_type;    /* Type of filesystem */
-    uint64_t f_bsize;   /* Optimal transfer block size */
-    uint64_t f_blocks;  /* Total data blocks in filesystem */
-    uint64_t f_bfree;   /* Free blocks in filesystem */
-    uint64_t f_bavail;  /* Free blocks available to unprivileged user */
-    uint64_t f_files;   /* Total file nodes in filesystem */
-    uint64_t f_ffree;   /* Free file nodes in filesystem */
-    uint64_t f_namelen; /* Maximum length of filenames */
-    uint64_t f_frsize;  /* Fragment size */
-    uint64_t f_flags;   /* Mount flags */
+    uint64 f_type;    /* Type of filesystem */
+    uint64 f_bsize;   /* Optimal transfer block size */
+    uint64 f_blocks;  /* Total data blocks in filesystem */
+    uint64 f_bfree;   /* Free blocks in filesystem */
+    uint64 f_bavail;  /* Free blocks available to unprivileged user */
+    uint64 f_files;   /* Total file nodes in filesystem */
+    uint64 f_ffree;   /* Free file nodes in filesystem */
+    uint64 f_namelen; /* Maximum length of filenames */
+    uint64 f_frsize;  /* Fragment size */
+    uint64 f_flags;   /* Mount flags */
 };
 
 /**

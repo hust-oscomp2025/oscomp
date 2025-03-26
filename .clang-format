@@ -8,3 +8,7 @@ UseTab: ForIndentation
 ContinuationIndentWidth: 4
 AccessModifierOffset: -4
 PointerAlignment: Left
+
+AllowShortIfStatementsOnASingleLine: true
+AllowShortBlocksOnASingleLine: Always
+AllowShortLoopsOnASingleLine: true

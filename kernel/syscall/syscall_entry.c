@@ -1,7 +1,7 @@
 /*copyright: 2023 farmos*/
-#include <kernel/syscall_ids.h>
-#include <kernel/syscall_file.h>
-#include <kernel/syscall.h>
+#include <kernel/syscall/syscall_ids.h>
+#include <kernel/syscall/syscall_file.h>
+#include <kernel/syscall/syscall.h>
 
 
 // 按字母顺序排列
@@ -56,11 +56,11 @@ struct syscall_function sys_table[] = {
     // [SYS_membarrier] = {sys_membarrier, "membarrier"},
     // [SYS_mkdirat] = {sys_mkdirat, "mkdirat"},
 
-		// [SYS_mmap] = {sys_mmap, "mkdirat"},
-    // [SYS_mount] = {sys_mount, "mount"},
-    //[SYS_mprotect] = {sys_mprotect, "mprotect"},
+	// [SYS_mmap] = {sys_mmap, "mkdirat"},
+    [SYS_mount] = {sys_mount, "mount"},
+    // [SYS_mprotect] = {sys_mprotect, "mprotect"},
     // [SYS_msync] = {sys_msync, "msync"},
-    //[SYS_munmap] = {sys_unmap, "munmap"},
+    // [SYS_munmap] = {sys_unmap, "munmap"},
     // [SYS_nanosleep] = {sys_nanosleep, "nanosleep"},
     // [SYS_openat] = {sys_openat, "openat"},
     // [SYS_pipe2] = {sys_pipe2, "pipe2"},

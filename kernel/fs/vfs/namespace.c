@@ -188,7 +188,7 @@ void put_mount(struct vfsmount* mnt) {
 
 		/* Decrease superblock reference count */
 		if (sb)
-			drop_super(sb);
+			superblock_put(sb);
 
 		/* Free the mount structure */
 		kfree(mnt);
@@ -257,7 +257,7 @@ bool is_mounted(struct dentry* dentry) {
  * do_mount - Mount a filesystem
  * @dev_name: Device name
  * @path: Mount point path
- * @fsType: Filesystem type
+ * @fstype: Filesystem type
  * @flags: Mount flags
  * @data: Filesystem-specific data
  *
@@ -265,7 +265,7 @@ bool is_mounted(struct dentry* dentry) {
  *
  * Returns 0 on success, negative error code otherwise
  */
-int do_mount(const char* dev_name, const char* path, const char* fsType, unsigned long flags,
+int do_mount(const char* dev_name, const char* path, const char* fstype, unsigned long flags,
              void* data) {
 	struct vfsmount* mnt;
 	struct path target_path;
@@ -273,7 +273,7 @@ int do_mount(const char* dev_name, const char* path, const char* fsType, unsigne
 	int error;
 
 	/* Look up filesystem type */
-	type = fsType_lookup(fsType);
+	type = fstype_lookup(fstype);
 	if (!type)
 		return -ENODEV;
 
@@ -296,7 +296,7 @@ int do_mount(const char* dev_name, const char* path, const char* fsType, unsigne
 	}
 
 	/* Set up mount point */
-	mnt->mnt_mountpoint = dget(target_path.dentry);
+	mnt->mnt_mountpoint = dentry_get(target_path.dentry);
 	mnt->mnt_parent = get_mount(target_path.mnt);
 
     /* Add to parent's children list */

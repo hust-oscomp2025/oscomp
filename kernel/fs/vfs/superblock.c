@@ -10,62 +10,16 @@
 
 
 
-static struct superblock* __alloc_super(struct fsType* type);
-
-/**
- * __alloc_super - Allocate a new superblock from a fsType
- * @type: Filesystem type
- *
- * Allocates and initializes a new superblock structure
- *
- * Returns a new superblock or NULL on failure
- */
-static struct superblock* __alloc_super(struct fsType* type) {
-	struct superblock* sb;
-
-	sb = kmalloc(sizeof(struct superblock));
-	if (!sb)
-		return NULL;
-
-	/* Initialize to zeros */
-	memset(sb, 0, sizeof(struct superblock));
-
-	/* Initialize lists */
-	INIT_LIST_HEAD(&sb->s_list_all_inodes);
-	spinlock_init(&sb->s_list_all_inodes_lock);
-
-	INIT_LIST_HEAD(&sb->s_list_clean_inodes);
-	INIT_LIST_HEAD(&sb->s_list_dirty_inodes);
-	INIT_LIST_HEAD(&sb->s_list_io_inodes);
-	spinlock_init(&sb->s_list_inode_states_lock);
-
-	INIT_LIST_HEAD(&sb->s_list_mounts);
-
-	INIT_LIST_HEAD(&sb->s_node_fsType);
-
-	/* Initialize locks */
-	spinlock_init(&sb->s_lock);
-	spinlock_init(&sb->s_list_mounts_lock);
-
-	/* Set up reference counts */
-	sb->s_refcount = 1; /* Initial reference */
-	//sb->s_active = 0;  /* No active references yet */
-
-	/* Set filesystem type */
-	sb->s_fsType = type;
-
-	return sb;
-}
 
 
 /**
- * drop_super - Decrease reference count of superblock
+ * superblock_put - Decrease reference count of superblock
  * @sb: Superblock to drop reference to
  *
  * Decrements the reference count and frees the superblock if
  * it reaches zero.
  */
-void drop_super(struct superblock* sb) {
+void superblock_put(struct superblock* sb) {
 	if (!sb)
 		return;
 	if (atomic_dec_and_test(&sb->s_refcount)) {
@@ -88,10 +42,10 @@ static void deactivate_super(struct superblock* sb) {
 	if (sb->s_operations && sb->s_operations->put_super)
 		sb->s_operations->put_super(sb);
 
-	spinlock_lock(&sb->s_fsType->fs_list_s_lock);
+	spinlock_lock(&sb->s_fstype->fs_list_superblock_lock);
 	/* Remove from filesystem's list */
-	list_del(&sb->s_node_fsType);
-	spinlock_unlock(&sb->s_fsType->fs_list_s_lock);
+	list_del(&sb->s_node_fstype);
+	spinlock_unlock(&sb->s_fstype->fs_list_superblock_lock);
 
 	/* Free any filesystem-specific info */
 	if (sb->s_fs_info)
@@ -219,21 +173,84 @@ void generic_shutdown_super(struct superblock* sb) {
 	spin_unlock(&sb->s_list_all_inodes_lock);
 
 	/* Free root dentry */
-	if (sb->s_global_root_dentry) {
-		dput(sb->s_global_root_dentry);
-		sb->s_global_root_dentry = NULL;
+	if (sb->s_root) {
+		dput(sb->s_root);
+		sb->s_root = NULL;
 	}
 
 	/* Decrease active count */
 	deactivate_super_safe(sb);
 
 	/* Drop reference */
-	drop_super(sb);
+	superblock_put(sb);
 }
 
 
 
+/**
+ * superblock_acquireMount - Create a mount point for a superblock
+ * @sb: Superblock to create mount for
+ * @flags: Mount flags
+ * @device_path: Path to the device being mounted (may be NULL)
+ *
+ * Creates a new mount structure for the given superblock,
+ * either using filesystem-specific mount creation if available,
+ * or the generic mount creation method.
+ *
+ * The returned mount has its reference count set to 1.
+ *
+ * Returns: A new mount structure on success, NULL on failure
+ */
+struct vfsmount* superblock_acquireMount(struct superblock* sb, int flags, const char* device_path) {
+    struct vfsmount* mnt = NULL;
+    static int mount_id = 0;
+    
+    if (!sb || !sb->s_root)
+        return NULL;
+        
+    // First try filesystem-specific mount creation if available
+    if (sb->s_operations && sb->s_operations->create_mount) {
+        mnt = sb->s_operations->create_mount(sb, flags, device_path, NULL);
+        if (mnt)
+            return mnt;
+    }
+    
+    // Fall back to generic mount creation
+    mnt = kmalloc(sizeof(struct vfsmount));
+	CHECK_PTR(mnt, ERR_PTR(-ENOMEM));
 
+    // Initialize the mount structure
+    memset(mnt, 0, sizeof(struct vfsmount));
+    atomic_set(&mnt->mnt_refcount, 1);
+    mnt->mnt_superblock = sb;
+    mnt->mnt_root = dentry_get(sb->s_root);
+    mnt->mnt_flags = flags;
+    mnt->mnt_id = mount_id++;
+    
+    // Store device name if provided
+    if (device_path && *device_path) {
+        mnt->mnt_devname = kstrdup(device_path, GFP_KERNEL);
+    }
+    
+    // Initialize list heads
+    INIT_LIST_HEAD(&mnt->mnt_list_children);
+    
+    // Initialize list nodes
+    INIT_LIST_HEAD(&mnt->mnt_node_superblock);
+    INIT_LIST_HEAD(&mnt->mnt_node_parent);
+    INIT_LIST_HEAD(&mnt->mnt_node_global);
+    INIT_LIST_HEAD(&mnt->mnt_node_namespace);
+    
+    // Add to the superblock's mount list
+    spin_lock(&sb->s_list_mounts_lock);
+    list_add(&mnt->mnt_node_superblock, &sb->s_list_mounts);
+    spin_unlock(&sb->s_list_mounts_lock);
+    
+    // Increment superblock reference count
+    grab_super(sb);
+    
+    return mnt;
+}
 
 
 

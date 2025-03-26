@@ -22,6 +22,7 @@
 - [ ] 在`__file_free`中处理f_private字段
 - [x] 用嵌入式哈希表重写inode hash
 - [x] 实现ext4 inode虚函数表
+- [ ] 在初始化ext4 mount时传入ext4全局锁
 
 
 
@@ -33,6 +34,14 @@
 - [ ] 加入一个现代的debugger
 - [ ] 在kmalloc中加入gfp_flags
 - [ ] 重写上下文服务程序
+- [ ] 改造ext4 mount锁（目前是所有mount共享的全局锁）
+- [ ] ext4_sync_fs中加入wait支持
+- [ ] block_device类异步IO
+- [ ] 加入kobject模块
+- [ ] 实现namespace虚拟化
+- [ ] 在copy_to_user中，检查pagefault disabled
+- [ ] 在access_ok中验证用户指针
+- [ ] 完善sys_mount中的文件系统特定数据
 
 ## 小任务
 - [ ] 把readp和writep分离出去

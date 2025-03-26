@@ -708,7 +708,7 @@ static void ext4_trans_abort(struct ext4_mountpoint *mp __unused)
 #endif
 }
 
-
+// deprecated
 int ext4_mount_point_stats(const char *mount_point,
 			   struct ext4_mount_stats *stats)
 {

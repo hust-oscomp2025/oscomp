@@ -36,7 +36,7 @@ struct addrSpace* addrSpace_create(struct inode* inode)
     
     // if (inode && inode->i_superblock) {
     //     struct superblock* sb = inode->i_superblock;
-    //     struct fsType* fs_type = sb->s_fsType;
+    //     struct fstype* fs_type = sb->s_fstype;
         
     //     // 假设每个文件系统类型提供了一个获取 address_space_ops 的函数
     //     // 实际实现中，这可能是文件系统特定的逻辑

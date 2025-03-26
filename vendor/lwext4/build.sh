@@ -9,8 +9,8 @@ if [ -d "build" ]; then
     rm -rf build
 fi
 
-# 创建新的 build 目录并进入
-mkdir build && cd build
+mkdir -p build_riscv64_bare
+cd build_riscv64_bare
 
 # 运行 CMake 配置
 echo "Configuring project with CMake..."

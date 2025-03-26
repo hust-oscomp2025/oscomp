@@ -109,6 +109,47 @@ int vfs_mkdir(struct inode* dir, struct dentry* dentry, fmode_t mode) {
 	return dir->i_op->mkdir(dir, dentry, mode & ~current_task()->umask);
 }
 
+
+
+/**
+ * vfs_kern_mount
+ * @fstype: Filesystem type
+ * @flags: Mount flags
+ * @device_path: 设备的虚拟文件路径 (虚拟文件系统为NULL)，用来解析devid
+ * @data: 最终传递给fs_fill_super解析
+ *
+ * Mounts a filesystem of the specified type.
+ * 这个函数只负责生成挂载点，在后续的mountpoint attachment中会将挂载点关联到目标路径
+ *
+ * Returns the superblock on success, ERR_PTR on failure
+ * 正在优化的vfs_kern_mount函数
+ */
+struct vfsmount* vfs_kern_mount(struct fstype* fstype, int flags, const char* device_path, void* data){
+	CHECK_PTR(fstype, ERR_PTR(-EINVAL));
+	dev_t dev_id = 0;
+	/***** 对于挂载实体设备的处理 *****/
+	if(device_path && *device_path){
+		int ret = lookup_dev_id(device_path, &dev_id);
+		if (ret < 0) {
+			sprint("VFS: Failed to get device ID for %s\n", device_path);
+			return ERR_PTR(ret);
+		}
+	}
+	struct superblock* sb = fstype_acquireSuperblock(fstype, dev_id, data);
+	CHECK_PTR(sb, ERR_PTR(-ENOMEM));
+
+	struct vfsmount* mount = superblock_acquireMount(sb, flags, device_path);
+	CHECK_PTR(mount, ERR_PTR(-ENOMEM));
+	
+
+
+
+	return mount;
+}
+
+
+
+
 /**
  * vfs_rmdir - Remove a directory
  * @dir: Parent directory's inode
@@ -207,7 +248,7 @@ int vfs_init(void)
 
     /* Register built-in filesystems */
     sprint("VFS: Registering built-in filesystems...\n");
-    err = fsType_register_all();
+    err = fstype_register_all();
     if (err < 0) {
         sprint("VFS: Failed to register filesystems\n");
         return err;

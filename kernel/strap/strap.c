@@ -13,7 +13,7 @@
 #include <kernel/riscv.h>
 #include <kernel/sched/sched.h>
 #include <util/string.h>
-#include <kernel/syscall.h>
+#include <kernel/syscall/syscall.h>
 
 
 

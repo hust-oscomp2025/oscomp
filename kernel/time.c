@@ -71,8 +71,8 @@ struct timespec current_fs_time(struct superblock *sb)
     
     /* If filesystem has a specific time granularity, use it */
     /* This would usually be defined in the filesystem's superblock operations */
-    if (sb->s_operations && sb->time_granularity)
-        granularity = sb->time_granularity;
+    if (sb->s_operations && sb->s_time_granularity)
+        granularity = sb->s_time_granularity;
     
     return timespec_trunc(now, granularity);
 }

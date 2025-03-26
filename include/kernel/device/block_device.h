@@ -6,61 +6,84 @@
 #include <util/spinlock.h>
 #include <kernel/fs/vfs/inode.h>
 
-/* Block device structure */
+/*linux-style block_device structure - minimum viable for ext4*/
 struct block_device {
-    dev_t                   bd_dev;        /* Device identifier */
-    struct inode           *bd_inode;      /* Inode of this device */
-    struct superblock     *bd_super;      /* Superblock mounted on this device */
+    dev_t                   bd_dev;         // 设备号 (主设备号 + 次设备号)
+    int                     bd_openers;     // 打开计数
+    struct inode           *bd_inode;       // 对应的 inode
+    struct super_block     *bd_super;       // 挂载的 superblock
     
-    unsigned int            bd_block_size; /* Block size in bytes */
-    unsigned long           bd_nr_blocks;  /* Number of blocks in device */
+    struct list_head        bd_list;        // 所有 bdev 的全局链表
+    unsigned int            bd_block_size;  // 块大小（bytes）
+    uint64_t                bd_nr_blocks;   // 块数量 - ext4需要知道设备大小
     
-    struct block_operations *bd_ops;       /* Block device s_operations */
+    void                   *bd_private;     // 驱动私有数据
+    atomic_t                bd_refcnt;      // 引用计数
+    fmode_t                 bd_mode;        // 打开模式（读/写）
     
-    void                   *bd_private;    /* Private data for driver */
-    spinlock_t              bd_lock;       /* Device lock */
+    spinlock_t              bd_lock;        // 设备访问锁
+    
+    struct block_operations *bd_ops;        // 块设备操作函数
+
+    /* 以下成员可以稍后实现 */
+    /*
+    struct mutex            bd_mutex;       // 打开/关闭保护锁
+    struct list_head        bd_inodes;      // 持有该 bdev 的所有 inode 列表
+    void                   *bd_disk;        // 对应的 genhd (磁盘描述结构)
+    struct block_device    *bd_contains;    // 如果是分区，指向整个磁盘
+    struct hd_geometry     *bd_geometry;    // 几何信息（分区/柱面）
+    struct gendisk         *bd_disk_info;   // 磁盘信息结构（gendisk）
+    struct request_queue   *bd_queue;       // 请求队列（I/O 调度）
+    struct kobject          bd_kobj;        // sysfs 对象
+    struct backing_dev_info *bd_bdi;        // 回写支持信息（writeback）
+    struct bdev_inode      *bd_inode_internal; // bdev 的 internal inode
+    */
 };
 
-/* Block device s_operations */
+/* Block device operations - 最小子集 */
 struct block_operations {
-    /* Basic block I/O */
+    /* 必要的块I/O操作 */
     int (*read_block)(struct block_device *bdev, sector_t sector, 
                       void *buffer, size_t count);
     int (*write_block)(struct block_device *bdev, sector_t sector, 
                        const void *buffer, size_t count);
     
-    /* Cleanup */
+    /* 设备生命周期管理 */
+    int (*open)(struct block_device *bdev, fmode_t mode);
     void (*release)(struct block_device *bdev);
+    
+    /* 设备控制 - ext4可能需要进行一些特定操作 */
+    int (*ioctl)(struct block_device *bdev, unsigned cmd, 
+                 unsigned long arg);
+
+    /* 以下操作可以稍后实现 */
+    /*
+    int (*flush)(struct block_device *bdev);
+    int (*getgeo)(struct block_device *bdev, struct hd_geometry *geo);
+    int (*direct_access)(struct block_device *bdev, sector_t sector,
+                        void **kaddr, unsigned long *pfn);
+    int (*secure_erase)(struct block_device *bdev, sector_t start,
+                      sector_t nsect);
+    */
 };
 
-/* Buffer head - tracks a single block in the buffer cache */
-struct buffer_head {
-    struct block_device *b_bdev;         /* Block device this buffer is from */
-    sector_t            b_blocknr;       /* Block number */
-    size_t              b_size;          /* Block size */
-    unsigned long       b_state;         /* State flags */
-    
-    char               *b_data;          /* Pointer to data block */
-    
-    struct list_head    b_lru;           /* LRU list entry */
-};
+/* Block device 创建和注册函数 */
+struct block_device *alloc_block_device(void);
+void free_block_device(struct block_device *bdev);
 
-/* Buffer head state flags */
-#define BH_Uptodate    0  /* Buffer contains valid data */
-#define BH_Dirty       1  /* Buffer is dirty */
-#define BH_Lock        2  /* Buffer is locked */
-#define BH_Mapped      3  /* Buffer is mapped to disk */
-
-/* Block device registration */
 int register_blkdev(unsigned int major, const char *name, 
                    struct block_operations *ops);
 int unregister_blkdev(unsigned int major, const char *name);
 
-/* Buffer s_operations */
-struct buffer_head *getblk(struct block_device *bdev, sector_t block, size_t size);
-struct buffer_head *bread(struct block_device *bdev, sector_t block, size_t size);
-void brelse(struct buffer_head *bh);
-void mark_buffer_dirty(struct buffer_head *bh);
+/* 获取块设备 */
+struct block_device *get_block_device(dev_t dev, fmode_t mode);
+void put_block_device(struct block_device *bdev);
+
+/* 块设备操作辅助函数 */
+int blkdev_get(struct block_device *bdev, fmode_t mode);
+void blkdev_put(struct block_device *bdev);
+
+/* 缓冲区管理 - 可选但建议实现 */
 int sync_dirty_buffers(struct block_device *bdev);
 
 /* Block layer initialization */
