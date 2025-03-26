@@ -3,6 +3,9 @@
 #include <kernel/mm/kmalloc.h>
 #include <kernel/types.h>
 #include <util/list.h>
+#include <util/string.h>
+
+#include <spike_interface/spike_utils.h>
 
 // 全局块设备链表
 struct list_head all_block_devices;
@@ -16,7 +19,7 @@ struct block_device *alloc_block_device(void) {
     
     memset(bdev, 0, sizeof(struct block_device));
     atomic_set(&bdev->bd_refcnt, 1);  // 初始引用计数为1
-    spin_lock_init(&bdev->bd_lock);
+    spinlock_init(&bdev->bd_lock);
     INIT_LIST_HEAD(&bdev->bd_list);
     
     return bdev;
@@ -28,7 +31,7 @@ void free_block_device(struct block_device *bdev) {
         return;
     
     if (atomic_read(&bdev->bd_refcnt) > 0) {
-        kprintf("Warning: freeing block device with references\n");
+        sprint("Warning: freeing block device with references\n");
     }
     
     kfree(bdev);
@@ -38,11 +41,11 @@ void free_block_device(struct block_device *bdev) {
 struct block_device *get_block_device(dev_t dev, fmode_t mode) {
     struct block_device *bdev = NULL;
     
-    spin_lock(&block_devices_lock);
+    spinlock_lock(&block_devices_lock);
     list_for_each_entry(bdev, &all_block_devices, bd_list) {
         if (bdev->bd_dev == dev) {
             atomic_inc(&bdev->bd_refcnt);
-            spin_unlock(&block_devices_lock);
+            spinlock_unlock(&block_devices_lock);
             
             // 打开设备
             if (blkdev_get(bdev, mode) != 0) {
@@ -53,7 +56,7 @@ struct block_device *get_block_device(dev_t dev, fmode_t mode) {
             return bdev;
         }
     }
-    spin_unlock(&block_devices_lock);
+    spinlock_unlock(&block_devices_lock);
     
     return NULL;
 }
@@ -83,9 +86,9 @@ void blkdev_put(struct block_device *bdev) {
             bdev->bd_ops->release(bdev);
         
         // 从全局列表中移除
-        spin_lock(&block_devices_lock);
+        spinlock_lock(&block_devices_lock);
         list_del(&bdev->bd_list);
-        spin_unlock(&block_devices_lock);
+        spinlock_unlock(&block_devices_lock);
         
         free_block_device(bdev);
     }

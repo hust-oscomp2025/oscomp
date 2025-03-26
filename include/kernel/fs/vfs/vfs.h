@@ -4,7 +4,7 @@
 #include <kernel/fs/vfs/dentry.h>
 #include <kernel/fs/vfs/file.h>
 #include <kernel/fs/vfs/inode.h>
-#include <kernel/fs/vfs/namespace.h>
+//#include <kernel/fs/vfs/namespace.h>
 #include <kernel/fs/vfs/path.h>
 #include <kernel/fs/vfs/superblock.h>
 #include <kernel/fs/vfs/kiocb.h>
@@ -33,17 +33,6 @@ struct nameidata;
 #define PATH_MAX 4096 /* Maximum path length */
 #define NAME_MAX 255  /* Maximum filename length */
 
-/* File open flags */
-#define O_RDONLY 00
-#define O_WRONLY 01
-#define O_RDWR 02
-#define O_CREAT 0100
-#define O_EXCL 0200
-#define O_NOCTTY 0400
-#define O_TRUNC 01000
-#define O_APPEND 02000
-#define O_NONBLOCK 04000
-#define O_DIRECTORY 0200000
 
 /* Seek types */
 #define SEEK_SET 0 /* Set position from beginning of file */
@@ -79,23 +68,6 @@ struct dir_context {
 		     unsigned);
 	loff_t pos; /* Current position in directory */
 };
-/**
- * Internal kernel filesystem statistics
- * Used by the VFS layer for all filesystem operations
- */
-struct kstatfs {
-	uint64_t f_type;    /* Type of filesystem */
-	uint64_t f_bsize;   /* Optimal transfer block size */
-	uint64_t f_blocks;  /* Total data blocks in filesystem */
-	uint64_t f_bfree;   /* Free blocks in filesystem */
-	uint64_t f_bavail;  /* Free blocks available to unprivileged user */
-	uint64_t f_files;   /* Total file nodes in filesystem */
-	uint64_t f_ffree;   /* Free file nodes in filesystem */
-	uint64_t f_namelen; /* Maximum length of filenames */
-	uint64_t f_frsize;  /* Fragment size */
-	uint64_t f_flags;   /* Mount flags */
-};
-
 /**
  * Filename lookup parameters
  */

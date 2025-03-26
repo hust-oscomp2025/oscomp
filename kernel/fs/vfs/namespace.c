@@ -58,11 +58,11 @@ struct vfsmount* lookup_vfsmount(struct dentry* dentry) {
     if (!dentry)
         return NULL;
     
-    spin_lock(&mount_lock);
+    spinlock_lock(&mount_lock);
     mnt = hashtable_lookup(&mount_hashtable, dentry);
     if (mnt)
         get_mount(mnt);
-    spin_unlock(&mount_lock);
+    spinlock_unlock(&mount_lock);
     
     return mnt;
 }
@@ -163,7 +163,7 @@ void put_mount(struct vfsmount* mnt) {
 		struct superblock* sb = mnt->mnt_superblock;
 
 		/* Remove from any lists */
-		spin_lock(&mount_lock);
+		spinlock_lock(&mount_lock);
 
 		/* Remove from superblock's mount list */
 		list_del(&mnt->mnt_node_superblock);
@@ -176,7 +176,7 @@ void put_mount(struct vfsmount* mnt) {
 		/* Remove from global mount list */
 		list_del(&mnt->mnt_node_global);
 
-		spin_unlock(&mount_lock);
+		spinlock_unlock(&mount_lock);
 
 		/* Free resources */
 		if (mnt->mnt_devname)
@@ -209,11 +209,11 @@ struct vfsmount* lookup_vfsmount(struct dentry* dentry) {
     if (!dentry)
         return NULL;
     
-    spin_lock(&mount_lock);
+    spinlock_lock(&mount_lock);
     mnt = hashtable_lookup(&mount_hashtable, dentry);
     if (mnt)
         get_mount(mnt);
-    spin_unlock(&mount_lock);
+    spinlock_unlock(&mount_lock);
     
     return mnt;
 }
@@ -300,7 +300,7 @@ int do_mount(const char* dev_name, const char* path, const char* fstype, unsigne
 	mnt->mnt_parent = get_mount(target_path.mnt);
 
     /* Add to parent's children list */
-    spin_lock(&mount_lock);
+    spinlock_lock(&mount_lock);
     list_add(&mnt->mnt_node_parent, &mnt->mnt_parent->mnt_list_children);
     
     /* Add to global mount list */
@@ -313,14 +313,14 @@ int do_mount(const char* dev_name, const char* path, const char* fstype, unsigne
 	if (current_task()->fs) {
 		struct mnt_namespace* ns = current_task()->fs->mnt_ns;
 		if (ns) {
-			spin_lock(&ns->lock);
+			spinlock_lock(&ns->lock);
 			list_add(&mnt->mnt_node_namespace, &ns->mount_list);
 			ns->mount_count++;
-			spin_unlock(&ns->lock);
+			spinlock_unlock(&ns->lock);
 		}
 	}
 
-	spin_unlock(&mount_lock);
+	spinlock_unlock(&mount_lock);
 
 	path_put(&target_path);
 	return 0;
@@ -340,9 +340,9 @@ int do_umount(struct vfsmount* mnt, int flags) {
 		return -EINVAL;
 
 	/* Check if it has child mounts */
-	spin_lock(&mount_lock);
+	spinlock_lock(&mount_lock);
 	if (!list_empty(&mnt->mnt_list_children)) {
-		spin_unlock(&mount_lock);
+		spinlock_unlock(&mount_lock);
 		return -EBUSY;
 	}
 
@@ -350,10 +350,10 @@ int do_umount(struct vfsmount* mnt, int flags) {
 	if (current_task()->fs) {
 		struct mnt_namespace* ns = current_task()->fs->mnt_ns;
 		if (ns) {
-			spin_lock(&ns->lock);
+			spinlock_lock(&ns->lock);
 			list_del(&mnt->mnt_node_namespace);
 			ns->mount_count--;
-			spin_unlock(&ns->lock);
+			spinlock_unlock(&ns->lock);
 		}
 	}
 
@@ -367,7 +367,7 @@ int do_umount(struct vfsmount* mnt, int flags) {
 		list_del(&mnt->mnt_node_parent);
 	}
 
-	spin_unlock(&mount_lock);
+	spinlock_unlock(&mount_lock);
 
 	/* Decrease reference count (may free the mount) */
 	put_mount(mnt);
@@ -396,13 +396,13 @@ int iterate_mounts(int (*f)(struct vfsmount*, void*), void* arg, struct vfsmount
         res = iterate_mount_subtree(f, arg, root);
     } else {
         /* Traverse all mounts */
-        spin_lock(&mount_lock);
+        spinlock_lock(&mount_lock);
         list_for_each_entry(mnt, &global_mounts_list, mnt_node_global) {
             res = f(mnt, arg);
             if (res)
                 break;
         }
-        spin_unlock(&mount_lock);
+        spinlock_unlock(&mount_lock);
     }
     
     return res;

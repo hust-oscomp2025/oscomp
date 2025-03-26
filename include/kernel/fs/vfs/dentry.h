@@ -7,7 +7,10 @@
 #include <util/list.h>
 #include <util/qstr.h>
 #include <util/spinlock.h>
+
+
 struct dentry_operations;
+struct iattr;
 /*
  * Directory entry (dentry) structure
  *
@@ -84,6 +87,9 @@ bool is_mounted(struct dentry *dentry);
 /*用于网络文件系统等需要验证缓存有效性的场景*/
 int dentry_revalidate(struct dentry* dentry, unsigned int flags);
 
+
+int setattr_prepare(struct dentry* dentry, struct iattr* attr);
+int notify_change(struct dentry* dentry, struct iattr* attr);
 
 /*inode hook functions*/
 int dentry_permission(struct dentry* dentry, int mask);

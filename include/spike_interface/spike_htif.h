@@ -1,8 +1,7 @@
 #ifndef _SPIKE_HTIF_H_
 #define _SPIKE_HTIF_H_
 
-#include <stdint.h>
-#include <sys/types.h>
+#include <kernel/types.h>
 
 #if __riscv_xlen == 64
 #define TOHOST_CMD(dev, cmd, payload) \
@@ -85,9 +84,6 @@
 #define HTIFSYS_lstat 1039
 #define HTIFSYS_time 1062
 
-#define IS_ERR_VALUE(x) ((unsigned long)(x) >= (unsigned long)-4096)
-#define ERR_PTR(x) ((void*)(long)(x))
-#define PTR_ERR(x) ((long)(x))
 
 
 extern __uint64_t htif;

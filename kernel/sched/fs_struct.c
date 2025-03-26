@@ -1,5 +1,5 @@
 #include <kernel/sched/fs_struct.h>
-#include <kernel/fs/vfs/namespace.h>
+//#include <kernel/fs/vfs/namespace.h>
 #include <kernel/fs/vfs/vfs.h>
 #include <kernel/mm/kmalloc.h>
 #include <util/string.h>
@@ -51,7 +51,7 @@ struct fs_struct *copy_fs_struct(struct fs_struct *old_fs)
     init_fs_struct(new_fs);
     
     /* Copy root and pwd with proper reference counting */
-    spin_lock(&old_fs->lock);
+    spinlock_lock(&old_fs->lock);
     
     if (old_fs->root.dentry) {
         new_fs->root.dentry = get_dentry(old_fs->root.dentry);
@@ -63,7 +63,7 @@ struct fs_struct *copy_fs_struct(struct fs_struct *old_fs)
         new_fs->pwd.mnt = get_mount(old_fs->pwd.mnt);
     }
     
-    spin_unlock(&old_fs->lock);
+    spinlock_unlock(&old_fs->lock);
     
     return new_fs;
 }
@@ -104,7 +104,7 @@ void set_fs_root(struct fs_struct *fs, const struct path *path)
     if (!fs || !path)
         return;
     
-    spin_lock(&fs->lock);
+    spinlock_lock(&fs->lock);
     
     /* Save old path for cleaning up */
     old_root = fs->root;
@@ -113,7 +113,7 @@ void set_fs_root(struct fs_struct *fs, const struct path *path)
     fs->root.dentry = get_dentry(path->dentry);
     fs->root.mnt = get_mount(path->mnt);
     
-    spin_unlock(&fs->lock);
+    spinlock_unlock(&fs->lock);
     
     /* Release references to old path */
     path_destroy(&old_root);
@@ -133,7 +133,7 @@ void set_fs_pwd(struct fs_struct *fs, const struct path *path)
     if (!fs || !path)
         return;
     
-    spin_lock(&fs->lock);
+    spinlock_lock(&fs->lock);
     
     /* Save old path for cleaning up */
     old_pwd = fs->pwd;
@@ -142,7 +142,7 @@ void set_fs_pwd(struct fs_struct *fs, const struct path *path)
     fs->pwd.dentry = get_dentry(path->dentry);
     fs->pwd.mnt = get_mount(path->mnt);
     
-    spin_unlock(&fs->lock);
+    spinlock_unlock(&fs->lock);
     
     /* Release references to old path */
     path_destroy(&old_pwd);

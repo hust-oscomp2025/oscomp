@@ -2,12 +2,14 @@
 #define _FILE_H
 
 #include <kernel/fs/vfs/vfs.h>
+#include <kernel/fs/vfs/path.h>
 #include <kernel/types.h>
 #include <util/atomic.h>
 #include <util/spinlock.h>
 
 typedef uint32 fmode_t;
-
+struct io_vector;
+struct io_vector_iterator;
 /**
  * Represents an open file in the system
  */
@@ -61,8 +63,8 @@ void file_put(struct file* file);
 /*位置与访问管理*/
 int file_denyWrite(struct file* file);
 int file_allowWrite(struct file* file);
-inline bool file_readable(struct file* file);
-inline bool file_writable(struct file* file);
+// inline bool file_readable(struct file* file);
+// inline bool file_writable(struct file* file);
 
 /*状态管理与通知*/
 int file_setAccessed(struct file *file);
@@ -82,71 +84,6 @@ ssize_t file_writev(struct file *file, const struct io_vector *vec,
 	 unsigned long vlen, loff_t *pos);
 
 
-/**
- * File operation structure - provides methods for file manipulation
- */
-struct file_operations {
-	/* Position manipulation */
-	loff_t (*llseek)(struct file*, loff_t, int);
-
-	/* Basic I/O */
-	ssize_t (*read)(struct file*, char*, size_t, loff_t*);
-	ssize_t (*write)(struct file*, const char*, size_t, loff_t*);
-
-	/* Vectored I/O */
-	ssize_t (*read_iter)(struct kiocb*, struct io_vector_iterator*);
-	ssize_t (*write_iter)(struct kiocb*, struct io_vector_iterator*);
-
-	/* Directory s_operations */
-	int (*iterate)(struct file*, struct dir_context*);
-	int (*iterate_shared)(struct file*, struct dir_context*);
-
-	/* Polling/selection */
-	__poll_t (*poll)(struct file*, struct poll_table_struct*);
-
-	/* Management s_operations */
-	int (*open)(struct inode*, struct file*);
-	int (*flush)(struct file*);
-	int (*release)(struct inode*, struct file*);
-	int (*fsync)(struct file*, loff_t, loff_t, int datasync);
-
-	/* Memory mapping */
-	int (*mmap)(struct file*, struct vm_area_struct*);
-
-	/* Special s_operations */
-	long (*unlocked_ioctl)(struct file*, unsigned int, unsigned long);
-	int (*fasync)(int, struct file*, int);
-
-	/* Splice s_operations */
-	ssize_t (*splice_read)(struct file*, loff_t*, struct pipe_inode_info*, size_t, unsigned int);
-	ssize_t (*splice_write)(struct pipe_inode_info*, struct file*, loff_t*, size_t, unsigned int);
-
-	/* Space allocation */
-	long (*fallocate)(struct file*, int, loff_t, loff_t);
-};
-
-
-/**
- * Open flags - used when opening files
- */
-#define O_ACCMODE 00000003         /* Access mode mask */
-#define O_RDONLY 00000000          /* Open read-only */
-#define O_WRONLY 00000001          /* Open write-only */
-#define O_RDWR 00000002            /* Open read-write */
-#define O_CREAT 00000100           /* Create if nonexistent */
-#define O_EXCL 00000200            /* Error if already exists */
-#define O_NOCTTY 00000400          /* Don't assign controlling terminal */
-#define O_TRUNC 00001000           /* Truncate to zero length */
-#define O_APPEND 00002000          /* Append to file */
-#define O_NONBLOCK 00004000        /* Non-blocking I/O */
-#define O_DSYNC 00010000           /* Synchronize data */
-#define O_SYNC (O_DSYNC | O_RSYNC) /* Synchronize data and metadata */
-#define O_RSYNC 00040000           /* Synchronize read s_operations */
-#define O_DIRECT 00100000          /* Direct I/O */
-#define O_DIRECTORY 00200000       /* Must be a directory */
-#define O_NOFOLLOW 00400000        /* Don't follow symbolic links */
-#define O_CLOEXEC 02000000         /* Close on exec */
-#define O_PATH 010000000           /* Path-only access */
 
 
 /* 文件预读(readahead)相关常量 */

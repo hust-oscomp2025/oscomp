@@ -13,41 +13,7 @@ extern struct hashtable inode_hashtable;
 /* File permission and type bits */
 typedef unsigned short umode_t;
 
-/* File types */
-#define S_IFMT 0170000   /* Mask for file type */
-#define S_IFREG 0100000  /* Regular file */
-#define S_IFDIR 0040000  /* Directory */
-#define S_IFCHR 0020000  /* Character device */
-#define S_IFBLK 0060000  /* Block device */
-#define S_IFIFO 0010000  /* FIFO */
-#define S_IFLNK 0120000  /* Symbolic link */
-#define S_IFSOCK 0140000 /* Socket */
 
-/* Permission bits */
-#define S_ISUID 0004000 /* Set user ID on execution */
-#define S_ISGID 0002000 /* Set group ID on execution */
-#define S_ISVTX 0001000 /* Sticky bit */
-#define S_IRWXU 0000700 /* User mask */
-#define S_IRUSR 0000400 /* User read permission */
-#define S_IWUSR 0000200 /* User write permission */
-#define S_IXUSR 0000100 /* User execute permission */
-#define S_IRWXG 0000070 /* Group mask */
-#define S_IRGRP 0000040 /* Group read permission */
-#define S_IWGRP 0000020 /* Group write permission */
-#define S_IXGRP 0000010 /* Group execute permission */
-#define S_IRWXO 0000007 /* Others mask */
-#define S_IROTH 0000004 /* Others read permission */
-#define S_IWOTH 0000002 /* Others write permission */
-#define S_IXOTH 0000001 /* Others execute permission */
-
-/* File type check macros */
-#define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
-#define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
-#define S_ISCHR(m) (((m) & S_IFMT) == S_IFCHR)
-#define S_ISBLK(m) (((m) & S_IFMT) == S_IFBLK)
-#define S_ISFIFO(m) (((m) & S_IFMT) == S_IFIFO)
-#define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
-#define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)
 
 /* Attribute flags for iattr */
 #define ATTR_MODE (1 << 0)
@@ -84,13 +50,7 @@ struct iattr {
 };
 
 /* Forward declarations */
-struct dir_context;
-struct kstat;
-struct iattr;
-struct fiemap_extent_info;
-struct addrSpace_ops;
 struct inode_operations;
-struct radixTreeRoot;
 /*
  * Inode structure - core of the filesystem
  */
@@ -180,8 +140,7 @@ int inode_sync_metadata(struct inode* inode, int wait);
 /* Utility functions */
 int inode_isBad(struct inode* inode);
 int inode_checkPermission(struct inode* inode, int mask);
-int setattr_prepare(struct dentry* dentry, struct iattr* attr);
-int notify_change(struct dentry* dentry, struct iattr* attr);
+
 
 // Add to inode.h or extend existing declarations
 #define XATTR_CREATE 0x1    /* Create attribute if it doesn't exist */
@@ -194,56 +153,6 @@ ssize_t inode_listxattr(struct inode* inode, char* list, size_t size);
 int inode_removexattr(struct inode* inode, const char* name);
 
 
-/*
- * Inode operations
- */
-struct inode_operations {
-	/* File operations */
-	struct dentry* (*lookup)(struct inode*, struct dentry*, unsigned int);
-	struct inode* (*create)(struct inode*, struct dentry*, fmode_t, bool);
-	int (*link)(struct dentry*, struct inode*, struct dentry*);
-	int (*unlink)(struct inode*, struct dentry*);
-	int (*symlink)(struct inode*, struct dentry*, const char*);
-	int (*mkdir)(struct inode*, struct dentry*, fmode_t);
-	int (*rmdir)(struct inode*, struct dentry*);
-	int (*mknod)(struct inode*, struct dentry*, fmode_t, dev_t);
-	int (*rename)(struct inode*, struct dentry*, struct inode*, struct dentry*, unsigned int);
-
-	/* Extended attribute operations */
-	int (*setxattr)(struct dentry*, const char*, const void*, size_t, int);
-	ssize_t (*getxattr)(struct dentry*, const char*, void*, size_t);
-	ssize_t (*listxattr)(struct dentry*, char*, size_t);
-	int (*removexattr)(struct dentry*, const char*);
-
-	/* Special file operations */
-	int (*readlink)(struct dentry*, char*, int);
-	int (*get_link)(struct dentry*, struct inode*, struct path*);
-	int (*permission)(struct inode*, int);
-	int (*get_acl)(struct inode*, int);
-	int (*setattr)(struct dentry*, struct iattr*);
-	int (*getattr)(const struct path*, struct kstat*, unsigned int, unsigned int);
-	int (*fiemap)(struct inode*, struct fiemap_extent_info*, uint64, uint64);
-
-	/* Block operations */
-	int (*get_block)(struct inode*, sector_t, struct buffer_head*, int create);
-	sector_t (*bmap)(struct inode*, sector_t);
-	void (*truncate_blocks)(struct inode*, loff_t size);
-
-	/* Direct I/O support */
-	int (*direct_IO)(struct kiocb*, struct io_vector_iterator*);
-    // ACL operations
-    struct posix_acl* (*get_acl)(struct inode*, int);
-    int (*set_acl)(struct inode*, struct posix_acl*, int);
-    // Memory mapping operations
-    vm_fault_t (*page_fault)(struct vm_area_struct *, struct vm_fault *);
-    unsigned long (*get_unmapped_area)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
-
-    // POSIX specific operations
-    int (*atomic_open)(struct inode *, struct dentry *, struct file *, unsigned open_flag, umode_t create_mode);
-    int (*tmpfile)(struct inode *, struct dentry *, umode_t);
-    int (*dentry_open)(struct dentry *, struct file *, const struct cred *);
-
-};
 
 /* Inode state flags */
 #define I_DIRTY (1 << 0)          /* Inode is dirty - needs writing */
@@ -279,14 +188,6 @@ struct inode_operations {
 #define ACL_TYPE_DEFAULT  (0x0001)  /* POSIX default ACL */
 
 
-/* File type check macros */
-#define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)
-#define S_ISLNK(m)  (((m) & S_IFMT) == S_IFLNK)
-#define S_ISREG(m)  (((m) & S_IFMT) == S_IFREG)
-#define S_ISBLK(m)  (((m) & S_IFMT) == S_IFBLK)
-#define S_ISDIR(m)  (((m) & S_IFMT) == S_IFDIR)
-#define S_ISCHR(m)  (((m) & S_IFMT) == S_IFCHR)
-#define S_ISFIFO(m) (((m) & S_IFMT) == S_IFIFO)
 
 #endif /* INODE_H */
 

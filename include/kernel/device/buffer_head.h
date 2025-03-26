@@ -38,7 +38,7 @@ struct buffer_head {
     spinlock_t          b_lock;        /* Buffer lock */
     
     /* 以下成员是可选的，如果需要，可以稍后实现 */
-    /*
+    
     unsigned long       b_end_io;      /* Completion function callback */
     void               *b_private;     /* Reserved for b_end_io */
     struct list_head    b_assoc_buffers; /* Associated buffer operations */

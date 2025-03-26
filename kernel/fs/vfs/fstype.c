@@ -97,20 +97,20 @@ struct superblock* fstype_acquireSuperblock(struct fstype* type, dev_t dev_id, v
 		return NULL;
 
 	/* Lock to protect the filesystem type's superblock list */
-	spin_lock(&type->fs_list_superblock_lock);
+	spinlock_lock(&type->fs_list_superblock_lock);
 	/* Check if a superblock already exists for this device */
 	if (dev_id != 0) {
 		list_for_each_entry(sb, &type->fs_list_superblock, s_node_fstype) {
 			if (sb->s_device_id == dev_id) {
 				/* Found matching superblock - increment reference */
 				//sb->s_refcount++;
-				spin_unlock(&type->fs_list_superblock_lock);
+				spinlock_unlock(&type->fs_list_superblock_lock);
 				return sb;
 			}
 		}
 	}
 	/* No existing superblock found, allocate a new one */
-	spin_unlock(&type->fs_list_superblock_lock);
+	spinlock_unlock(&type->fs_list_superblock_lock);
 
 	sb = __fstype_allocSuperblock(type);
 	CHECK_PTR(sb, ERR_PTR(-ENOMEM));
@@ -128,9 +128,9 @@ struct superblock* fstype_acquireSuperblock(struct fstype* type, dev_t dev_id, v
 
 
 	/* Add to the filesystem's list of superblocks */
-	spin_lock(&type->fs_list_superblock_lock);
+	spinlock_lock(&type->fs_list_superblock_lock);
 	list_add(&sb->s_node_fstype, &type->fs_list_superblock);
-	spin_unlock(&type->fs_list_superblock_lock);
+	spinlock_unlock(&type->fs_list_superblock_lock);
 
 	return sb;
 }

@@ -11,7 +11,6 @@
 #include <kernel/mm/mm_struct.h>
 #include <kernel/mm/mmap.h>
 #include <kernel/mm/vma.h>
-#include <kernel/proc_file.h>
 #include <kernel/riscv.h>
 #include <kernel/sched/process.h>
 #include <kernel/trapframe.h>

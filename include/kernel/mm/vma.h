@@ -78,18 +78,6 @@ struct vm_area_struct {
   spinlock_t vma_lock; // VMA锁
 };
 
-/* VM fault类型及常量定义 */
-typedef int vm_fault_t;
-
-#define VM_FAULT_NOPAGE     0x00 /* 页面故障已成功处理 */
-#define VM_FAULT_MINOR      0x01 /* 次要页面故障 */
-#define VM_FAULT_MAJOR      0x02 /* 主要页面故障 */
-#define VM_FAULT_RETRY      0x04 /* 重试页面故障 */
-#define VM_FAULT_ERROR      0x08 /* 页面故障处理中发生错误 */
-#define VM_FAULT_BADMAP     0x10 /* 错误的映射 */
-#define VM_FAULT_BADACCESS  0x20 /* 错误的访问权限 */
-#define VM_FAULT_SIGBUS     0x40 /* 总线错误信号 */
-#define VM_FAULT_OOM        0x80 /* 内存不足 */
 
 /**
  * 虚拟内存故障信息结构

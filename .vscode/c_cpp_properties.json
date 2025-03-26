@@ -4,16 +4,13 @@
 					"name": "riscv-pke",
 					"includePath": [
 							"${workspaceFolder}/include",
-							"${workspaceFolder}/lib",
-							"${workspaceFolder}/spike_interface",
-							"${workspaceFolder}",
-							"/usr/riscv64-linux-gnu/include"
+							"/usr/lib/gcc-cross/riscv64-linux-gnu/13/include/"
 					],
 					"defines": [
 							"__riscv",
 							"__riscv64"
 					],
-					"compilerPath": "/usr/bin/riscv64-unknown-elf-gcc",
+					"compilerPath": "/usr/bin/riscv64-linux-gnu-gcc",
 					"cStandard": "gnu11",
 					"cppStandard": "gnu++17",
 					"intelliSenseMode": "gcc-x64"

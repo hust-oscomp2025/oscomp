@@ -38,7 +38,9 @@
 		"ext4_super.h": "c",
 		"ext4_fs.h": "c",
 		"ext4_dir.h": "c",
-		"statvfs.h": "c"
+		"statvfs.h": "c",
+		"buffer_head.h": "c",
+		"stat.h": "c"
 	},
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyFunction": true,
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyType": true,

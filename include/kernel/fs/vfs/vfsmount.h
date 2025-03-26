@@ -68,29 +68,4 @@ bool is_mounted(struct dentry* dentry);
 int iterate_mounts(int (*f)(struct vfsmount*, void*), void* arg, struct vfsmount* root);
 
 
-#define MS_RDONLY       1     /* 挂载为只读 */
-#define MS_NOSUID       2     /* 忽略 set-user-ID 和 set-group-ID */
-#define MS_NODEV        4     /* 不解释设备文件 */
-#define MS_NOEXEC       8     /* 禁止执行 */
-#define MS_SYNCHRONOUS  16    /* 同步 I/O */
-#define MS_REMOUNT      32    /* 改变挂载标志 */
-#define MS_MANDLOCK     64    /* 允许强制锁 */
-#define MS_DIRSYNC      128   /* 目录同步 */
-#define MS_NOATIME      1024  /* 不更新访问时间 */
-#define MS_NODIRATIME   2048  /* 不更新目录访问时间 */
-#define MS_BIND         4096  /* 绑定挂载（bind mount）*/
-#define MS_MOVE         8192  /* 移动挂载点 */
-#define MS_REC          16384 /* 递归挂载（bind/move 时用）*/
-#define MS_SILENT       32768 /* 静默挂载，不显示错误信息 */
-#define MS_POSIXACL     (1<<16)  /* 启用 POSIX ACL */
-#define MS_UNBINDABLE   (1<<17)
-#define MS_PRIVATE      (1<<18)
-#define MS_SLAVE        (1<<19)
-#define MS_SHARED       (1<<20)
-#define MS_RELATIME     (1<<21)
-#define MS_KERNMOUNT    (1<<22)
-#define MS_I_VERSION    (1<<23)
-#define MS_STRICTATIME  (1<<24)
-#define MS_LAZYTIME     (1<<25)
-
 #endif

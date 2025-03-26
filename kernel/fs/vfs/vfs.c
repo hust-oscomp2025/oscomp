@@ -73,9 +73,9 @@ struct vfsmount* vfs_kern_mount(struct fsType* type, int flags, const char* name
 	INIT_LIST_HEAD(&mnt->mnt_node_namespace);
 
 	/* Add to superblock's mount list */
-	spin_lock(&sb->s_list_mounts_lock);
+	spinlock_lock(&sb->s_list_mounts_lock);
 	list_add(&mnt->mnt_node_superblock, &sb->s_list_mounts);
-	spin_unlock(&sb->s_list_mounts_lock);
+	spinlock_unlock(&sb->s_list_mounts_lock);
 
 	return mnt;
 }
@@ -140,7 +140,7 @@ struct vfsmount* vfs_kern_mount(struct fstype* fstype, int flags, const char* de
 
 	struct vfsmount* mount = superblock_acquireMount(sb, flags, device_path);
 	CHECK_PTR(mount, ERR_PTR(-ENOMEM));
-	
+
 
 
 
@@ -322,13 +322,13 @@ void put_mount(struct vfsmount *mnt) {
 
   if (atomic_dec_and_test(&mnt->mnt_refcount)) {
     /* Last reference - free the mount */
-    spin_lock(&mount_lock);
+    spinlock_lock(&mount_lock);
     list_del(&mnt->mnt_node_global);
-    spin_unlock(&mount_lock);
+    spinlock_unlock(&mount_lock);
 
-    spin_lock(&mnt->mnt_superblock->s_list_mounts_lock);
+    spinlock_lock(&mnt->mnt_superblock->s_list_mounts_lock);
     list_del(&mnt->mnt_node_superblock);
-    spin_unlock(&mnt->mnt_superblock->s_list_mounts_lock);
+    spinlock_unlock(&mnt->mnt_superblock->s_list_mounts_lock);
 
     dentry_put(mnt->mnt_root);
     if (mnt->mnt_devname)

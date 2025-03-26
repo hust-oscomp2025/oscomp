@@ -6,7 +6,7 @@
 #include <util/spinlock.h>
 
 struct inode;
-
+struct writeback_control;
 /* Memory management */
 struct addrSpace {
 	// struct inode *host;               /* Owning inode */

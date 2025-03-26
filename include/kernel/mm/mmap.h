@@ -25,6 +25,8 @@
 #define PROT_WRITE 0x2 /* 页可写 */
 #define PROT_EXEC 0x4  /* 页可执行 */
 
+struct file;
+
 uint64 do_mmap(struct mm_struct *mm, uint64 addr, size_t length, int prot,
                uint64 flags, struct file *file, uint64 pgoff);
 int do_unmap(struct mm_struct *mm, uint64 start, size_t len);

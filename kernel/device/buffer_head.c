@@ -6,6 +6,8 @@
 #include <util/string.h>
 #include <util/list.h>
 
+#include <spike_interface/spike_utils.h>
+
 // 缓冲区哈希表
 static struct hashtable buffer_hash;
 
@@ -62,7 +64,7 @@ struct buffer_head *alloc_buffer_head(void) {
     if (bh) {
         memset(bh, 0, sizeof(struct buffer_head));
         INIT_LIST_HEAD(&bh->b_lru);
-        spin_lock_init(&bh->b_lock);
+        spinlock_init(&bh->b_lock);
         atomic_set(&bh->b_count, 0);
     }
     return bh;
@@ -96,12 +98,12 @@ struct buffer_head *getblk(struct block_device *bdev, sector_t block, size_t siz
         atomic_inc(&bh->b_count);
         
         // 更新 LRU 位置 (从当前位置移除并添加到尾部)
-        spin_lock(&bh_lru_lock);
+        spinlock_lock(&bh_lru_lock);
         if (!list_empty(&bh->b_lru)) {
             list_del(&bh->b_lru);
             list_add_tail(&bh->b_lru, &bh_lru_list);
         }
-        spin_unlock(&bh_lru_lock);
+        spinlock_unlock(&bh_lru_lock);
         
         return bh;
     }
@@ -137,9 +139,9 @@ struct buffer_head *getblk(struct block_device *bdev, sector_t block, size_t siz
     }
     
     // 添加到LRU列表
-    spin_lock(&bh_lru_lock);
+    spinlock_lock(&bh_lru_lock);
     list_add_tail(&bh->b_lru, &bh_lru_list);
-    spin_unlock(&bh_lru_lock);
+    spinlock_unlock(&bh_lru_lock);
     
     return bh;
 }
@@ -243,14 +245,14 @@ void ll_rw_block(int rw, int nr, struct buffer_head *bhs[]) {
 
 // 锁住一个缓冲区
 void lock_buffer(struct buffer_head *bh) {
-    spin_lock(&bh->b_lock);
+    spinlock_lock(&bh->b_lock);
     set_buffer_locked(bh);
 }
 
 // 解锁一个缓冲区
 void unlock_buffer(struct buffer_head *bh) {
     clear_buffer_locked(bh);
-    spin_unlock(&bh->b_lock);
+    spinlock_unlock(&bh->b_lock);
 }
 
 // 等待缓冲区操作完成
@@ -274,7 +276,7 @@ void buffer_init(void) {
     
     // 初始化LRU列表
     INIT_LIST_HEAD(&bh_lru_list);
-    spin_lock_init(&bh_lru_lock);
+    spinlock_init(&bh_lru_lock);
 }
 
 // 同步脏缓冲区
@@ -287,7 +289,7 @@ int sync_dirty_buffers(struct block_device *bdev) {
     // 需要实现一个额外的设备->缓冲区映射或修改哈希表接口
     
     // 简单起见，遍历LRU列表查找该设备的脏缓冲区
-    spin_lock(&bh_lru_lock);
+    spinlock_lock(&bh_lru_lock);
     list_for_each_entry(bh, &bh_lru_list, b_lru) {
         if (bh->b_bdev == bdev && buffer_dirty(bh)) {
             int err = sync_dirty_buffer(bh);
@@ -295,7 +297,7 @@ int sync_dirty_buffers(struct block_device *bdev) {
                 ret = err;
         }
     }
-    spin_unlock(&bh_lru_lock);
+    spinlock_unlock(&bh_lru_lock);
     
     return ret;
 }

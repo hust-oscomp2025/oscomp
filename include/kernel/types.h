@@ -1,10 +1,14 @@
 #ifndef _TYPES_H_
 #define _TYPES_H_
+#include <asm-generic/statfs.h>
+#include <sys/mount.h>
+#include <stdint.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <stddef.h>
 
 /* 关于指针和数据类型的说明
  * uint64: 切实的数据值，不可能用作内存/内存运算
@@ -31,17 +35,6 @@ typedef signed short int16;
 typedef signed int int32;
 typedef signed long long int64;
 
-#define INT64_MAX 0x7fffffffffffffffLL
-#define INT64_MIN 0x8000000000000000LL
-
-#define INT32_MAX 0x7fffffff
-#define INT32_MIN 0x80000000
-
-#define UINT32_MAX 0xffffffff
-#define UINT32_MIN 0x0
-
-#define UINT64_MAX 0xffffffffffffffffUL
-#define UINT64_MIN 0x0UL
 
 #ifndef bool
 typedef int bool;
@@ -68,6 +61,7 @@ typedef uint64 uaddr;
 typedef uint64 paddr_t;  // Physical address
 typedef uint64 vaddr_t;  // Virtual address
 typedef uint64 time64_t; // 64-bit time value
+typedef unsigned int fmode_t;
 
 // User/kernel space pointers (for clarity in interfaces)
 typedef void* kptr_t;        // Kernel pointer
@@ -81,28 +75,10 @@ typedef void* __user uptr_t; // User space pointer
 
 /* Basic time types and structures */
 
-/*
- * Time value with nanosecond resolution
- * Represents time as seconds and nanoseconds since the Epoch (1970-01-01 00:00:00 +0000)
- */
-struct timespec {
-	time_t tv_sec; /* seconds */
-	long tv_nsec;  /* nanoseconds */
-};
-
 // timespec64 structure if not already defined
 struct timespec64 {
 	time64_t tv_sec; /* seconds */
 	long tv_nsec;    /* nanoseconds */
-};
-
-/*
- * Time value with microsecond resolution
- * Used in many system calls that pre-date nanosecond precision
- */
-struct timeval {
-	time_t tv_sec;       /* seconds */
-	suseconds_t tv_usec; /* microseconds */
 };
 
 /*
@@ -167,7 +143,6 @@ typedef unsigned int vm_fault_t;
  */
 
 #define MAX_FILE_NAME_LEN 256
-typedef uint64 loff_t;
 
 typedef uint64_t sector_t; /* 64-bit sector number */
 /* File permissions and type mode */
@@ -188,11 +163,38 @@ struct istat {
 
 typedef long __fsword_t;
 typedef unsigned long fsblkcnt_t;
-typedef struct { int __val[2]; } __fsid_t;
 
 
 #define READ    0
 #define WRITE   1
+
+
+/**
+ * 测试位是否被置位（返回1或0）
+ * @param nr 位编号（从0开始）
+ * @param addr 位图指针
+ */
+static inline int test_bit(int nr, const volatile unsigned long *addr) {
+    return (addr[nr / (8 * sizeof(unsigned long))] >> (nr % (8 * sizeof(unsigned long)))) & 1UL;
+}
+
+/**
+ * 设置指定位置的位
+ * @param nr 位编号（从0开始）
+ * @param addr 位图指针
+ */
+static inline void set_bit(int nr, volatile unsigned long *addr) {
+    addr[nr / (8 * sizeof(unsigned long))] |= (1UL << (nr % (8 * sizeof(unsigned long))));
+}
+
+/**
+ * 清除指定位置的位
+ * @param nr 位编号（从0开始）
+ * @param addr 位图指针
+ */
+static inline void clear_bit(int nr, volatile unsigned long *addr) {
+    addr[nr / (8 * sizeof(unsigned long))] &= ~(1UL << (nr % (8 * sizeof(unsigned long))));
+}
 
 
 #endif

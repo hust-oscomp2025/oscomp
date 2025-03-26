@@ -807,7 +807,7 @@ char *dentry_rawPath(struct dentry *dentry, char *buf, int buflen)
     /* 回溯构建路径 */
     while (d) {
         /* 获取父dentry，需要处理根目录的情况 */
-        spin_lock(&d->d_lock);
+        spinlock_lock(&d->d_lock);
         
         /* 如果是根目录，特殊处理 */
         if (d == d->d_parent) {
@@ -815,7 +815,7 @@ char *dentry_rawPath(struct dentry *dentry, char *buf, int buflen)
             if (start == end)
                 --start;
             *start = '/';
-            spin_unlock(&d->d_lock);
+            spinlock_unlock(&d->d_lock);
             dentry_put(d);
             break;
         }
@@ -824,7 +824,7 @@ char *dentry_rawPath(struct dentry *dentry, char *buf, int buflen)
         int name_len = d->d_name->len;
         /* 检查空间是否足够 */
         if (start - buf < name_len + 1) {
-            spin_unlock(&d->d_lock);
+            spinlock_unlock(&d->d_lock);
             dentry_put(d);
             return NULL; /* 缓冲区太小 */
         }
@@ -838,7 +838,7 @@ char *dentry_rawPath(struct dentry *dentry, char *buf, int buflen)
         memcpy(start, d->d_name->name, name_len);
         
         /* 增加父dentry引用并释放当前锁 */
-        spin_unlock(&d->d_lock);
+        spinlock_unlock(&d->d_lock);
         
         /* 释放当前dentry引用，移动到父级 */\
 		struct dentry* parent = d->d_parent;
@@ -1106,3 +1106,98 @@ bool is_mounted(struct dentry* dentry) {
     
     return false;
 }
+
+
+/**
+ * setattr_prepare - Check if attribute change is allowed
+ * @dentry: dentry of the inode to change
+ * @attr: attributes to change
+ *
+ * Validates that the requested attribute changes are allowed
+ * based on permissions and constraints.
+ *
+ * Returns 0 if the change is allowed, negative error code otherwise.
+ */
+int setattr_prepare(struct dentry* dentry, struct iattr* attr) {
+	struct inode* inode = dentry->d_inode;
+	int error = 0;
+  
+	if (!inode)
+	  return -EINVAL;
+  
+	/* Check for permission to change attributes */
+	if (attr->ia_valid & ATTR_MODE) {
+	  error = inode_checkPermission(inode, MAY_WRITE);
+	  if (error)
+		return error;
+	}
+  
+	/* Check if user can change ownership */
+	if (attr->ia_valid & (ATTR_UID | ATTR_GID)) {
+	  /* Only root can change ownership */
+	  if (current_task()->euid != 0)
+		return -EPERM;
+	}
+  
+	/* Check if size can be changed */
+	if (attr->ia_valid & ATTR_SIZE) {
+	  error = inode_checkPermission(inode, MAY_WRITE);
+	  if (error)
+		return error;
+  
+	  /* Cannot change size of directories */
+	  if (S_ISDIR(inode->i_mode))
+		return -EISDIR;
+	}
+  
+	return 0;
+  }
+  
+  /**
+   * notify_change - Notify filesystem of attribute changes
+   * @dentry: dentry of the changed inode
+   * @attr: attributes that changed
+   *
+   * After validating attribute changes with setattr_prepare,
+   * this function applies the changes and notifies the filesystem.
+   *
+   * Returns 0 on success, negative error code on failure.
+   */
+  int notify_change(struct dentry* dentry, struct iattr* attr) {
+	struct inode* inode = dentry->d_inode;
+	int error;
+  
+	if (!inode)
+	  return -EINVAL;
+  
+	/* Validate changes */
+	error = setattr_prepare(dentry, attr);
+	if (error)
+	  return error;
+  
+	/* Call the filesystem's setattr method if available */
+	if (inode->i_op && inode->i_op->setattr)
+	  return inode->i_op->setattr(dentry, attr);
+  
+	/* Apply attribute changes to the inode */
+	if (attr->ia_valid & ATTR_MODE)
+	  inode->i_mode = attr->ia_mode;
+	if (attr->ia_valid & ATTR_UID)
+	  inode->i_uid = attr->ia_uid;
+	if (attr->ia_valid & ATTR_GID)
+	  inode->i_gid = attr->ia_gid;
+	if (attr->ia_valid & ATTR_SIZE)
+	  inode->i_size = attr->ia_size;
+	if (attr->ia_valid & ATTR_ATIME)
+	  inode->i_atime = attr->ia_atime;
+	if (attr->ia_valid & ATTR_MTIME)
+	  inode->i_mtime = attr->ia_mtime;
+	if (attr->ia_valid & ATTR_CTIME)
+	  inode->i_ctime = attr->ia_ctime;
+  
+	/* Mark the inode as dirty */
+	inode_setDirty(inode);
+  
+	return 0;
+  }
+  

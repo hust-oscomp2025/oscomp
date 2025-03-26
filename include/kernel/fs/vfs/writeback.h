@@ -9,6 +9,16 @@
  */
 #define WB_SYNC_NONE    0       /* Don't wait on completion */
 #define WB_SYNC_ALL     1       /* Wait on all write completion */
+/**
+ * Reason for writeback
+ */
+enum wb_reason {
+    WB_REASON_BACKGROUND,        /* Regular background writeback */
+    WB_REASON_SYNC,              /* Explicit sync operation */
+    WB_REASON_PERIODIC,          /* Periodic flush */
+    WB_REASON_VMSCAN,            /* Memory pressure */
+    WB_REASON_SHUTDOWN           /* System shutdown */
+};
 
 /**
  * Controls writeback operations for dirty pages/buffers
@@ -40,16 +50,6 @@ struct writeback_control {
     enum wb_reason reason;        /* Why writeback was triggered */
 };
 
-/**
- * Reason for writeback
- */
-enum wb_reason {
-    WB_REASON_BACKGROUND,        /* Regular background writeback */
-    WB_REASON_SYNC,              /* Explicit sync operation */
-    WB_REASON_PERIODIC,          /* Periodic flush */
-    WB_REASON_VMSCAN,            /* Memory pressure */
-    WB_REASON_SHUTDOWN           /* System shutdown */
-};
 
 /* Core writeback functions */
 void writeback_inodes_sb(struct superblock *, enum wb_reason);

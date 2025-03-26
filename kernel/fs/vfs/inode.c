@@ -222,13 +222,13 @@ void inode_put(struct inode* inode) {
     /* Last reference gone - add to superblock's LRU */
     if (!(inode->i_state & I_DIRTY)) {
       /* If it's on another state list, remove it first */
-      spin_lock(&sb->s_list_inode_states_lock);
+      spinlock_lock(&sb->s_list_inode_states_lock);
       if (!list_empty(&inode->i_state_list_node)) {
         list_del_init(&inode->i_state_list_node);
       }
 
       list_add_tail(&inode->i_state_list_node, &sb->s_list_clean_inodes);
-      spin_unlock(&sb->s_list_inode_states_lock);
+      spinlock_unlock(&sb->s_list_inode_states_lock);
     }
   }
   spinlock_unlock(&inode->i_lock);
@@ -244,98 +244,6 @@ int inode_isBad(struct inode* inode) {
   return (!inode || inode->i_op == NULL);
 }
 
-/**
- * setattr_prepare - Check if attribute change is allowed
- * @dentry: dentry of the inode to change
- * @attr: attributes to change
- *
- * Validates that the requested attribute changes are allowed
- * based on permissions and constraints.
- *
- * Returns 0 if the change is allowed, negative error code otherwise.
- */
-int setattr_prepare(struct dentry* dentry, struct iattr* attr) {
-  struct inode* inode = dentry->d_inode;
-  int error = 0;
-
-  if (!inode)
-    return -EINVAL;
-
-  /* Check for permission to change attributes */
-  if (attr->ia_valid & ATTR_MODE) {
-    error = inode_checkPermission(inode, MAY_WRITE);
-    if (error)
-      return error;
-  }
-
-  /* Check if user can change ownership */
-  if (attr->ia_valid & (ATTR_UID | ATTR_GID)) {
-    /* Only root can change ownership */
-    if (current_task()->euid != 0)
-      return -EPERM;
-  }
-
-  /* Check if size can be changed */
-  if (attr->ia_valid & ATTR_SIZE) {
-    error = inode_checkPermission(inode, MAY_WRITE);
-    if (error)
-      return error;
-
-    /* Cannot change size of directories */
-    if (S_ISDIR(inode->i_mode))
-      return -EISDIR;
-  }
-
-  return 0;
-}
-
-/**
- * notify_change - Notify filesystem of attribute changes
- * @dentry: dentry of the changed inode
- * @attr: attributes that changed
- *
- * After validating attribute changes with setattr_prepare,
- * this function applies the changes and notifies the filesystem.
- *
- * Returns 0 on success, negative error code on failure.
- */
-int notify_change(struct dentry* dentry, struct iattr* attr) {
-  struct inode* inode = dentry->d_inode;
-  int error;
-
-  if (!inode)
-    return -EINVAL;
-
-  /* Validate changes */
-  error = setattr_prepare(dentry, attr);
-  if (error)
-    return error;
-
-  /* Call the filesystem's setattr method if available */
-  if (inode->i_op && inode->i_op->setattr)
-    return inode->i_op->setattr(dentry, attr);
-
-  /* Apply attribute changes to the inode */
-  if (attr->ia_valid & ATTR_MODE)
-    inode->i_mode = attr->ia_mode;
-  if (attr->ia_valid & ATTR_UID)
-    inode->i_uid = attr->ia_uid;
-  if (attr->ia_valid & ATTR_GID)
-    inode->i_gid = attr->ia_gid;
-  if (attr->ia_valid & ATTR_SIZE)
-    inode->i_size = attr->ia_size;
-  if (attr->ia_valid & ATTR_ATIME)
-    inode->i_atime = attr->ia_atime;
-  if (attr->ia_valid & ATTR_MTIME)
-    inode->i_mtime = attr->ia_mtime;
-  if (attr->ia_valid & ATTR_CTIME)
-    inode->i_ctime = attr->ia_ctime;
-
-  /* Mark the inode as dirty */
-  inode_setDirty(inode);
-
-  return 0;
-}
 
 /**
  * inode_setDirty - Mark an inode as needing writeback
@@ -414,10 +322,10 @@ void __clear_inode(struct inode* inode) {
 
   /* Remove from superblock lists */
   if (inode->i_superblock) {
-    spin_lock(&inode->i_superblock->s_list_all_inodes_lock);
+    spinlock_lock(&inode->i_superblock->s_list_all_inodes_lock);
     list_del_init(&inode->i_s_list_node);
     list_del_init(&inode->i_state_list_node);
-    spin_unlock(&inode->i_superblock->s_list_all_inodes_lock);
+    spinlock_unlock(&inode->i_superblock->s_list_all_inodes_lock);
   }
 
   /* Clear file system specific data if needed */
@@ -555,9 +463,9 @@ static void __unlock_new_inode(struct inode *inode) {
 	if (!inode)
 			return;
 			
-	spin_lock(&inode->i_lock);
+	spinlock_lock(&inode->i_lock);
 	inode->i_state &= ~I_NEW;
-	spin_unlock(&inode->i_lock);
+	spinlock_unlock(&inode->i_lock);
 	
 	/* Wake up anyone waiting for this inode to be initialized */
 	wake_up_inode(inode);
@@ -592,14 +500,14 @@ int inode_sync(struct inode *inode, int wait) {
 	
 	/* If successful and waiting requested, clear dirty state */
 	if (ret == 0 && wait) {
-			spin_lock(&inode->i_superblock->s_list_inode_states_lock);
+			spinlock_lock(&inode->i_superblock->s_list_inode_states_lock);
 			/* Remove from dirty list */
 			if (inode->i_state & I_DIRTY) {
 					list_del_init(&inode->i_state_list_node);
 					inode->i_state &= ~I_DIRTY;
 					list_add(&inode->i_state_list_node, &inode->i_superblock->s_list_clean_inodes);
 			}
-			spin_unlock(&inode->i_superblock->s_list_inode_states_lock);
+			spinlock_unlock(&inode->i_superblock->s_list_inode_states_lock);
 	}
 	
 	return ret;

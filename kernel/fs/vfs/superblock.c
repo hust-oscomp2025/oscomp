@@ -66,10 +66,10 @@ void grab_super(struct superblock* sb) {
 	if (!sb)
 		return;
 
-	spin_lock(&sb->s_lock);
+	spinlock_lock(&sb->s_lock);
 	atomic_inc(&sb->s_refcount);
 	//sb->s_active++;
-	spin_unlock(&sb->s_lock);
+	spinlock_unlock(&sb->s_lock);
 }
 
 /**
@@ -82,11 +82,11 @@ void deactivate_super_safe(struct superblock* sb) {
 	if (!sb)
 		return;
 
-	spin_lock(&sb->s_lock);
+	spinlock_lock(&sb->s_lock);
 	atomic_dec(&sb->s_refcount);
 
 	//sb->s_active--;
-	spin_unlock(&sb->s_lock);
+	spinlock_unlock(&sb->s_lock);
 }
 
 /**
@@ -113,12 +113,12 @@ int sync_filesystem(struct superblock* sb, int wait) {
 	}
 
 	/* Sync all dirty inodes */
-	spin_lock(&sb->s_list_inode_states_lock);
+	spinlock_lock(&sb->s_list_inode_states_lock);
 	list_for_each_entry_safe(inode, next, &sb->s_list_dirty_inodes, i_state_list_node) {
 		if (sb->s_operations && sb->s_operations->write_inode) {
-			spin_unlock(&sb->s_list_inode_states_lock);
+			spinlock_unlock(&sb->s_list_inode_states_lock);
 			ret = sb->s_operations->write_inode(inode, wait);
-			spin_lock(&sb->s_list_inode_states_lock);
+			spinlock_lock(&sb->s_list_inode_states_lock);
 
 			if (ret == 0 && wait) {
 				/* Move from dirty list to LRU list */
@@ -131,7 +131,7 @@ int sync_filesystem(struct superblock* sb, int wait) {
 				break;
 		}
 	}
-	spin_unlock(&sb->s_list_inode_states_lock);
+	spinlock_unlock(&sb->s_list_inode_states_lock);
 
 	return ret;
 }
@@ -153,9 +153,9 @@ void generic_shutdown_super(struct superblock* sb) {
 	sync_filesystem(sb, 1);
 
 	/* Free all inodes */
-	spin_lock(&sb->s_list_all_inodes_lock);
+	spinlock_lock(&sb->s_list_all_inodes_lock);
 	list_for_each_entry_safe(inode, next, &sb->s_list_all_inodes, i_s_list_node) {
-		spin_unlock(&sb->s_list_all_inodes_lock);
+		spinlock_unlock(&sb->s_list_all_inodes_lock);
 
 		/* Forcibly evict the inode */
 		if (inode->i_state & I_DIRTY) {
@@ -168,9 +168,9 @@ void generic_shutdown_super(struct superblock* sb) {
 		else
 			clear_inode(inode);
 
-		spin_lock(&sb->s_list_all_inodes_lock);
+		spinlock_lock(&sb->s_list_all_inodes_lock);
 	}
-	spin_unlock(&sb->s_list_all_inodes_lock);
+	spinlock_unlock(&sb->s_list_all_inodes_lock);
 
 	/* Free root dentry */
 	if (sb->s_root) {
@@ -242,9 +242,9 @@ struct vfsmount* superblock_acquireMount(struct superblock* sb, int flags, const
     INIT_LIST_HEAD(&mnt->mnt_node_namespace);
     
     // Add to the superblock's mount list
-    spin_lock(&sb->s_list_mounts_lock);
+    spinlock_lock(&sb->s_list_mounts_lock);
     list_add(&mnt->mnt_node_superblock, &sb->s_list_mounts);
-    spin_unlock(&sb->s_list_mounts_lock);
+    spinlock_unlock(&sb->s_list_mounts_lock);
     
     // Increment superblock reference count
     grab_super(sb);

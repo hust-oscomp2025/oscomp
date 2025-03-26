@@ -22,7 +22,7 @@
  struct page;
  struct block_device;
  struct inode;
- 
+ struct buffer_head;
  /**
   * Buffer state bit flags
   */
@@ -57,8 +57,8 @@
  #define buffer_new(bh)      BH_STATE(BH_New, bh)
  #define buffer_delay(bh)    BH_STATE(BH_Delay, bh)
  
- /* Common buffer head end I/O function signature */
- typedef void (*bh_end_io_t)(struct buffer_head *bh, int uptodate);
+  /* Common buffer head end I/O function signature */
+  typedef void (*bh_end_io_t)(struct buffer_head *bh, int uptodate);
  
  /**
   * struct buffer_head - Buffer for block I/O operations
@@ -84,6 +84,8 @@
 	 struct list_head b_assoc_buffers; /* Associated mappings */
 	 struct list_head b_lru;       /* List for LRU management */
  };
+
+
  
  /**
   * Initialize a buffer_head structure
