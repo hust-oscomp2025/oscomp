@@ -8,8 +8,8 @@
 #include <kernel/riscv.h>
 #include <kernel/sched/process.h>
 #include <kernel/types.h>
-#include <util/list.h>
-#include <util/spinlock.h>
+#include <kernel/util/list.h>
+#include <kernel/util/spinlock.h>
 
 typedef uint64 pte_t;
 typedef uint64 *pagetable_t; // 512 PTEs
@@ -20,12 +20,12 @@ enum vma_type;
  */
 struct mm_struct {
   // struct maple_tree mm_mt;
-  int is_kernel_mm;
+  int32 is_kernel_mm;
   // 页表
   pagetable_t pagetable; // 页表
   // VMA链表
   struct list_head vma_list; // VMA链表头
-  int map_count;             // VMA数量
+  int32 map_count;             // VMA数量
 
   // 地址空间边界
   uint64 start_code;
@@ -52,7 +52,7 @@ void create_init_mm();
 struct mm_struct *user_alloc_mm(void);
 void free_mm(struct mm_struct *mm);
 
-uint64 prot_to_type(int prot, int user);
+uint64 prot_to_type(int32 prot, int32 user);
 
 /**
  * 创建新的VMA

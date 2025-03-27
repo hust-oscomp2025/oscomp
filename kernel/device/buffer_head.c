@@ -1,12 +1,12 @@
 #include <kernel/device/buffer_head.h>
 #include <kernel/mm/kmalloc.h>
 #include <kernel/types.h>
-#include <util/hashtable.h>
+#include <kernel/util/hashtable.h>
 #include <kernel/types.h>
-#include <util/string.h>
-#include <util/list.h>
+#include <kernel/util/string.h>
+#include <kernel/util/list.h>
 
-#include <spike_interface/spike_utils.h>
+#include <kernel/sprint.h>
 
 // 缓冲区哈希表
 static struct hashtable buffer_hash;
@@ -23,12 +23,12 @@ struct buffer_key {
 };
 
 // 哈希函数 - 为 buffer_key 生成哈希值
-static unsigned int buffer_hash_func(const void *key, unsigned int size) {
+static uint32 buffer_hash_func(const void *key, uint32 size) {
     const struct buffer_key *bkey = (const struct buffer_key *)key;
     // 组合设备指针、块号和大小以生成哈希值
-    unsigned int hash = (unsigned int)(uintptr_t)bkey->bdev;
-    hash = hash * 37 + (unsigned int)bkey->block;
-    hash = hash * 37 + (unsigned int)bkey->size;
+    uint32 hash = (uint32)(uintptr_t)bkey->bdev;
+    hash = hash * 37 + (uint32)bkey->block;
+    hash = hash * 37 + (uint32)bkey->size;
     return hash;
 }
 
@@ -45,7 +45,7 @@ static void *buffer_get_key(struct list_head *node) {
 }
 
 // 比较两个缓冲区键
-static int buffer_key_equals(const void *key1, const void *key2) {
+static int32 buffer_key_equals(const void *key1, const void *key2) {
     const struct buffer_key *k1 = (const struct buffer_key *)key1;
     const struct buffer_key *k2 = (const struct buffer_key *)key2;
     
@@ -155,7 +155,7 @@ struct buffer_head *bread(struct block_device *bdev, sector_t block, size_t size
     if (!buffer_uptodate(bh)) {
         lock_buffer(bh);
         if (!buffer_uptodate(bh)) {  // 双重检查，避免竞争条件
-            if (bdev->bd_ops->read_block(bdev, block, bh->b_data, 1) != 0) {
+            if (bdev->bd_ops->read_blocks(bdev, block, bh->b_data, 1) != 0) {
                 unlock_buffer(bh);
                 brelse(bh);
                 return NULL;
@@ -194,8 +194,8 @@ void mark_buffer_dirty(struct buffer_head *bh) {
 }
 
 // 提交一个脏缓冲区
-int sync_dirty_buffer(struct buffer_head *bh) {
-    int ret = 0;
+int32 sync_dirty_buffer(struct buffer_head *bh) {
+    int32 ret = 0;
     
     if (!buffer_dirty(bh))
         return 0;
@@ -214,8 +214,8 @@ int sync_dirty_buffer(struct buffer_head *bh) {
 }
 
 // 异步读写块（简化实现，实际应该使用异步 I/O）
-void ll_rw_block(int rw, int nr, struct buffer_head *bhs[]) {
-    int i;
+void ll_rw_block(int32 rw, int32 nr, struct buffer_head *bhs[]) {
+    int32 i;
     
     for (i = 0; i < nr; i++) {
         struct buffer_head *bh = bhs[i];
@@ -226,7 +226,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head *bhs[]) {
         if (rw == READ) {
             if (!buffer_uptodate(bh)) {
                 lock_buffer(bh);
-                bh->b_bdev->bd_ops->read_block(bh->b_bdev, bh->b_blocknr, 
+                bh->b_bdev->bd_ops->read_blocks(bh->b_bdev, bh->b_blocknr, 
                                               bh->b_data, 1);
                 set_buffer_uptodate(bh);
                 unlock_buffer(bh);
@@ -267,7 +267,7 @@ void wait_on_buffer(struct buffer_head *bh) {
 // 初始化buffer_head子系统
 void buffer_init(void) {
     // 初始化哈希表，大小为1024，最大负载因子为80%
-    int ret = hashtable_setup(&buffer_hash, 1024, 80, 
+    int32 ret = hashtable_setup(&buffer_hash, 1024, 80, 
                             buffer_hash_func, buffer_get_key, buffer_key_equals);
     if (ret != 0) {
         // 初始化失败处理
@@ -280,9 +280,9 @@ void buffer_init(void) {
 }
 
 // 同步脏缓冲区
-int sync_dirty_buffers(struct block_device *bdev) {
+int32 sync_dirty_buffers(struct block_device *bdev) {
     struct buffer_head *bh;
-    int ret = 0;
+    int32 ret = 0;
     
     // 这里应该遍历所有与该设备相关的缓冲区并同步它们
     // 但由于哈希表的设计，我们无法直接获取特定设备的所有缓冲区
@@ -292,7 +292,7 @@ int sync_dirty_buffers(struct block_device *bdev) {
     spinlock_lock(&bh_lru_lock);
     list_for_each_entry(bh, &bh_lru_list, b_lru) {
         if (bh->b_bdev == bdev && buffer_dirty(bh)) {
-            int err = sync_dirty_buffer(bh);
+            int32 err = sync_dirty_buffer(bh);
             if (err && !ret)
                 ret = err;
         }

@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <stddef.h>
+#include <kernel/types/mm_types.h>
 
 /* 关于指针和数据类型的说明
  * uint64: 切实的数据值，不可能用作内存/内存运算
@@ -105,8 +106,10 @@ struct itimerspec {
 #define PTR_ERR(ptr) ((long)(ptr))
 #define IS_ERR(ptr) IS_ERR_VALUE((unsigned long)(ptr))
 // clang-format off
-#define CHECK_PTR(ptr, errno_val) \
+#define CHECK_PTR_VALID(ptr, errno_val) \
     do { if (unlikely(!(ptr) || IS_ERR(ptr))) return (errno_val); } while (0)
+#define CHECK_PTR_ERROR(ptr, errno_val) \
+	do { if (unlikely(IS_ERR(ptr))) return (errno_val); } while (0)
 
 #define IS_INVALID(ptr) (!(ptr) || IS_ERR(ptr))
 
@@ -174,8 +177,8 @@ typedef unsigned long fsblkcnt_t;
  * @param nr 位编号（从0开始）
  * @param addr 位图指针
  */
-static inline int test_bit(int nr, const volatile unsigned long *addr) {
-    return (addr[nr / (8 * sizeof(unsigned long))] >> (nr % (8 * sizeof(unsigned long)))) & 1UL;
+static inline int test_bit(int nr, const volatile uint64 *addr) {
+    return (addr[nr / (8 * sizeof(uint64))] >> (nr % (8 * sizeof(uint64)))) & 1UL;
 }
 
 /**
@@ -183,8 +186,8 @@ static inline int test_bit(int nr, const volatile unsigned long *addr) {
  * @param nr 位编号（从0开始）
  * @param addr 位图指针
  */
-static inline void set_bit(int nr, volatile unsigned long *addr) {
-    addr[nr / (8 * sizeof(unsigned long))] |= (1UL << (nr % (8 * sizeof(unsigned long))));
+static inline void set_bit(int nr, volatile uint64 *addr) {
+    addr[nr / (8 * sizeof(uint64))] |= (1UL << (nr % (8 * sizeof(uint64))));
 }
 
 /**
@@ -192,9 +195,44 @@ static inline void set_bit(int nr, volatile unsigned long *addr) {
  * @param nr 位编号（从0开始）
  * @param addr 位图指针
  */
-static inline void clear_bit(int nr, volatile unsigned long *addr) {
-    addr[nr / (8 * sizeof(unsigned long))] &= ~(1UL << (nr % (8 * sizeof(unsigned long))));
+static inline void clear_bit(int nr, volatile uint64 *addr) {
+    addr[nr / (8 * sizeof(uint64))] &= ~(1UL << (nr % (8 * sizeof(uint64))));
 }
+
+/*
+ * File mode fmode_t flags
+ */
+/* Access modes */
+#define FMODE_READ (1U << 0)  /* File is open for reading */
+#define FMODE_WRITE (1U << 1) /* File is open for writing */
+#define FMODE_EXEC (1U << 5)  /* File is executable */
+
+/* Seeking flags */
+#define FMODE_LSEEK (1U << 2)  /* File is seekable */
+#define FMODE_PREAD (1U << 3)  /* File supports pread */
+#define FMODE_PWRITE (1U << 4) /* File supports pwrite */
+
+/* Special access flags */
+#define FMODE_ATOMIC_POS (1U << 12) /* File needs atomic access to position */
+#define FMODE_RANDOM (1U << 13)     /* File will be accessed randomly */
+#define FMODE_PATH (1U << 14)       /* O_PATH flag - minimal file access */
+#define FMODE_STREAM (1U << 16)     /* File is stream-like */
+
+/* Permission indicators */
+#define FMODE_WRITER (1U << 17)    /* Has write access to underlying fs */
+#define FMODE_CAN_READ (1U << 18)  /* Has read methods */
+#define FMODE_CAN_WRITE (1U << 19) /* Has write methods */
+
+/* State flags */
+#define FMODE_OPENED (1U << 20)  /* File has been opened */
+#define FMODE_CREATED (1U << 21) /* File was created */
+
+/* Optimization flags */
+#define FMODE_NOWAIT (1U << 22)      /* Return -EAGAIN if I/O would block */
+#define FMODE_CAN_ODIRECT (1U << 24) /* Supports direct I/O */
+#define FMODE_BUF_RASYNC (1U << 28)  /* Supports async buffered reads */
+#define FMODE_BUF_WASYNC (1U << 29)  /* Supports async buffered writes */
+
 
 
 #endif

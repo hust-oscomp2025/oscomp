@@ -1,10 +1,10 @@
 #ifndef _BUFFER_HEAD_H
 #define _BUFFER_HEAD_H
 #include <kernel/device/block_device.h>
-#include <util/list.h>
-#include <util/spinlock.h>
+#include <kernel/util/list.h>
+#include <kernel/util/spinlock.h>
 #include <kernel/types.h>
-#include <util/atomic.h>
+#include <kernel/util/atomic.h>
 
 /* Buffer states (b_state) */
 enum {
@@ -29,7 +29,7 @@ struct buffer_head {
     struct block_device *b_bdev;       /* Block device this buffer is from */
     sector_t            b_blocknr;     /* Block number */
     size_t              b_size;        /* Block size */
-    unsigned long       b_state;       /* State flags */
+    uint64       b_state;       /* State flags */
     atomic_t            b_count;       /* Reference counter */
     
     char               *b_data;        /* Pointer to data block */
@@ -39,7 +39,7 @@ struct buffer_head {
     
     /* 以下成员是可选的，如果需要，可以稍后实现 */
     
-    unsigned long       b_end_io;      /* Completion function callback */
+    uint64       b_end_io;      /* Completion function callback */
     void               *b_private;     /* Reserved for b_end_io */
     struct list_head    b_assoc_buffers; /* Associated buffer operations */
     struct address_space *b_assoc_map; /* Associated address space */
@@ -88,10 +88,10 @@ void mark_buffer_dirty(struct buffer_head *bh);
 /* 以下是对ext4支持有用的附加函数 */
 
 /* 提交一个缓冲区的内容 */
-int sync_dirty_buffer(struct buffer_head *bh);
+int32 sync_dirty_buffer(struct buffer_head *bh);
 
 /* 异步读取一个缓冲区 */
-void ll_rw_block(int rw, int nr, struct buffer_head *bhs[]);
+void ll_rw_block(int32 rw, int32 nr, struct buffer_head *bhs[]);
 
 /* 等待缓冲区操作完成 */
 void wait_on_buffer(struct buffer_head *bh);
@@ -115,10 +115,10 @@ void free_buffer_head(struct buffer_head *bh);
 struct buffer_head *page_buffers(struct page *page);
 
 // 检查页面是否有缓冲区
-int page_has_buffers(struct page *page);
+int32 page_has_buffers(struct page *page);
 
 // 创建页面缓冲区
-int create_empty_buffers(struct page *page, unsigned long blocksize, unsigned long b_state);
+int32 create_empty_buffers(struct page *page, uint64 blocksize, uint64 b_state);
 
 // 映射缓冲区
 void map_bh(struct buffer_head *bh, struct super_block *sb, sector_t block);
@@ -127,7 +127,7 @@ void map_bh(struct buffer_head *bh, struct super_block *sb, sector_t block);
 sector_t bmap(struct inode *inode, sector_t block);
 
 // 缓冲同步函数组
-int sync_blockdev(struct block_device *bdev);
+int32 sync_blockdev(struct block_device *bdev);
 */
 
 #endif /* _BUFFER_HEAD_H */

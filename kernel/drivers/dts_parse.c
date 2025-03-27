@@ -5,8 +5,8 @@
  */
 
 #include <spike_interface/dts_parse.h>
-#include <spike_interface/spike_utils.h>
-#include <util/string.h>
+#include <kernel/sprint.h>
+#include <kernel/util/string.h>
 
 static inline __uint32_t bswap(__uint32_t x) {
   __uint32_t y = (x & 0x00FF00FF) << 8 | (x & 0xFF00FF00) >> 8;
@@ -18,7 +18,7 @@ static __uint32_t *fdt_scan_helper(__uint32_t *lex, const char *strings, struct 
                                const struct fdt_cb *cb) {
   struct fdt_scan_node child;
   struct fdt_scan_prop prop;
-  int last = 0;
+  int32 last = 0;
 
   child.parent = node;
   // these are the default cell counts, as per the FDT spec
@@ -74,14 +74,14 @@ static __uint32_t *fdt_scan_helper(__uint32_t *lex, const char *strings, struct 
 const __uint32_t *fdt_get_address(const struct fdt_scan_node *node, const __uint32_t *value,
                               __uint64_t *result) {
   *result = 0;
-  for (int cells = node->address_cells; cells > 0; --cells)
+  for (int32 cells = node->address_cells; cells > 0; --cells)
     *result = (*result << 32) + bswap(*value++);
   return value;
 }
 
 const __uint32_t *fdt_get_size(const struct fdt_scan_node *node, const __uint32_t *value, __uint64_t *result) {
   *result = 0;
-  for (int cells = node->size_cells; cells > 0; --cells)
+  for (int32 cells = node->size_cells; cells > 0; --cells)
     *result = (*result << 32) + bswap(*value++);
   return value;
 }

@@ -1,6 +1,8 @@
 #ifndef _PATH_H
 #define _PATH_H
 
+#include <kernel/types.h>
+
 struct vfsmount;
 struct dentry;
 /**
@@ -12,11 +14,11 @@ struct path {
 };
 
 /* Path lookup and traversal */
-int path_create(const char* name, unsigned int flags, struct path* result);
-//int kern_path_qstr(const struct qstr *name, unsigned int flags, struct path *result);
+int32 path_create(const char* name, uint32 flags, struct path* result);
+//int32 kern_path_qstr(const struct qstr *name, uint32 flags, struct path *result);
 void path_destroy(struct path* path);
 
-int filename_lookup(int dfd, const char* name, unsigned int flags,
+int32 filename_lookup(int32 dfd, const char* name, uint32 flags,
                     struct path* path, struct path* started);
 
 /* Lookup flags */

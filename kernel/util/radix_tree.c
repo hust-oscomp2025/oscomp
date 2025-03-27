@@ -1,5 +1,5 @@
 #include <kernel/mm/kmalloc.h>
-#include <util/radix_tree.h>
+#include <kernel/util/radix_tree.h>
 #include <errno.h>
 
 /*
@@ -28,18 +28,18 @@ static void radix_tree_node_free(struct radix_tree_node *node)
 }
 
 /* Calculate the index of a slot in a particular level of the tree */
-static unsigned int radix_tree_index_in_node(unsigned long index, unsigned int height)
+static uint32 radix_tree_index_in_node(uint64 index, uint32 height)
 {
-    unsigned int shift = (height - 1) * RADIX_TREE_MAP_SHIFT;
+    uint32 shift = (height - 1) * RADIX_TREE_MAP_SHIFT;
     return (index >> shift) & RADIX_TREE_MAP_MASK;
 }
 
 /* Extend the tree height to accommodate a particular index */
-static int radix_tree_extend(struct radixTreeRoot *root, unsigned long index)
+static int32 radix_tree_extend(struct radixTreeRoot *root, uint64 index)
 {
     struct radix_tree_node *node;
-    unsigned int height;
-    int result;
+    uint32 height;
+    int32 result;
 
     /* Calculate the height needed for this index */
     height = root->height;
@@ -83,12 +83,12 @@ static int radix_tree_extend(struct radixTreeRoot *root, unsigned long index)
 }
 
 /* Create a path to a leaf node for a given index */
-static int radix_tree_create_path(struct radixTreeRoot *root, unsigned long index,
+static int32 radix_tree_create_path(struct radixTreeRoot *root, uint64 index,
                                  void **slot_ptr)
 {
     struct radix_tree_node *node, *tmp, *child;
-    unsigned int i, height, shift, offset;
-    int result;
+    uint32 i, height, shift, offset;
+    int32 result;
 
     /* Extend the tree if necessary */
     result = radix_tree_extend(root, index);
@@ -134,7 +134,7 @@ static int radix_tree_create_path(struct radixTreeRoot *root, unsigned long inde
 }
 
 /* Check if a node can be deleted (has no items or child nodes) */
-static int radix_tree_node_can_delete(struct radix_tree_node *node)
+static int32 radix_tree_node_can_delete(struct radix_tree_node *node)
 {
     return node && node->count == 0;
 }
@@ -142,10 +142,10 @@ static int radix_tree_node_can_delete(struct radix_tree_node *node)
 /* Delete nodes recursively upward if empty */
 static struct radix_tree_node *radix_tree_delete_node(struct radixTreeRoot *root,
                                                     struct radix_tree_node *node,
-                                                    unsigned int height,
-                                                    unsigned long index)
+                                                    uint32 height,
+                                                    uint64 index)
 {
-    unsigned int offset = radix_tree_index_in_node(index, height);
+    uint32 offset = radix_tree_index_in_node(index, height);
     struct radix_tree_node *child = node->slots[offset];
     struct radix_tree_node *parent;
     
@@ -216,10 +216,10 @@ void radix_tree_init(struct radixTreeRoot *root)
 }
 
 /* Insert an item into the radix tree */
-int radix_tree_insert(struct radixTreeRoot *root, unsigned long index, void *item)
+int32 radix_tree_insert(struct radixTreeRoot *root, uint64 index, void *item)
 {
     void **slot;
-    int result;
+    int32 result;
     
     /* Cannot insert NULL items */
     if (!item)
@@ -241,10 +241,10 @@ int radix_tree_insert(struct radixTreeRoot *root, unsigned long index, void *ite
 }
 
 /* Look up an item in the radix tree */
-void *radix_tree_lookup(struct radixTreeRoot *root, unsigned long index)
+void *radix_tree_lookup(struct radixTreeRoot *root, uint64 index)
 {
     struct radix_tree_node *node;
-    unsigned int height, shift, offset;
+    uint32 height, shift, offset;
     
     if (!root->height)
         return NULL;
@@ -272,10 +272,10 @@ void *radix_tree_lookup(struct radixTreeRoot *root, unsigned long index)
 }
 
 /* Delete an item from the radix tree */
-void *radix_tree_delete(struct radixTreeRoot *root, unsigned long index)
+void *radix_tree_delete(struct radixTreeRoot *root, uint64 index)
 {
     struct radix_tree_node *node;
-    unsigned int height, shift, offset;
+    uint32 height, shift, offset;
     void *item = NULL;
     
     if (!root->height)
@@ -346,12 +346,12 @@ void *radix_tree_delete(struct radixTreeRoot *root, unsigned long index)
 }
 
 /* Gang lookup - find multiple items */
-unsigned int radix_tree_gang_lookup(struct radixTreeRoot *root,
-                                    void **results, unsigned long first_index,
-                                    unsigned int max_items)
+uint32 radix_tree_gang_lookup(struct radixTreeRoot *root,
+                                    void **results, uint64 first_index,
+                                    uint32 max_items)
 {
-    unsigned long index = first_index;
-    unsigned int found = 0;
+    uint64 index = first_index;
+    uint32 found = 0;
     void *item;
     
     while (found < max_items) {
@@ -372,10 +372,10 @@ unsigned int radix_tree_gang_lookup(struct radixTreeRoot *root,
 }
 
 /* Set a tag on an item */
-int radix_tree_tag_set(struct radixTreeRoot *root, unsigned long index, unsigned int tag)
+int32 radix_tree_tag_set(struct radixTreeRoot *root, uint64 index, uint32 tag)
 {
     struct radix_tree_node *node, *parent;
-    unsigned int height, shift, offset;
+    uint32 height, shift, offset;
     
     if (tag >= RADIX_TREE_MAX_TAGS)
         return -EINVAL;
@@ -399,8 +399,8 @@ int radix_tree_tag_set(struct radixTreeRoot *root, unsigned long index, unsigned
         offset = (index >> shift) & RADIX_TREE_MAP_MASK;
         
         /* Set the tag at this level */
-        node->tags[tag][offset / (sizeof(unsigned long) * 8)] |= 
-            1UL << (offset % (sizeof(unsigned long) * 8));
+        node->tags[tag][offset / (sizeof(uint64) * 8)] |= 
+            1UL << (offset % (sizeof(uint64) * 8));
         
         /* Move to the next level */
         node = node->slots[offset];
@@ -412,11 +412,11 @@ int radix_tree_tag_set(struct radixTreeRoot *root, unsigned long index, unsigned
 }
 
 /* Clear a tag from an item */
-int radix_tree_tag_clear(struct radixTreeRoot *root, unsigned long index, unsigned int tag)
+int32 radix_tree_tag_clear(struct radixTreeRoot *root, uint64 index, uint32 tag)
 {
     struct radix_tree_node *node, *parent;
-    unsigned int height, shift, offset;
-    unsigned long tag_bit;
+    uint32 height, shift, offset;
+    uint64 tag_bit;
     
     if (tag >= RADIX_TREE_MAX_TAGS)
         return -EINVAL;
@@ -440,10 +440,10 @@ int radix_tree_tag_clear(struct radixTreeRoot *root, unsigned long index, unsign
         offset = (index >> shift) & RADIX_TREE_MAP_MASK;
         
         /* Calculate bit position in the tag word */
-        tag_bit = 1UL << (offset % (sizeof(unsigned long) * 8));
+        tag_bit = 1UL << (offset % (sizeof(uint64) * 8));
         
         /* Clear the tag at this level */
-        node->tags[tag][offset / (sizeof(unsigned long) * 8)] &= ~tag_bit;
+        node->tags[tag][offset / (sizeof(uint64) * 8)] &= ~tag_bit;
         
         /* Move to the next level */
         node = node->slots[offset];
@@ -455,11 +455,11 @@ int radix_tree_tag_clear(struct radixTreeRoot *root, unsigned long index, unsign
 }
 
 /* Check if an item has a tag set */
-int radix_tree_tag_get(struct radixTreeRoot *root, unsigned long index, unsigned int tag)
+int32 radix_tree_tag_get(struct radixTreeRoot *root, uint64 index, uint32 tag)
 {
     struct radix_tree_node *node;
-    unsigned int height, shift, offset;
-    unsigned long tag_bit;
+    uint32 height, shift, offset;
+    uint64 tag_bit;
     
     if (tag >= RADIX_TREE_MAX_TAGS)
         return 0;
@@ -482,10 +482,10 @@ int radix_tree_tag_get(struct radixTreeRoot *root, unsigned long index, unsigned
         offset = (index >> shift) & RADIX_TREE_MAP_MASK;
         
         /* Calculate bit position in the tag word */
-        tag_bit = 1UL << (offset % (sizeof(unsigned long) * 8));
+        tag_bit = 1UL << (offset % (sizeof(uint64) * 8));
         
         /* Check if tag is set at this level */
-        if (!(node->tags[tag][offset / (sizeof(unsigned long) * 8)] & tag_bit))
+        if (!(node->tags[tag][offset / (sizeof(uint64) * 8)] & tag_bit))
             return 0;
         
         /* Move to the next level */
@@ -498,12 +498,12 @@ int radix_tree_tag_get(struct radixTreeRoot *root, unsigned long index, unsigned
 }
 
 /* Gang lookup for tagged items */
-unsigned int radix_tree_gang_lookup_tag(struct radixTreeRoot *root,
-                                        void **results, unsigned long first_index,
-                                        unsigned int max_items, unsigned int tag)
+uint32 radix_tree_gang_lookup_tag(struct radixTreeRoot *root,
+                                        void **results, uint64 first_index,
+                                        uint32 max_items, uint32 tag)
 {
-    unsigned long index = first_index;
-    unsigned int found = 0;
+    uint64 index = first_index;
+    uint32 found = 0;
     void *item;
     
     if (tag >= RADIX_TREE_MAX_TAGS)
@@ -534,9 +534,9 @@ unsigned int radix_tree_gang_lookup_tag(struct radixTreeRoot *root,
 }
 
 /* Helper for radix_tree_destroy */
-static void radix_tree_destroy_node(struct radix_tree_node *node, unsigned int height)
+static void radix_tree_destroy_node(struct radix_tree_node *node, uint32 height)
 {
-    unsigned int i;
+    uint32 i;
     
     if (!node)
         return;
@@ -563,10 +563,10 @@ void radix_tree_destroy(struct radixTreeRoot *root)
 }
 
 /* Helper for radix_tree_count_items */
-static unsigned long _count_items(struct radix_tree_node *node, unsigned int height)
+static uint64 _count_items(struct radix_tree_node *node, uint32 height)
 {
-    unsigned long count = 0;
-    unsigned int i;
+    uint64 count = 0;
+    uint32 i;
     
     if (!node)
         return 0;
@@ -589,7 +589,7 @@ static unsigned long _count_items(struct radix_tree_node *node, unsigned int hei
 }
 
 /* Count items in the tree */
-unsigned long radix_tree_count_items(struct radixTreeRoot *root)
+uint64 radix_tree_count_items(struct radixTreeRoot *root)
 {
     if (!root->height || !root->node)
         return 0;
@@ -598,12 +598,12 @@ unsigned long radix_tree_count_items(struct radixTreeRoot *root)
 }
 
 /* Helper for radix_tree_for_each */
-static unsigned int _for_each(struct radix_tree_node *node, unsigned int height, 
-                            unsigned long base_index, int (*fn)(void *, unsigned long, void *), 
+static uint32 _for_each(struct radix_tree_node *node, uint32 height, 
+                            uint64 base_index, int32 (*fn)(void *, uint64, void *), 
                             void *data)
 {
-    unsigned int i, count = 0;
-    unsigned long index;
+    uint32 i, count = 0;
+    uint64 index;
     
     if (!node)
         return 0;
@@ -623,8 +623,8 @@ static unsigned int _for_each(struct radix_tree_node *node, unsigned int height,
         /* Internal node - recurse */
         for (i = 0; i < RADIX_TREE_MAP_SIZE; i++) {
             if (node->slots[i]) {
-                unsigned long new_base = base_index | (i << ((height - 1) * RADIX_TREE_MAP_SHIFT));
-                unsigned int ret = _for_each(node->slots[i], height - 1, new_base, fn, data);
+                uint64 new_base = base_index | (i << ((height - 1) * RADIX_TREE_MAP_SHIFT));
+                uint32 ret = _for_each(node->slots[i], height - 1, new_base, fn, data);
                 count += ret;
                 if (ret != _count_items(node->slots[i], height - 1))
                     return count;  /* Stop if function returned non-zero */
@@ -636,8 +636,8 @@ static unsigned int _for_each(struct radix_tree_node *node, unsigned int height,
 }
 
 /* Apply a function to each item in the tree */
-unsigned int radix_tree_for_each(struct radixTreeRoot *root,
-                                int (*fn)(void *item, unsigned long index, void *data),
+uint32 radix_tree_for_each(struct radixTreeRoot *root,
+                                int32 (*fn)(void *item, uint64 index, void *data),
                                 void *data)
 {
     if (!root->height || !root->node)

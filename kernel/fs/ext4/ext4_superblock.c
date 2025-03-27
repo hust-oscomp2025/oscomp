@@ -1,16 +1,17 @@
 #include <kernel/fs/ext4_adaptor.h>
 #include <kernel/fs/vfs/superblock.h>
-#include <kernel/fs/vfs/vfs.h>
+#include <kernel/vfs.h>
 #include <kernel/mm/kmalloc.h>
 
 #include <kernel/types.h>
+#include <kernel/util/string.h>
 
 /* Forward declarations */
-static int ext4_read_inode(struct inode* inode);
-static int ext4_write_inode(struct inode* inode, int wait);
+static int32 ext4_read_inode(struct inode* inode);
+static int32 ext4_write_inode(struct inode* inode, int32 wait);
 static void ext4_put_super(struct superblock* sb);
-static int ext4_statfs(struct superblock* sb, struct statfs* stat);
-static int ext4_sync_fs(struct superblock* sb, int wait);
+static int32 ext4_statfs(struct superblock* sb, struct statfs* stat);
+static int32 ext4_sync_fs(struct superblock* sb, int32 wait);
 
 /* Define the superblock operations structure for ext4 */
 const struct superblock_operations ext4_superblock_operations = {
@@ -27,9 +28,9 @@ const struct superblock_operations ext4_superblock_operations = {
  *
  * Returns: 0 on success, negative error code on failure
  */
-static int ext4_read_inode(struct inode* inode) {
+static int32 ext4_read_inode(struct inode* inode) {
 	/* This is implemented in ext4_inode_operations.c */
-	extern int ext4_inode_init(struct superblock * sb, struct inode * inode, uint32_t ino);
+	extern int32 ext4_inode_init(struct superblock * sb, struct inode * inode, uint32_t ino);
 	return ext4_inode_init(inode->i_superblock, inode, inode->i_ino);
 }
 
@@ -40,11 +41,11 @@ static int ext4_read_inode(struct inode* inode) {
  *
  * Returns: 0 on success, negative error code on failure
  */
-static int ext4_write_inode(struct inode* inode, int wait) {
+static int32 ext4_write_inode(struct inode* inode, int32 wait) {
 	struct ext4_inode_ref inode_ref;
 	struct ext4_fs* e_fs = inode->i_superblock->s_fs_info;
 	struct ext4_sblock* e_sb = &e_fs->sb;
-	int ret;
+	int32 ret;
 
 	if (!inode || !e_fs) return -EINVAL;
 
@@ -64,7 +65,7 @@ static int ext4_write_inode(struct inode* inode, int wait) {
 	ext4_inode_set_links_cnt(inode_ref.inode, inode->i_nlink);
 
 	/* Sync the inode if requested */
-	if (wait) { ret = ext4_fs_sync_inode(e_fs, inode_ref.inode); }
+	if (wait) { ret = ext4_sync_inode(&inode_ref); }
 
 	/* Release the ext4 inode reference */
 	ext4_fs_put_inode_ref(&inode_ref);
@@ -102,15 +103,15 @@ static void ext4_put_super(struct superblock* sb) {
  * 取自lwext4库中 ext4_mount_point_stats
  * 
  */
-static int ext4_statfs(struct superblock* sb, struct statfs* stats) {
-	CHECK_PTR(sb, -EINVAL);
-	CHECK_PTR(stat, -EINVAL);
+static int32 ext4_statfs(struct superblock* sb, struct statfs* stats) {
+	CHECK_PTR_VALID(sb, -EINVAL);
+	CHECK_PTR_VALID(stats, -EINVAL);
 
 	struct ext4_fs* e_fs = sb->s_fs_info;
-	CHECK_PTR(e_fs, -EINVAL);
+	CHECK_PTR_VALID(e_fs, -EINVAL);
 
 	struct ext4_sblock* e_sb = &e_fs->sb;
-	CHECK_PTR(e_sb, -EINVAL);
+	CHECK_PTR_VALID(e_sb, -EINVAL);
 
 	ext4_lock();
 	stats->f_type = ext4_get16(e_sb, magic);
@@ -136,8 +137,8 @@ static int ext4_statfs(struct superblock* sb, struct statfs* stats) {
  *
  * Returns: 0 on success, negative error code on failure
  */
-static int ext4_sync_fs(struct superblock* sb, int wait) {
-	CHECK_PTR(sb, -EINVAL);
+static int32 ext4_sync_fs(struct superblock* sb, int32 wait) {
+	CHECK_PTR_VALID(sb, -EINVAL);
 	struct ext4_fs* fs = sb->s_fs_info;
 
 	if (!fs) return -EINVAL;
@@ -146,46 +147,47 @@ static int ext4_sync_fs(struct superblock* sb, int wait) {
 	return ext4_fs_sync(fs);
 }
 
-/**
- * ext4_fill_super - Fill a superblock with filesystem information
- * @sb: The superblock to fill
- * @data: Mount options
- * @silent: Whether to suppress error messages
- *
- * Returns: 0 on success, negative error code on failure
- */
-int ext4_fill_super(struct superblock* sb, void* data, int silent) {
-	/* Allocate and initialize the ext4_fs structure */
-	struct ext4_fs* e_fs = kmalloc(sizeof(struct ext4_fs));
-	if (!e_fs) return -ENOMEM;
-	memset(e_fs, 0, sizeof(struct ext4_fs));
+int32 ext4_fill_super(struct superblock* sb, void* data, int32 silent) {
+    /* Allocate and initialize the ext4_fs structure */
+    struct ext4_fs* e_fs = kmalloc(sizeof(struct ext4_fs));
+    if (!e_fs) return -ENOMEM;
+    memset(e_fs, 0, sizeof(struct ext4_fs));
 
-	/* Get the block device from the superblock */
-	struct ext4_blockdev* bdev = sb->s_bdev;
-	if (!bdev) {
-		kfree(e_fs);
-		return -EINVAL;
-	}
+    /* Get the kernel block device and create the adapter */
+    struct block_device *kernel_bdev = sb->s_bdev;
+    if (!kernel_bdev) {
+        kfree(e_fs);
+        return -EINVAL;
+    }
 
-	/* Initialize the filesystem */
-	int ret = ext4_fs_init(e_fs, bdev, sb->s_flags & MS_RDONLY);
-	if (ret != 0) {
-		kfree(e_fs);
-		return ret;
-	}
+    /* Create the ext4_blockdev adapter */
+    struct ext4_blockdev *e_blockdevice = ext4_blockdev_create_adapter(kernel_bdev);
+    if (!e_blockdevice) {
+        kfree(e_fs);
+        return -ENOMEM;
+    }
+    
+    /* Store the adapter in the filesystem */
+    e_fs->bdev = e_blockdevice;
+    e_blockdevice->fs = e_fs;
 
-	/* Set up the superblock */
-	sb->s_blocksize = ext4_sb_get_block_size(&e_fs->sb);
-	sb->s_blocksize_bits = ffs(sb->s_blocksize) - 1;
-	sb->s_magic = EXT4_SUPERBLOCK_MAGIC;
-	sb->s_operations = &ext4_superblock_operations;
-	sb->s_fs_info = e_fs;
-	sb->s_max_links = EXT4_LINK_MAX;
+    /* Initialize the filesystem */
+    int32 ret = ext4_fs_init(e_fs, e_blockdevice, sb->s_flags & MS_RDONLY);
+    if (ret != 0) {
+        ext4_blockdev_free_adapter(e_blockdevice);
+        kfree(e_fs);
+        return ret;
+    }
 
-	/* Read the root inode */
-	//sb->s_root = dentry_get(e_fs->sb.s_root);
+    /* Set up the superblock */
+    sb->s_blocksize = ext4_sb_get_block_size(&e_fs->sb);
+    sb->s_blocksize_bits = __builtin_ffs(sb->s_blocksize) - 1;
+    sb->s_magic = EXT4_SUPERBLOCK_MAGIC;
+    sb->s_operations = &ext4_superblock_operations;
+    sb->s_fs_info = e_fs;
+    sb->s_max_links = EXT4_LINK_MAX;
 
-	return 0;
+    return 0;
 }
 
 /**
@@ -197,31 +199,24 @@ int ext4_fill_super(struct superblock* sb, void* data, int silent) {
  *
  * Returns: The mounted superblock or an error pointer
  */
-struct superblock* ext4_mount(struct fstype* fs_type, int flags, const char* dev_name, void* data) {
-	struct superblock* sb;
-	int ret;
+// struct superblock* ext4_mount_adapter(struct fstype* fs_type, int32 flags, const char* dev_name, void* data) {
+// 	struct superblock* sb;
+// 	int32 ret;
 
-	/* Create a new superblock */
-	sb = fstype_acquireSuperblock(fs_type, NULL, ext4_fill_super, flags, data);
-	if (IS_ERR(sb)) return sb;
+// 	/* Create a new superblock */
+// 	sb = fstype_acquireSuperblock(fs_type, NULL, ext4_fill_super, flags, data);
+// 	if (IS_ERR(sb)) return sb;
 
-	/* Set the device name */
-	if (dev_name && *dev_name) sb->s_dev_name = kstrdup(dev_name, 0);
+// 	/* Set the device name */
+// 	if (dev_name && *dev_name) sb->s_dev_name = kstrdup(dev_name, 0);
 
-	return sb;
-}
+// 	return sb;
+// }
 
 /* Filesystem type registration structure */
 static struct fstype ext4_fs_type = {
     .fs_name = "ext4",
     .fs_flags = FS_REQUIRES_DEV,
-    .fs_mount = ext4_mount,
-    .fs_kill_sb = kill_block_super,
+    //.fs_mount = ext4_mount_adapter,
+    //.fs_kill_sb = kill_block_super,
 };
-
-/**
- * ext4_init - Initialize the ext4 filesystem driver
- *
- * Returns: 0 on success, negative error code on failure
- */
-int ext4_init(void) { return register_filesystem(&ext4_fs_type); }

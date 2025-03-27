@@ -57,7 +57,7 @@ struct vm_area_struct {
   uint64 vm_end;   // 结束虚拟地址（不包含）
 
   // 保护标志
-  int vm_prot; // 保护标志 (PROT_READ, PROT_WRITE, PROT_EXEC)
+  int32 vm_prot; // 保护标志 (PROT_READ, PROT_WRITE, PROT_EXEC)
   // 蕴含在vm_flags中
 
   // VMA类型和标志
@@ -74,7 +74,7 @@ struct vm_area_struct {
 
   // 页数据
   struct page **pages; // 区域包含的页数组
-  int page_count;      // 页数量
+  int32 page_count;      // 页数量
   spinlock_t vma_lock; // VMA锁
 };
 
@@ -88,7 +88,7 @@ struct vm_fault {
     uint64 address;
 
     /* 标志位 */
-    unsigned int flags;
+    uint32 flags;
     #define FAULT_FLAG_WRITE  0x01 /* 写访问故障 */
     #define FAULT_FLAG_USER   0x02 /* 用户空间访问故障 */
     #define FAULT_FLAG_REMOTE 0x04 /* 远程故障 */
@@ -107,17 +107,17 @@ struct vm_fault {
     struct page *page;
 
     /* 缺页中间状态 */
-    int result;
+    int32 result;
 };
 
 struct vm_area_struct *vm_area_setup(struct mm_struct *mm, uint64 addr,
-                                     uint64 len, enum vma_type type, int prot,
+                                     uint64 len, enum vma_type type, int32 prot,
                                      uint64 flags);
 
 void free_vma(struct vm_area_struct *vma);
 
-int populate_vma(struct vm_area_struct *vma, uint64 addr, size_t length,
-                 int prot);
+int32 populate_vma(struct vm_area_struct *vma, uint64 addr, size_t length,
+                 int32 prot);
 
 /**
  * @brief 通用页面故障处理函数
@@ -134,8 +134,8 @@ vm_fault_t handle_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf);
  * @param vma 虚拟内存区域结构
  * @param addr 虚拟地址
  * @param page 要插入的页面
- * @return int 成功返回0，失败返回错误码
+ * @return int32 成功返回0，失败返回错误码
  */
-int vm_insert_page(struct vm_area_struct *vma, uint64 addr, struct page *page);
+int32 vm_insert_page(struct vm_area_struct *vma, uint64 addr, struct page *page);
 
 #endif

@@ -45,10 +45,10 @@ struct kstat {
     uint64     blocks;  /* Number of 512B blocks allocated */
     
     /* Time values with nanosecond precision */
-    struct timespec64 atime; /* Last access time */
-    struct timespec64 mtime; /* Last modification time */
-    struct timespec64 ctime; /* Last status change time */
-    struct timespec64 btime; /* Creation (birth) time */
+    struct timespec atime; /* Last access time */
+    struct timespec mtime; /* Last modification time */
+    struct timespec ctime; /* Last status change time */
+    struct timespec btime; /* Creation (birth) time */
 };
 
 /**
@@ -70,8 +70,8 @@ struct kstatfs {
 
 
 /* Function prototypes */
-int vfs_stat(const char* path, struct kstat* stat);
-int vfs_statfs(struct path* path, struct kstatfs* kstatfs);
-int vfs_utimes(const char* path, struct timespec* times, int flags);
+int32 vfs_stat(const char* path, struct kstat* stat);
+int32 vfs_statfs(struct path* path, struct kstatfs* kstatfs);
+int32 vfs_utimes(const char* path, struct timespec* times, int32 flags);
 
 #endif /* _STAT_H */

@@ -1,12 +1,13 @@
-
+#include <kernel/mm/kmalloc.h>
 #include <kernel/mm/page.h>
 #include <kernel/types.h>
-#include <util/radix_tree.h>
-#include <util/spinlock.h>
-#include <kernel/fs/vfs/vfs.h>
+#include <kernel/util/radix_tree.h>
+#include <kernel/util/spinlock.h>
+#include <kernel/util/string.h>
+#include <kernel/vfs.h>
 
-int __addrSpace_writeback(struct addrSpace *mapping, struct writeback_control *wbc);
-static void __init_writeback_control(struct writeback_control *wbc, unsigned int sync_mode);
+int32 __addrSpace_writeback(struct addrSpace *mapping, struct writeback_control *wbc);
+static void __init_writeback_control(struct writeback_control *wbc, uint32 sync_mode);
 /**
  * addrSpace_create - Create a new address space for an inode
  * @inode: Inode to associate with the address space
@@ -71,7 +72,7 @@ struct addrSpace* addrSpace_create(struct inode* inode)
  * 这个index不是全局的page index，是addrspace中页的index
  * Returns the page if found, NULL otherwise
  */
-struct page* addrSpace_getPage(struct addrSpace* mapping, unsigned long index) {
+struct page* addrSpace_getPage(struct addrSpace* mapping, uint64 index) {
 	struct page* page = NULL;
 
 	spinlock_lock(&mapping->tree_lock);
@@ -91,8 +92,8 @@ struct page* addrSpace_getPage(struct addrSpace* mapping, unsigned long index) {
  *
  * Returns 0 on success, negative error code on failure
  */
-int addrSpace_addPage(struct addrSpace* mapping, struct page* page, unsigned long index) {
-	int ret;
+int32 addrSpace_addPage(struct addrSpace* mapping, struct page* page, uint64 index) {
+	int32 ret;
 
 	get_page(page); /* Increment ref count before adding */
 
@@ -118,8 +119,8 @@ int addrSpace_addPage(struct addrSpace* mapping, struct page* page, unsigned lon
  *
  * Returns 1 if the page was found and removed, 0 otherwise
  */
-int addrSpace_putPage(struct addrSpace* mapping, struct page* page) {
-	int ret = 0;
+int32 addrSpace_putPage(struct addrSpace* mapping, struct page* page) {
+	int32 ret = 0;
 
 	spinlock_lock(&mapping->tree_lock);
 	if (radix_tree_delete(&mapping->page_tree, page->index) == page) {
@@ -142,7 +143,7 @@ int addrSpace_putPage(struct addrSpace* mapping, struct page* page) {
  *
  * Returns 1 if the page was successfully marked dirty, 0 otherwise
  */
-int addrSpace_setPageDirty(struct addrSpace* mapping, struct page* page) {
+int32 addrSpace_setPageDirty(struct addrSpace* mapping, struct page* page) {
 	if (!mapping || !page)
 		return 0;
 
@@ -167,9 +168,9 @@ int addrSpace_setPageDirty(struct addrSpace* mapping, struct page* page) {
  *
  * Returns the number of pages found
  */
-unsigned int addrSpace_getDirtyPages(struct addrSpace* mapping, struct page** pages, unsigned int nr_pages, unsigned long start) {
-	unsigned int found;
-	unsigned int i;
+uint32 addrSpace_getDirtyPages(struct addrSpace* mapping, struct page** pages, uint32 nr_pages, uint64 start) {
+	uint32 found;
+	uint32 i;
 
 	spinlock_lock(&mapping->tree_lock);
 	found = radix_tree_gang_lookup_tag(&mapping->page_tree, (void**)pages, start, nr_pages, RADIX_TREE_TAG_DIRTY);
@@ -190,7 +191,7 @@ unsigned int addrSpace_getDirtyPages(struct addrSpace* mapping, struct page** pa
  *
  * Returns 1 if successful, 0 otherwise
  */
-int addrSpace_removeDirtyTag(struct addrSpace* mapping, struct page* page) {
+int32 addrSpace_removeDirtyTag(struct addrSpace* mapping, struct page* page) {
 	if (!mapping || !page)
 		return 0;
 
@@ -212,7 +213,7 @@ int addrSpace_removeDirtyTag(struct addrSpace* mapping, struct page* page) {
  *
  * Returns 0 on success, negative error code on failure
  */
-int addrSpace_writeBack(struct addrSpace *mapping) {
+int32 addrSpace_writeBack(struct addrSpace *mapping) {
     struct writeback_control wbc;
     
     init_writeback_control(&wbc, WB_SYNC_ALL);
@@ -232,9 +233,9 @@ int addrSpace_writeBack(struct addrSpace *mapping) {
  *
  * Returns 0 on success, -EBUSY if the page is dirty
  */
-int addrSpace_invalidate(struct addrSpace* mapping, struct page* page)
+int32 addrSpace_invalidate(struct addrSpace* mapping, struct page* page)
 {
-	int ret = 0;
+	int32 ret = 0;
 
 	spinlock_lock(&mapping->tree_lock);
 
@@ -264,7 +265,7 @@ int addrSpace_invalidate(struct addrSpace* mapping, struct page* page)
  *
  * Returns the found or created page, or NULL on failure
  */
-struct page* addrSpace_acquirePage(struct addrSpace* mapping, unsigned long index, unsigned int gfp_mask) {
+struct page* addrSpace_acquirePage(struct addrSpace* mapping, uint64 index, uint32 gfp_mask) {
 	struct page* page;
 
 	/* First try to find the page */
@@ -301,9 +302,9 @@ struct page* addrSpace_acquirePage(struct addrSpace* mapping, unsigned long inde
  *
  * Returns the read page, or NULL on failure
  */
-struct page* addrSpace_readPage(struct addrSpace* mapping, unsigned long index) {
+struct page* addrSpace_readPage(struct addrSpace* mapping, uint64 index) {
 	struct page* page;
-	int ret;
+	int32 ret;
 
 	/* Try to find the page in the cache first */
 	page = addrSpace_getPage(mapping, index);
@@ -360,19 +361,19 @@ struct page* addrSpace_readPage(struct addrSpace* mapping, unsigned long index) 
  *
  * Returns 0 on success, negative error code on failure
  */
-int __addrSpace_writeback(struct addrSpace *mapping, struct writeback_control *wbc) {
+int32 __addrSpace_writeback(struct addrSpace *mapping, struct writeback_control *wbc) {
     struct page *pages[16]; /* Process 16 pages in each batch */
-    unsigned int nr_pages;
-    unsigned long index = 0;
-    int ret = 0;
-    long nr_to_write = wbc->nr_to_write;
+    uint32 nr_pages;
+    uint64 index = 0;
+    int32 ret = 0;
+    int64 nr_to_write = wbc->nr_to_write;
 
     if (!mapping || !mapping->a_ops || !mapping->a_ops->writepage)
         return -EINVAL;
 
     /* Process batches of dirty pages until no more are found or quota reached */
     do {
-        unsigned int i;
+        uint32 i;
 
         nr_pages = addrSpace_getDirtyPages(mapping, pages, 16, index);
 
@@ -443,7 +444,7 @@ int __addrSpace_writeback(struct addrSpace *mapping, struct writeback_control *w
  *
  * Returns 0 on success, negative error code on failure
  */
-int addrSpace_writeback_range(struct addrSpace *mapping, loff_t start, loff_t end, int sync_mode) {
+int32 addrSpace_writeback_range(struct addrSpace *mapping, loff_t start, loff_t end, int32 sync_mode) {
     struct writeback_control wbc;
     
     // Initialize writeback control
@@ -459,7 +460,7 @@ int addrSpace_writeback_range(struct addrSpace *mapping, loff_t start, loff_t en
  * @wbc: The writeback_control structure to initialize
  * @sync_mode: Synchronization mode (WB_SYNC_ALL or WB_SYNC_NONE)
  */
-static void __init_writeback_control(struct writeback_control *wbc, unsigned int sync_mode) {
+static void __init_writeback_control(struct writeback_control *wbc, uint32 sync_mode) {
     memset(wbc, 0, sizeof(struct writeback_control));
     wbc->nr_to_write = INT32_MAX;  // Write as many pages as possible
     wbc->sync_mode = sync_mode;   // Set synchronization mode

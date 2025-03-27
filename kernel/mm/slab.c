@@ -8,11 +8,11 @@
 
 #include <kernel/mm/page.h>
 #include <kernel/mm/slab.h>
-#include <spike_interface/spike_utils.h>
-#include <util/atomic.h>
-#include <util/list.h>
-#include <util/spinlock.h>
-#include <util/string.h>
+#include <kernel/sprint.h>
+#include <kernel/util/atomic.h>
+#include <kernel/util/list.h>
+#include <kernel/util/spinlock.h>
+#include <kernel/util/string.h>
 
 // Slab sizes including allocation headers (8 bytes)
 // These sizes are the total allocation size
@@ -36,30 +36,30 @@ static struct kmem_cache slab_caches[SLAB_SIZES_COUNT];
 /**
  * @brief Set a bit in bitmap
  */
-static inline void set_bit(unsigned char *bitmap, unsigned int idx) {
+static inline void set_bit(unsigned char *bitmap, uint32 idx) {
   bitmap[idx / 8] |= (1 << (idx % 8));
 }
 
 /**
  * @brief Clear a bit in bitmap
  */
-static inline void clear_bit(unsigned char *bitmap, unsigned int idx) {
+static inline void clear_bit(unsigned char *bitmap, uint32 idx) {
   bitmap[idx / 8] &= ~(1 << (idx % 8));
 }
 
 /**
  * @brief Test a bit in bitmap
  */
-static inline int test_bit(unsigned char *bitmap, unsigned int idx) {
+static inline int32 test_bit(unsigned char *bitmap, uint32 idx) {
   return (bitmap[idx / 8] >> (idx % 8)) & 1;
 }
 
 /**
  * @brief Find first zero bit in bitmap
  */
-static int find_first_zero(unsigned char *bitmap, unsigned int size) {
-  for (unsigned int i = 0; i < (size + 7) / 8; i++) {
-    for (unsigned int j = 0; j < 8; j++) {
+static int32 find_first_zero(unsigned char *bitmap, uint32 size) {
+  for (uint32 i = 0; i < (size + 7) / 8; i++) {
+    for (uint32 j = 0; j < 8; j++) {
       if (!(bitmap[i] & (1 << j)) && (i * 8 + j < size)) {
         return i * 8 + j;
       }
@@ -71,14 +71,14 @@ static int find_first_zero(unsigned char *bitmap, unsigned int size) {
 /**
  * @brief Get object index in slab
  */
-static inline unsigned int obj_index(struct slab_header *slab, void *obj) {
+static inline uint32 obj_index(struct slab_header *slab, void *obj) {
   return ((char *)obj - (char *)(slab + 1)) / slab->obj_size;
 }
 
 /**
  * @brief Get object address from index
  */
-static inline void *index_to_obj(struct slab_header *slab, unsigned int idx) {
+static inline void *index_to_obj(struct slab_header *slab, uint32 idx) {
   return (void *)((char *)(slab + 1) + idx * slab->obj_size);
 }
 
@@ -98,11 +98,11 @@ static struct slab_header *slab_header_init(size_t obj_size) {
   // Make sure objects are aligned to 8 bytes
   obj_size = (obj_size + 7) & ~7;
 
-  unsigned int bitmap_size =
+  uint32 bitmap_size =
       sizeof(unsigned char) * ((PAGE_SIZE / obj_size + 7) / 8);
-  unsigned int usable_size =
+  uint32 usable_size =
       PAGE_SIZE - sizeof(struct slab_header) - bitmap_size;
-  unsigned int total_objs = usable_size / obj_size;
+  uint32 total_objs = usable_size / obj_size;
 
   // Initialize slab header
   INIT_LIST_HEAD(&slab->list);
@@ -148,7 +148,7 @@ static void *slab_alloc_obj(struct kmem_cache *cache) {
       list_entry(cache->slabs_partial.next, struct slab_header, list);
 
   // Find first free object
-  int idx = find_first_zero(slab->bitmap, slab->total_count);
+  int32 idx = find_first_zero(slab->bitmap, slab->total_count);
   if (idx < 0) {
     // This shouldn't happen, as partial slabs should have free objects
     panic("slab_alloc_obj: no free object in partial slab\n");
@@ -180,7 +180,7 @@ static void *slab_alloc_obj(struct kmem_cache *cache) {
 static void slab_free_obj(struct kmem_cache *cache, struct slab_header *slab,
                           void *obj) {
   // Get object index
-  unsigned int idx = obj_index(slab, obj);
+  uint32 idx = obj_index(slab, obj);
 
   // Check index validity
   if (idx >= slab->total_count) {
@@ -229,7 +229,7 @@ static void slab_free_obj(struct kmem_cache *cache, struct slab_header *slab,
 void slab_init(void) {
 	sprint("slab_init: start\n");
   // Initialize all slab caches
-  for (int i = 0; i < SLAB_SIZES_COUNT; i++) {
+  for (int32 i = 0; i < SLAB_SIZES_COUNT; i++) {
     struct kmem_cache *cache = &slab_caches[i];
 
     spinlock_init(&cache->lock);
@@ -251,7 +251,7 @@ struct kmem_cache *slab_cache_for_size(size_t size) {
   // Round up size to next multiple of 8 bytes for alignment
   size = (size + 7) & ~7;
 
-  for (int i = 0; i < SLAB_SIZES_COUNT; i++) {
+  for (int32 i = 0; i < SLAB_SIZES_COUNT; i++) {
     if (size <= slab_sizes[i]) {
       //sprint("slab_cache_for_size: i = %d, &slab_caches[i]=%lx\n", i,&slab_caches[i]);
 
@@ -303,7 +303,7 @@ static struct slab_header *find_slab(void *ptr) {
 /**
  * @brief Find and free slab object
  */
-int slab_free(void *ptr) {
+int32 slab_free(void *ptr) {
   if (!ptr)
     return 0;
 
@@ -311,13 +311,13 @@ int slab_free(void *ptr) {
   struct slab_header *slab = find_slab(ptr);
 
   // Verify this is a valid slab object
-  unsigned int idx = obj_index(slab, ptr);
+  uint32 idx = obj_index(slab, ptr);
   if (idx >= slab->total_count) {
     return 0; // Not a valid slab object
   }
 
   // Find matching cache
-  for (int i = 0; i < SLAB_SIZES_COUNT; i++) {
+  for (int32 i = 0; i < SLAB_SIZES_COUNT; i++) {
     struct kmem_cache *cache = &slab_caches[i];
 
     if (cache->obj_size == slab->obj_size) {
@@ -336,12 +336,12 @@ int slab_free(void *ptr) {
  */
 void slab_stats(void) {
   sprint("Slab caches:\n");
-  for (int i = 0; i < SLAB_SIZES_COUNT; i++) {
+  for (int32 i = 0; i < SLAB_SIZES_COUNT; i++) {
     struct kmem_cache *cache = &slab_caches[i];
 
     spinlock_lock(&cache->lock);
 
-    int full_count = 0, partial_count = 0, free_count = 0;
+    int32 full_count = 0, partial_count = 0, free_count = 0;
     struct list_head *pos;
 
     list_for_each(pos, &cache->slabs_full) { full_count++; }

@@ -3,9 +3,9 @@
 
 #include <kernel/riscv.h>
 #include <kernel/types.h>
-#include <util/atomic.h>
-#include <util/list.h>
-#include <util/spinlock.h>
+#include <kernel/util/atomic.h>
+#include <kernel/util/list.h>
+#include <kernel/util/spinlock.h>
 #include <kernel/mm/pagetable.h>
 
 // Forward declarations
@@ -48,7 +48,7 @@ struct page {
 
 // 初始化页管理子系统
 void init_page_manager();
-int get_free_page_count(void);
+int32 get_free_page_count(void);
 
 
 struct page *alloc_page(void);     // 分配单个页并返回page结构
@@ -65,16 +65,16 @@ void get_page(struct page *page); // 增加页引用计数
 // 页标志位操作
 void set_page_dirty(struct page *page);   // 设置页为脏
 void clear_page_dirty(struct page *page); // 清除页脏标志
-int test_page_dirty(struct page *page);   // 测试页是否为脏
+int32 test_page_dirty(struct page *page);   // 测试页是否为脏
 
 // 页锁操作
 void lock_page(struct page *page);   // 锁定页
 void unlock_page(struct page *page); // 解锁页
-int trylock_page(struct page *page); // 尝试锁定页
+int32 trylock_page(struct page *page); // 尝试锁定页
 
 
 // 检查页内容是否最新
-static inline int page_uptodate(struct page *page) {
+static inline int32 page_uptodate(struct page *page) {
   return (page->flags & PAGE_UPTODATE) != 0;
 }
 

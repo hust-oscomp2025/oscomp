@@ -10,8 +10,8 @@
 #include <kernel/fs/lwext4/ext4_config.h>
 #include <kernel/fs/lwext4/ext4_crc32.h>
 #include <kernel/fs/lwext4/ext4_debug.h>
-#include <kernel/fs/lwext4/ext4_dir_idx.h>
 #include <kernel/fs/lwext4/ext4_dir.h>
+#include <kernel/fs/lwext4/ext4_dir_idx.h>
 #include <kernel/fs/lwext4/ext4_errno.h>
 #include <kernel/fs/lwext4/ext4_extent.h>
 #include <kernel/fs/lwext4/ext4_fs.h>
@@ -28,31 +28,27 @@
 #include <kernel/fs/lwext4/ext4_types.h>
 #include <kernel/fs/lwext4/ext4_xattr.h>
 
-#include <kernel/fs/vfs/vfs.h>
+#include <kernel/vfs.h>
 /*helper functions*/
-inline void ext4_timestamp_to_timespec64(uint32_t timestamp, struct timespec64 *ts);
-inline uint32_t timespec64_to_ext4_timestamp(struct timespec64 *ts);
-void make_fsid_from_uuid(const uint8_t uuid[16], fsid_t *fsid);
+void ext4_timestamp_to_timespec64(uint32_t timestamp, struct timespec* ts);
+
+uint32_t timespec64_to_ext4_timestamp(struct timespec* ts);
+void make_fsid_from_uuid(const uint8_t uuid[16], __kernel_fsid_t* fsid);
+
 /*global ext4 superblock lock*/
-inline void ext4_lock(void);		// 注意，我们不使用ext4的mountpoint锁。
-inline void ext4_unlock(void);
+extern spinlock_t ext4_spinlock;
+static inline void ext4_lock(void) { spinlock_lock(&ext4_spinlock); }
+static inline void ext4_unlock(void) { spinlock_unlock(&ext4_spinlock); }
+
+int32 ext4_sync_inode(struct ext4_inode_ref* inode_ref);
+int32 ext4_fs_sync(struct ext4_fs* fs);
 
 
 
+/* Block device adapter */
+struct ext4_blockdev* ext4_blockdev_create_adapter(struct block_device* kernel_bdev);
+void ext4_blockdev_free_adapter(struct ext4_blockdev* e_blockdevice);
 
-
-/**@brief   Mount point OS dependent lock*/
-#define EXT4_MP_LOCK(_m)                                                       \
-	do {                                                                   \
-		if ((_m)->os_locks)                                            \
-			(_m)->os_locks->lock();                                \
-	} while (0)
-
-/**@brief   Mount point OS dependent unlock*/
-#define EXT4_MP_UNLOCK(_m)                                                     \
-	do {                                                                   \
-		if ((_m)->os_locks)                                            \
-			(_m)->os_locks->unlock();                              \
-	} while (0)
+// int32 ext4_fs_flush_journal(struct ext4_fs *fs);
 
 #endif

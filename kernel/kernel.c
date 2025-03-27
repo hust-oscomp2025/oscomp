@@ -8,17 +8,17 @@
 
 #include <kernel/sched/sched.h>
 
-#include <kernel/fs/vfs/vfs.h>
+#include <kernel/vfs.h>
 
 #include <kernel/mm/kmalloc.h>
 #include <kernel/mm/mm_struct.h>
 #include <kernel/mm/mmap.h>
 #include <kernel/mm/pagetable.h>
 
-#include <util/spinlock.h>
-#include <util/string.h>
+#include <kernel/util/spinlock.h>
+#include <kernel/util/string.h>
 
-#include <spike_interface/spike_utils.h>
+#include <kernel/sprint.h>
 
 #include <kernel/types.h>
 
@@ -74,8 +74,8 @@ static void kernel_vm_init(void) {
   sprint("kern_vm_init: complete\n");
 }
 
-int setup_init_fds(struct task_struct *init_task) {
-	int fd, console_fd;
+int32 setup_init_fds(struct task_struct *init_task) {
+	int32 fd, console_fd;
 	
 	
 	// Open console device for standard I/O
@@ -128,10 +128,10 @@ static struct task_struct *load_init_task() {
   // 11. 初始化子进程列表
   INIT_LIST_HEAD(&task->children);
   INIT_LIST_HEAD(&task->sibling);
-  INIT_LIST_HEAD(&task->queue_node);
+  INIT_LIST_HEAD(&task->ready_queue_node);
 
   // // 12. 初始化CPU亲和性(初始进程可以在任何CPU上运行)
-  // for (int i = 0; i < NR_CPUS; i++) {
+  // for (int32 i = 0; i < NR_CPUS; i++) {
   //   cpumask_set_cpu(i, &task->cpus_allowed);
   // }
 
@@ -154,14 +154,15 @@ static struct task_struct *load_init_task() {
 //
 // s_start: S-mode entry point of riscv-pke OS kernel.
 //
-volatile static int sig = 1;
-int s_start(void) {
+volatile static int32 sig = 1;
+
+int32 s_start(void) {
   extern void init_idle_task(void);
 
   sprint("Enter supervisor mode...\n");
   write_csr(satp, 0);
 
-  int hartid = read_tp();
+  int32 hartid = read_tp();
   if (hartid == 0) {
     init_page_manager();
     kernel_vm_init();

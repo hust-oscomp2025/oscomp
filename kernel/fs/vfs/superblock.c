@@ -1,12 +1,12 @@
-#include <kernel/fs/vfs/vfs.h>
+#include <kernel/vfs.h>
 #include <kernel/mm/kmalloc.h>
 #include <kernel/sched/sched.h>
 #include <kernel/types.h>
-#include <util/list.h>
-#include <util/spinlock.h>
-#include <util/string.h>
+#include <kernel/util/list.h>
+#include <kernel/util/spinlock.h>
+#include <kernel/util/string.h>
 
-#include <spike_interface/spike_utils.h>
+#include <kernel/sprint.h>
 
 
 
@@ -98,8 +98,8 @@ void deactivate_super_safe(struct superblock* sb) {
  *
  * Returns 0 on success, negative error code on failure
  */
-int sync_filesystem(struct superblock* sb, int wait) {
-	int ret = 0;
+int32 sync_filesystem(struct superblock* sb, int32 wait) {
+	int32 ret = 0;
 	struct inode *inode, *next;
 
 	if (!sb)
@@ -201,9 +201,9 @@ void generic_shutdown_super(struct superblock* sb) {
  *
  * Returns: A new mount structure on success, NULL on failure
  */
-struct vfsmount* superblock_acquireMount(struct superblock* sb, int flags, const char* device_path) {
+struct vfsmount* superblock_acquireMount(struct superblock* sb, int32 flags, const char* device_path) {
     struct vfsmount* mnt = NULL;
-    static int mount_id = 0;
+    static int32 mount_id = 0;
     
     if (!sb || !sb->s_root)
         return NULL;
@@ -217,13 +217,13 @@ struct vfsmount* superblock_acquireMount(struct superblock* sb, int flags, const
     
     // Fall back to generic mount creation
     mnt = kmalloc(sizeof(struct vfsmount));
-	CHECK_PTR(mnt, ERR_PTR(-ENOMEM));
+	CHECK_PTR_VALID(mnt, ERR_PTR(-ENOMEM));
 
     // Initialize the mount structure
     memset(mnt, 0, sizeof(struct vfsmount));
     atomic_set(&mnt->mnt_refcount, 1);
     mnt->mnt_superblock = sb;
-    mnt->mnt_root = dentry_get(sb->s_root);
+    mnt->mnt_root = dentry_ref(sb->s_root);
     mnt->mnt_flags = flags;
     mnt->mnt_id = mount_id++;
     
@@ -254,3 +254,39 @@ struct vfsmount* superblock_acquireMount(struct superblock* sb, int flags, const
 
 
 
+/**
+ * superblock_createInode - Allocate a new inode for a specific filesystem
+ * @sb: superblock the inode belongs to
+ *
+ * Allocates and initializes a new inode. If the superblock has
+ * an superblock_createInode operation, use that; otherwise allocate a generic inode.
+ *
+ * Returns the new inode or NULL if allocation failed.
+ */
+struct inode* superblock_createInode(struct superblock* sb, uint64 ino) {
+	struct inode* inode;
+  
+	if (sb->s_operations && sb->s_operations->alloc_inode) {
+	  inode = sb->s_operations->alloc_inode(sb, ino);
+	} else {
+	  inode = kmalloc(sizeof(struct inode));
+	}
+	CHECK_PTR_VALID(inode,ERR_PTR(-ENOMEM));
+  
+	/* Initialize the inode */
+	memset(inode, 0, sizeof(struct inode));
+	atomic_set(&inode->i_count, 0);
+	INIT_LIST_HEAD(&inode->i_dentryList);
+	INIT_LIST_HEAD(&inode->i_s_list_node);
+	INIT_LIST_HEAD(&inode->i_state_list_node);
+	spinlock_init(&inode->i_lock);
+	inode->i_superblock = sb;
+	//inode->i_state = I_NEW; /* Mark as new */
+	inode->i_ino = ino;
+	list_add(&inode->i_s_list_node, &sb->s_list_all_inodes);
+	list_add(&inode->i_state_list_node, &sb->s_list_clean_inodes);
+
+	inode_ref(inode);
+	return inode;
+  }
+  

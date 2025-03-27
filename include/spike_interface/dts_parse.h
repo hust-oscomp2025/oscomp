@@ -2,6 +2,8 @@
 #define _DT_PARSE_H_
 
 #include <sys/types.h>
+#include <kernel/types.h>
+#include <kernel/sprint.h>
 
 #define FDT_MAGIC 0xd00dfeed
 #define FDT_VERSION 17
@@ -28,15 +30,15 @@ struct fdt_header {
 struct fdt_scan_node {
   const struct fdt_scan_node *parent;
   const char *name;
-  int address_cells;
-  int size_cells;
+  int32 address_cells;
+  int32 size_cells;
 };
 
 struct fdt_scan_prop {
   const struct fdt_scan_node *node;
   const char *name;
   __uint32_t *value;
-  int len;  // in bytes of value
+  int32 len;  // in bytes of value
 };
 
 struct fdt_cb {
@@ -44,7 +46,7 @@ struct fdt_cb {
   void (*prop)(const struct fdt_scan_prop *prop, void *extra);
   void (*done)(const struct fdt_scan_node *node,
                void *extra);  // last property was seen
-  int (*close)(const struct fdt_scan_node *node,
+  int32 (*close)(const struct fdt_scan_node *node,
                void *extra);  // -1 => delete the node + children
   void *extra;
 };
@@ -56,6 +58,6 @@ __uint32_t fdt_size(__uint64_t fdt);
 // Extract fields
 const __uint32_t *fdt_get_address(const struct fdt_scan_node *node, const __uint32_t *base, __uint64_t *value);
 const __uint32_t *fdt_get_size(const struct fdt_scan_node *node, const __uint32_t *base, __uint64_t *value);
-int fdt_string_list_index(const struct fdt_scan_prop *prop,
+int32 fdt_string_list_index(const struct fdt_scan_prop *prop,
                           const char *str);  // -1 if not found
 #endif

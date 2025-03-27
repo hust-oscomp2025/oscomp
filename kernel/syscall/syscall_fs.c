@@ -1,10 +1,11 @@
-#include <kernel/fs/vfs/vfs.h>
+#include <kernel/vfs.h>
 #include <kernel/mm/uaccess.h>
 #include <kernel/sched/process.h>
 #include <kernel/syscall/syscall.h>
 #include <kernel/types.h>
-#include <spike_interface/spike_utils.h>
-#include <util/string.h>
+#include <kernel/sprint.h>
+#include <kernel/util/string.h>
+#include <kernel/mm/kmalloc.h>
 
 /**
  * sys_mount - Mount a filesystem
@@ -19,12 +20,12 @@
  *
  * Returns 0 on success, negative error code on failure
  */
-long sys_mount(const char* source_user, const char* target_user, const char* fstype_user, unsigned long flags, const void* data_user) {
+int64 sys_mount(const char* source_user, const char* target_user, const char* fstype_user, uint64 flags, const void* data_user) {
 	char* k_source = NULL;
 	char* k_target = NULL;
 	char* k_fstype = NULL;
 	void* k_data = NULL;
-	int ret = 0;
+	int32 ret = 0;
 
 	// 验证用户指针
 	if (!target_user) return -EFAULT;
@@ -52,7 +53,7 @@ long sys_mount(const char* source_user, const char* target_user, const char* fst
 
 		return ret;
 	}
-	
+
 	k_fstype = user_to_kernel_str(fstype_user);
 	if (!k_fstype) {
 		ret = -EFAULT;
@@ -82,4 +83,85 @@ long sys_mount(const char* source_user, const char* target_user, const char* fst
 	if (k_source) kfree(k_source);
 
 	return ret;
+}
+
+
+
+
+// User-facing open syscall
+int64 sys_open(const char *pathname, int32 flags, mode_t mode) {
+    if (!pathname) 
+        return -EFAULT;
+    
+    // Copy pathname from user space
+    char *kpathname = kmalloc(PATH_MAX);
+    if (!kpathname)
+        return -ENOMEM;
+    
+    if (copy_from_user(kpathname, pathname, PATH_MAX)) {
+        kfree(kpathname);
+        return -EFAULT;
+    }
+    
+    // Call internal implementation
+    int32 ret = do_open(kpathname, flags, mode);
+    kfree(kpathname);
+    return ret;
+}
+
+// User-facing close syscall
+int64 sys_close(int32 fd) {
+    return do_close(fd);
+}
+
+// User-facing lseek syscall
+int64 sys_lseek(int32 fd, off_t offset, int32 whence) {
+    return do_lseek(fd, offset, whence);
+}
+
+// User-facing read syscall
+int64 sys_read(int32 fd, void *buf, size_t count) {
+    if (!buf)
+        return -EFAULT;
+    
+    // Allocate kernel buffer
+    char *kbuf = kmalloc(count);
+    if (!kbuf)
+        return -ENOMEM;
+    
+    // Read into kernel buffer
+    ssize_t ret = do_read(fd, kbuf, count);
+    
+    // Copy to user space if successful
+    if (ret > 0) {
+        if (copy_to_user(buf, kbuf, ret)) {
+            kfree(kbuf);
+            return -EFAULT;
+        }
+    }
+    
+    kfree(kbuf);
+    return ret;
+}
+
+// User-facing write syscall
+int64 sys_write(int32 fd, const void *buf, size_t count) {
+    if (!buf)
+        return -EFAULT;
+    
+    // Allocate kernel buffer
+    char *kbuf = kmalloc(count);
+    if (!kbuf)
+        return -ENOMEM;
+    
+    // Copy from user space
+    if (copy_from_user(kbuf, buf, count)) {
+        kfree(kbuf);
+        return -EFAULT;
+    }
+    
+    // Write from kernel buffer
+    ssize_t ret = do_write(fd, kbuf, count);
+    kfree(kbuf);
+    return ret;
 }

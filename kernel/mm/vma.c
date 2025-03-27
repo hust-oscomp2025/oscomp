@@ -1,16 +1,16 @@
 #include <kernel/mm/vma.h>
 #include <kernel/mm/kmalloc.h>
-#include <util/string.h>
+#include <kernel/util/string.h>
 
-static int insert_vm_struct(struct mm_struct *mm, struct vm_area_struct *vma);
-static int vma_alloc_page_array(struct vm_area_struct *vma);
+static int32 insert_vm_struct(struct mm_struct *mm, struct vm_area_struct *vma);
+static int32 vma_alloc_page_array(struct vm_area_struct *vma);
 static void vma_init(struct vm_area_struct *vma, struct mm_struct *mm,
-                     uint64 start, uint64 end,enum vma_type type, int prot, uint64 flags);
+                     uint64 start, uint64 end,enum vma_type type, int32 prot, uint64 flags);
 static struct vm_area_struct *alloc_vma();
 
 void free_vma(struct vm_area_struct *vma) {
   if (vma->pages) {
-    for (int i = 0; i < vma->page_count; i++) {
+    for (int32 i = 0; i < vma->page_count; i++) {
       if (vma->pages[i]) {
         put_page(vma->pages[i]);
       }
@@ -33,7 +33,7 @@ void free_vma(struct vm_area_struct *vma) {
  * Returns: The created VMA or NULL on failure
  */
 struct vm_area_struct *vm_area_setup(struct mm_struct *mm, uint64 addr,
-                                     uint64 len, enum vma_type type, int prot,
+                                     uint64 len, enum vma_type type, int32 prot,
                                      uint64 flags) {
   struct vm_area_struct *vma;
 
@@ -84,8 +84,8 @@ struct vm_area_struct *vm_area_setup(struct mm_struct *mm, uint64 addr,
  * Populate a VMA with physical pages (used with MAP_POPULATE)
  * 也可以只填充vma的部分页
  */
-int populate_vma(struct vm_area_struct *vma, vaddr_t va, size_t length,
-                 int prot) {
+int32 populate_vma(struct vm_area_struct *vma, vaddr_t va, size_t length,
+                 int32 prot) {
   for (size_t offset = 0, page_idx = offset / PAGE_SIZE; offset < length;
        offset += PAGE_SIZE, page_idx++) {
     if (vma->pages[page_idx]) {
@@ -98,7 +98,7 @@ int populate_vma(struct vm_area_struct *vma, vaddr_t va, size_t length,
     }
     vma->pages[page_idx] = page;
 
-    int ret = pgt_map_page(vma->vm_mm->pagetable, va + offset, page->paddr,
+    int32 ret = pgt_map_page(vma->vm_mm->pagetable, va + offset, page->paddr,
                            prot_to_type(prot, vma->vm_flags & VM_USER));
     if (unlikely(ret)) {
       put_page(page);
@@ -139,7 +139,7 @@ static struct vm_area_struct *alloc_vma() {
  * This sets up common fields but doesn't allocate page arrays.
  */
 static void vma_init(struct vm_area_struct *vma, struct mm_struct *mm,
-                     uint64 start, uint64 end,enum vma_type type, int prot, uint64 flags) {
+                     uint64 start, uint64 end,enum vma_type type, int32 prot, uint64 flags) {
   vma->vm_start = start;
   vma->vm_end = end;
   vma->vm_flags = flags;
@@ -164,7 +164,7 @@ static void vma_init(struct vm_area_struct *vma, struct mm_struct *mm,
  *
  * Returns: 0 on success, -ENOMEM on failure
  */
-static int vma_alloc_page_array(struct vm_area_struct *vma) {
+static int32 vma_alloc_page_array(struct vm_area_struct *vma) {
   if (vma->page_count > 0) {
     vma->pages = kmalloc(vma->page_count * sizeof(struct page *));
     if (!vma->pages)
@@ -182,7 +182,7 @@ static int vma_alloc_page_array(struct vm_area_struct *vma) {
  *
  * Returns: 0 on success, -ENOMEM if VMA overlaps with existing ones
  */
-static int insert_vm_struct(struct mm_struct *mm, struct vm_area_struct *vma) {
+static int32 insert_vm_struct(struct mm_struct *mm, struct vm_area_struct *vma) {
   // Check for overlaps
   if (find_vma_intersection(mm, vma->vm_start, vma->vm_end)) {
     return -ENOMEM;

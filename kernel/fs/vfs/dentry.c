@@ -1,11 +1,13 @@
 #include <kernel/fs/vfs/dentry.h>
 #include <kernel/fs/vfs/inode.h>
 #include <kernel/mm/kmalloc.h>
+#include <kernel/sched/sched.h>
 #include <kernel/time.h>
-#include <util/hashtable.h>
-#include <util/string.h>
+#include <kernel/util/hashtable.h>
+#include <kernel/util/string.h>
+#include <kernel/util/qstr.h>
 
-#include <spike_interface/spike_utils.h>
+#include <kernel/sprint.h>
 #include <errno.h>
 
 
@@ -13,20 +15,21 @@
 static struct hashtable dentry_hashtable;
 
 static void* __dentry_get_key(struct list_head* node);
-static unsigned int __dentry_hash(const void* key, unsigned int size);
-static int __dentry_key_equals(const void* k1, const void* k2);
+static uint32 __dentry_hash(const void* key, uint32 size);
+static int32 __dentry_key_equals(const void* k1, const void* k2);
 static struct dentry* __dentry_alloc(struct dentry* parent, const struct qstr* name);
 static void __dentry_free(struct dentry* dentry);
 static struct dentry* __find_in_lru_list(struct dentry* parent, const struct qstr* name);
+static struct dentry* __hashtable_lookupDentry(struct dentry* parent, const struct qstr* name);
 
 /* 复合键结构 - 用于查找时构建临时键 */
 struct dentry_key {
 	struct dentry* parent; /* 父目录项 */
-	struct qstr* name;     /* 名称 */
+	const struct qstr* name;     /* 名称 */
 };
 
 static struct list_head g_dentry_lru_list;  /* 全局LRU链表，用于dentry的复用 */
-static unsigned int g_dentry_lru_count = 0; /* 当前LRU链表中的dentry数量 */
+static uint32 g_dentry_lru_count = 0; /* 当前LRU链表中的dentry数量 */
 static spinlock_t g_dentry_lru_list_lock;
 
 
@@ -52,7 +55,7 @@ void init_dentry_lruList(void) {
  * @param alloc: 未找到时是否创建新dentry
  * @return: 匹配的dentry，引用计数加1，未找到或不符合要求时返回NULL
  */
-struct dentry* dentry_locate(struct dentry* parent, const struct qstr* name, int is_dir, bool revalidate, bool alloc) {
+struct dentry* dentry_acquire(struct dentry* parent, const struct qstr* name, int32 is_dir, bool revalidate, bool alloc) {
 	struct dentry* dentry = NULL;
 	bool type_match = true;
 
@@ -65,14 +68,14 @@ struct dentry* dentry_locate(struct dentry* parent, const struct qstr* name, int
 		tmp_name.hash = full_name_hash(tmp_name.name, tmp_name.len);
 
 	/* 1. 先尝试查找已有的dentry */
-	dentry = d_lookup(parent, &tmp_name);
+	dentry = dentry_lookup(parent, &tmp_name);
 
 	/* 2. 如果找到但需要重新验证 */
 	if (dentry && revalidate && dentry->d_operations && dentry->d_operations->d_revalidate) {
 		if (!dentry->d_operations->d_revalidate(dentry, 0)) {
 			/* 验证失败，放弃此dentry */
-			dentry_put(dentry);
-			d_drop(dentry);
+			dentry_unref(dentry);
+			dentry_unref(dentry);
 			dentry = NULL;
 		}
 	}
@@ -90,7 +93,7 @@ struct dentry* dentry_locate(struct dentry* parent, const struct qstr* name, int
 
 		if (!type_match) {
 			/* 类型不匹配，放弃此dentry */
-			dentry_put(dentry);
+			dentry_unref(dentry);
 			dentry = NULL;
 		}
 	}
@@ -116,7 +119,7 @@ struct dentry* dentry_locate(struct dentry* parent, const struct qstr* name, int
 
 					/* 重新添加到哈希表 */
 					if (!(dentry->d_flags & DCACHE_HASHED)) {
-						int ret = hashtable_insert(&dentry_hashtable, &dentry->d_hashNode);
+						int32 ret = hashtable_insert(&dentry_hashtable, &dentry->d_hashNode);
 						if (ret == 0) {
 							dentry->d_flags |= DCACHE_HASHED;
 						}
@@ -132,7 +135,7 @@ struct dentry* dentry_locate(struct dentry* parent, const struct qstr* name, int
 		dentry = __dentry_alloc(parent, &tmp_name);
 		if (dentry) {
 			/* 添加到哈希表 */
-			int ret = hashtable_insert(&dentry_hashtable, &dentry->d_hashNode);
+			int32 ret = hashtable_insert(&dentry_hashtable, &dentry->d_hashNode);
 			if (ret == 0) {
 				dentry->d_flags |= DCACHE_HASHED;
 			}
@@ -145,7 +148,7 @@ struct dentry* dentry_locate(struct dentry* parent, const struct qstr* name, int
 	return dentry;
 }
 
-struct dentry* dentry_get(struct dentry* dentry){
+struct dentry* dentry_ref(struct dentry* dentry){
 	if (!dentry)
 		return NULL;
 
@@ -156,7 +159,7 @@ struct dentry* dentry_get(struct dentry* dentry){
 /**
  * 初始化dentry缓存
  */
-int init_dentry_hashtable(void) {
+int32 init_dentry_hashtable(void) {
 	sprint("Initializing dentry hashtable\n");
 
 	/* 初始化dentry哈希表 */
@@ -168,7 +171,7 @@ int init_dentry_hashtable(void) {
 /**
  * 释放dentry引用
  */
-int dentry_put(struct dentry* dentry) {
+int32 dentry_unref(struct dentry* dentry) {
 	if (!dentry)
 		return -EINVAL;
 	if (atomic_read(&dentry->d_refcount) <= 0)
@@ -225,13 +228,13 @@ static void __dentry_free(struct dentry* dentry) {
 
 	/* 释放inode引用 */
 	if (dentry->d_inode) {
-		inode_put(dentry->d_inode);
+		inode_unref(dentry->d_inode);
 		dentry->d_inode = NULL;
 	}
 
 	/* 释放父引用 */
 	if (dentry->d_parent && dentry->d_parent != dentry) {
-		dentry_put(dentry->d_parent);
+		dentry_unref(dentry->d_parent);
 		dentry->d_parent = NULL;
 	}
 
@@ -253,10 +256,10 @@ static void __dentry_free(struct dentry* dentry) {
  * @param count: 要释放的dentry数量，0表示全部释放
  * @return: 实际释放的数量
  */
-unsigned int shrink_dentry_lru(unsigned int count) {
+uint32 shrink_dentry_lru(uint32 count) {
 	struct dentry* dentry;
 	struct list_head *pos, *n;
-	unsigned int freed = 0;
+	uint32 freed = 0;
 
 	spinlock_lock(&g_dentry_lru_list_lock);
 
@@ -293,7 +296,7 @@ unsigned int shrink_dentry_lru(unsigned int count) {
  * @param inode: 要关联的inode，NULL表示创建负向dentry（未实现）
  * @return: 成功返回0，失败返回错误码
  */
-int dentry_instantiate(struct dentry* dentry, struct inode* inode) {
+int32 dentry_instantiate(struct dentry* dentry, struct inode* inode) {
 	if (!dentry || !inode)
 		return -EINVAL;
 
@@ -307,14 +310,12 @@ int dentry_instantiate(struct dentry* dentry, struct inode* inode) {
 			list_del_init(&dentry->d_aliasListNode);
 			spinlock_unlock(&dentry->d_inode->i_dentryList_lock);
 		}
-
-		/* 减少inode引用 */
-		inode_put(dentry->d_inode);
+		inode_unref(dentry->d_inode);
 		dentry->d_inode = NULL;
 	}
 
 	/* 增加inode引用计数 */
-	inode = iget(inode);
+	inode = inode_ref(inode);
 	dentry->d_inode = inode;
 
 	/* 添加到inode的别名列表 */
@@ -344,12 +345,12 @@ static void* __dentry_get_key(struct list_head* node) {
 /**
  * 计算dentry复合键的哈希值
  */
-static unsigned int __dentry_hash(const void* key, unsigned int size) {
+static uint32 __dentry_hash(const void* key, uint32 size) {
 	const struct dentry_key* dkey = (const struct dentry_key*)key;
-	unsigned int hash;
+	uint32 hash;
 
 	/* 结合父指针和名称哈希 */
-	hash = (unsigned long)dkey->parent;
+	hash = (uint64)dkey->parent;
 	hash = hash * 31 + dkey->name->hash;
 
 	return hash;
@@ -358,7 +359,7 @@ static unsigned int __dentry_hash(const void* key, unsigned int size) {
 /**
  * 比较两个dentry键是否相等
  */
-static int __dentry_key_equals(const void* k1, const void* k2) {
+static int32 __dentry_key_equals(const void* k1, const void* k2) {
 	const struct dentry_key* key1 = (const struct dentry_key*)k1;
 	const struct dentry_key* key2 = (const struct dentry_key*)k2;
 
@@ -451,7 +452,7 @@ static struct dentry* __dentry_alloc(struct dentry* parent, const struct qstr* n
 	dentry->d_name = qstr_create_with_length(name->name, name->len);
 
 	/* 设置父节点关系 */
-	dentry->d_parent = parent ? dentry_get(parent) : dentry; /* 根目录是自己的父节点 */
+	dentry->d_parent = parent ? dentry_ref(parent) : dentry; /* 根目录是自己的父节点 */
 
 	if (parent) {
 		dentry->d_superblock = parent->d_superblock;
@@ -476,7 +477,6 @@ static struct dentry* __dentry_alloc(struct dentry* parent, const struct qstr* n
  */
 static struct dentry* __find_in_lru_list(struct dentry* parent, const struct qstr* name)
 {
-    struct dentry* dentry = NULL;
     struct dentry_key key;
     
     if (!parent || !name)
@@ -487,8 +487,7 @@ static struct dentry* __find_in_lru_list(struct dentry* parent, const struct qst
     key.name = (struct qstr*)name;
     
     /* 使用全局dentry哈希表直接查找 */
-    dentry = hashtable_lookup(&dentry_hashtable, &key);
-    
+    struct dentry* dentry = __hashtable_lookupDentry(parent, name);
     if (dentry) {
         spinlock_lock(&g_dentry_lru_list_lock);
         
@@ -510,27 +509,27 @@ static struct dentry* __find_in_lru_list(struct dentry* parent, const struct qst
 }
 
 /**
- * dentry_rename - 重命名dentry
- * @old_dentry: 源dentry
- * @new_dentry: 目标dentry
+ * dentry_rename - Rename a dentry (update parent and/or name)
+ * @old_dentry: Source dentry to be renamed
+ * @new_dentry: Target dentry containing new parent and name information
  *
- * 执行dentry重命名操作，包括更新哈希表和父子关系。
- * 此操作需谨慎，因为它会更改哈希表中的键。
+ * Updates a dentry's parent and name, maintaining hash table integrity.
+ * Performs proper locking and reference counting on the parent dentries.
  *
- * 返回: 成功返回0，失败返回错误码
+ * Returns: 0 on success, negative error code on failure
  */
-int dentry_rename(struct dentry *old_dentry, struct dentry *new_dentry)
+int32 dentry_rename(struct dentry *old_dentry, struct dentry *new_dentry)
 {
-    int error = 0;
+    int32 error = 0;
     
     if (!old_dentry || !new_dentry)
         return -EINVAL;
     
-    /* 不能重命名为自身 */
+    /* Don't rename to self */
     if (old_dentry == new_dentry)
         return 0;
     
-    /* 锁定两个dentry - 按地址顺序加锁避免死锁 */
+    /* Lock dentries in address order to prevent deadlocks */
     if (old_dentry < new_dentry) {
         spinlock_lock(&old_dentry->d_lock);
         spinlock_lock(&new_dentry->d_lock);
@@ -539,54 +538,56 @@ int dentry_rename(struct dentry *old_dentry, struct dentry *new_dentry)
         spinlock_lock(&old_dentry->d_lock);
     }
     
-    /* 从哈希表中移除旧dentry */
+    /* Remove from hash table first */
     if (old_dentry->d_flags & DCACHE_HASHED) {
         hashtable_remove(&dentry_hashtable, &old_dentry->d_hashNode);
         old_dentry->d_flags &= ~DCACHE_HASHED;
     }
     
-    /* 如果目标dentry已存在且已哈希，从哈希表移除 */
-    if (new_dentry->d_flags & DCACHE_HASHED) {
-        hashtable_remove(&dentry_hashtable, &new_dentry->d_hashNode);
-        new_dentry->d_flags &= ~DCACHE_HASHED;
-    }
-    
-    /* 更新旧dentry的父和名称 */
+    /* Handle parent change if needed */
     if (old_dentry->d_parent != new_dentry->d_parent) {
-        /* 从旧父移除 */
-        spinlock_lock(&old_dentry->d_parent->d_lock);
+        /* Remove from old parent's child list */
         list_del(&old_dentry->d_parentListNode);
-        spinlock_unlock(&old_dentry->d_parent->d_lock);
         
-        /* 添加到新父 */
+        /* Update parent reference */
+        struct dentry *old_parent = old_dentry->d_parent;
+        old_dentry->d_parent = dentry_ref(new_dentry->d_parent);
+        
+        /* Add to new parent's child list */
         spinlock_lock(&new_dentry->d_parent->d_lock);
         list_add(&old_dentry->d_parentListNode, &new_dentry->d_parent->d_childList);
         spinlock_unlock(&new_dentry->d_parent->d_lock);
         
-        /* 更新父引用 */
-        struct dentry *old_parent = old_dentry->d_parent;
-        old_dentry->d_parent = get_dentry(new_dentry->d_parent);
-        dentry_put(old_parent);
+        /* Release reference to old parent */
+        dentry_unref(old_parent);
     }
-	kfree(old_dentry->d_name);
-	old_dentry->d_name = qstr_create_with_len(new_dentry->d_name->name, new_dentry->d_name->len);
     
+    /* Update name */
+    if (old_dentry->d_name) {
+        kfree(old_dentry->d_name);
+    }
+    old_dentry->d_name = qstr_create_with_length(new_dentry->d_name->name, new_dentry->d_name->len);
     
-
-    
-    
-    if (hashtable_insert(&dentry_hashtable, old_dentry) == 0) {
+    /* Re-hash the dentry with new parent/name */
+    error = hashtable_insert(&dentry_hashtable, &old_dentry->d_hashNode);
+    if (error == 0) {
         old_dentry->d_flags |= DCACHE_HASHED;
     } else {
+        /* If insertion failed, try to restore old state as much as possible */
         error = -EBUSY;
     }
     
-out:
-    spinlock_unlock(&new_dentry->d_lock);
-    spinlock_unlock(&old_dentry->d_lock);
+    /* Unlock in reverse order */
+    if (old_dentry < new_dentry) {
+        spinlock_unlock(&new_dentry->d_lock);
+        spinlock_unlock(&old_dentry->d_lock);
+    } else {
+        spinlock_unlock(&old_dentry->d_lock);
+        spinlock_unlock(&new_dentry->d_lock);
+    }
+    
     return error;
 }
-
 /**
  * dentry_revalidate - 重新验证dentry的有效性
  * @dentry: 要验证的dentry
@@ -597,7 +598,7 @@ out:
  *
  * 返回: 有效返回1，无效返回0，错误返回负值
  */
-int dentry_revalidate(struct dentry *dentry, unsigned int flags)
+int32 dentry_revalidate(struct dentry *dentry, uint32 flags)
 {
     if (!dentry)
         return -EINVAL;
@@ -622,237 +623,256 @@ int dentry_revalidate(struct dentry *dentry, unsigned int flags)
  *
  * Return: The target dentry with increased reference count, or ERR_PTR on error
  */
-struct dentry *dentry_follow_link(struct dentry *link_dentry)
-{
-    struct dentry *target_dentry = NULL;
-    char *link_value = NULL;
-    int res, link_len;
-    int max_loops = 8; /* Maximum symlink recursion depth */
-    bool is_absolute;
+// struct dentry *dentry_follow_link(struct dentry *link_dentry)
+// {
+//     struct dentry *target_dentry = NULL;
+//     char *link_value = NULL;
+//     int32 res, link_len;
+//     int32 max_loops = 8; /* Maximum symlink recursion depth */
+//     bool is_absolute;
     
-    /* Validate input parameters */
-    if (!link_dentry || !link_dentry->d_inode)
-        return ERR_PTR(-EINVAL);
+//     /* Validate input parameters */
+//     if (!link_dentry || !link_dentry->d_inode)
+//         return ERR_PTR(-EINVAL);
     
-    /* Ensure it's a symlink */
-    if (!S_ISLNK(link_dentry->d_inode->i_mode))
-        return ERR_PTR(-EINVAL);
+//     /* Ensure it's a symlink */
+//     if (!S_ISLNK(link_dentry->d_inode->i_mode))
+//         return ERR_PTR(-EINVAL);
     
-    /* Allocate buffer for link content */
-    link_value = kmalloc(PATH_MAX);
-    if (!link_value)
-        return ERR_PTR(-ENOMEM);
+//     /* Allocate buffer for link content */
+//     link_value = kmalloc(PATH_MAX);
+//     if (!link_value)
+//         return ERR_PTR(-ENOMEM);
     
-    /* Get a reference to the original link */
-    struct dentry *current_dentry = dentry_get(link_dentry);
+//     /* Get a reference to the original link */
+//     struct dentry *current_dentry = dentry_ref(link_dentry);
     
-    /* Track the starting point for relative path resolution */
-    struct dentry *base_dir = dentry_get(link_dentry->d_parent);
+//     /* Track the starting point for relative path resolution */
+//     struct dentry *base_dir = dentry_ref(link_dentry->d_parent);
     
-    while (max_loops-- > 0) {
-        /* Read the link content */
-        if (!current_dentry->d_inode->i_op || !current_dentry->d_inode->i_op->readlink) {
-            res = -EINVAL;
-            goto out_error;
-        }
+//     while (max_loops-- > 0) {
+//         /* Read the link content */
+//         if (!current_dentry->d_inode->i_op || !current_dentry->d_inode->i_op->readlink) {
+//             res = -EINVAL;
+//             goto out_error;
+//         }
         
-        link_len = current_dentry->d_inode->i_op->readlink(current_dentry, link_value, PATH_MAX - 1);
-        if (link_len < 0) {
-            res = link_len;
-            goto out_error;
-        }
+//         link_len = current_dentry->d_inode->i_op->readlink(current_dentry, link_value, PATH_MAX - 1);
+//         if (link_len < 0) {
+//             res = link_len;
+//             goto out_error;
+//         }
         
-        /* Ensure the string is null-terminated */
-        link_value[link_len] = '\0';
+//         /* Ensure the string is null-terminated */
+//         link_value[link_len] = '\0';
         
-        /* Determine if the path is absolute or relative */
-        is_absolute = (link_value[0] == '/');
+//         /* Determine if the path is absolute or relative */
+//         is_absolute = (link_value[0] == '/');
         
-        /* Release current dentry before resolving the next path */
-        dentry_put(current_dentry);
-        current_dentry = NULL;
+//         /* Release current dentry before resolving the next path */
+//         dentry_unref(current_dentry);
+//         current_dentry = NULL;
         
-        /* Parse the link path */
-        struct path link_path;
-        struct nameidata nd;
+//         /* Parse the link path */
+//         struct path link_path;
+//         struct nameidata nd;
         
-        /* Pseudocode: Initialize nameidata with appropriate context */
-        /*
-         * nameidata_init(&nd);
-         * nd.path.dentry = is_absolute ? root_dentry : base_dir;
-         * nd.path.mnt = current->fs->root.mnt;
-         * nd.flags = LOOKUP_FOLLOW;
-         */
+//         /* Pseudocode: Initialize nameidata with appropriate context */
+//         /*
+//          * nameidata_init(&nd);
+//          * nd.path.dentry = is_absolute ? root_dentry : base_dir;
+//          * nd.path.mnt = current->fs->root.mnt;
+//          * nd.flags = LOOKUP_FOLLOW;
+//          */
         
-        /* Pseudocode: Path lookup - would be implemented via path_lookup() in a real system */
-        /*
-         * res = path_lookup(link_value, &nd);
-         * if (res) goto out_error;
-         * link_path = nd.path;
-         */
+//         /* Pseudocode: Path lookup - would be implemented via path_lookup() in a real system */
+//         /*
+//          * res = path_lookup(link_value, &nd);
+//          * if (res) goto out_error;
+//          * link_path = nd.path;
+//          */
         
-        /* For demonstration purposes, we'll use the existing path_create function */
-        unsigned int lookup_flags = LOOKUP_FOLLOW;
-        if (!is_absolute) {
-            /* Pseudocode: For relative paths, we need to start from base_dir */
-            /*
-             * // Real implementation would use something like:
-             * res = vfs_path_lookup(base_dir, base_dir->d_sb->s_root.mnt,
-             *                      link_value, lookup_flags, &link_path);
-             */
+//         /* For demonstration purposes, we'll use the existing path_create function */
+//         uint32 lookup_flags = LOOKUP_FOLLOW;
+//         if (!is_absolute) {
+//             /* Pseudocode: For relative paths, we need to start from base_dir */
+//             /*
+//              * // Real implementation would use something like:
+//              * res = vfs_path_lookup(base_dir, base_dir->d_sb->s_root.mnt,
+//              *                      link_value, lookup_flags, &link_path);
+//              */
             
-            /* Since we're using path_create, we need to construct the full path */
-            char full_path[PATH_MAX*2];
-            char base_path[PATH_MAX];
+//             /* Since we're using path_create, we need to construct the full path */
+//             char full_path[PATH_MAX*2];
+//             char base_path[PATH_MAX];
             
-            /* Get the path of the parent directory */
-            dentry_rawPath(base_dir, base_path, PATH_MAX);
+//             /* Get the path of the parent directory */
+//             dentry_allocRawPath(base_dir, base_path, PATH_MAX);
             
-            /* Construct full path by concatenating parent path and link content */
-            if (strlen(base_path) + strlen(link_value) + 2 > PATH_MAX*2) {
-                res = -ENAMETOOLONG;
-                goto out_error;
-            }
+//             /* Construct full path by concatenating parent path and link content */
+//             if (strlen(base_path) + strlen(link_value) + 2 > PATH_MAX*2) {
+//                 res = -ENAMETOOLONG;
+//                 goto out_error;
+//             }
             
-            /* Handle special case when base_path is root */
-            if (strcmp(base_path, "/") == 0)
-                snprintf(full_path, PATH_MAX*2, "/%s", link_value);
-            else
-                snprintf(full_path, PATH_MAX*2, "%s/%s", base_path, link_value);
+//             /* Handle special case when base_path is root */
+//             if (strcmp(base_path, "/") == 0)
+//                 snprintf(full_path, PATH_MAX*2, "/%s", link_value);
+//             else
+//                 snprintf(full_path, PATH_MAX*2, "%s/%s", base_path, link_value);
             
-            res = path_create(full_path, lookup_flags, &link_path);
-        } else {
-            /* Absolute path - just use path_create */
-            res = path_create(link_value, lookup_flags, &link_path);
-        }
+//             res = path_create(full_path, lookup_flags, &link_path);
+//         } else {
+//             /* Absolute path - just use path_create */
+//             res = path_create(link_value, lookup_flags, &link_path);
+//         }
         
-        if (res) {
-            goto out_error;
-        }
+//         if (res) {
+//             goto out_error;
+//         }
         
-        /* Get a reference to the resolved dentry */
-        current_dentry = dentry_get(link_path.dentry);
+//         /* Get a reference to the resolved dentry */
+//         current_dentry = dentry_ref(link_path.dentry);
         
-        /* Clean up the path */
-        /*
-         * Pseudocode: Real implementation would have a proper path_put() function
-         * path_put(&link_path);
-         */
-        path_destroy(&link_path);
+//         /* Clean up the path */
+//         /*
+//          * Pseudocode: Real implementation would have a proper path_put() function
+//          * path_put(&link_path);
+//          */
+//         path_destroy(&link_path);
         
-        /* Check if the target exists */
-        if (!current_dentry->d_inode) {
-            res = -ENOENT;
-            goto out_error;
-        }
+//         /* Check if the target exists */
+//         if (!current_dentry->d_inode) {
+//             res = -ENOENT;
+//             goto out_error;
+//         }
         
-        /* If not a symlink, we're done */
-        if (!S_ISLNK(current_dentry->d_inode->i_mode)) {
-            target_dentry = current_dentry;
-            current_dentry = NULL; /* Prevent it from being released */
-            break;
-        }
+//         /* If not a symlink, we're done */
+//         if (!S_ISLNK(current_dentry->d_inode->i_mode)) {
+//             target_dentry = current_dentry;
+//             current_dentry = NULL; /* Prevent it from being released */
+//             break;
+//         }
         
-        /* For another symlink, update the base_dir for relative path resolution */
-        dentry_put(base_dir);
-        base_dir = dentry_get(current_dentry->d_parent);
-    }
+//         /* For another symlink, update the base_dir for relative path resolution */
+//         dentry_unref(base_dir);
+//         base_dir = dentry_ref(current_dentry->d_parent);
+//     }
     
-    /* Check for too many levels of symlinks */
-    if (max_loops < 0) {
-        res = -ELOOP;
-        goto out_error;
-    }
+//     /* Check for too many levels of symlinks */
+//     if (max_loops < 0) {
+//         res = -ELOOP;
+//         goto out_error;
+//     }
     
-    /* Success - free resources and return target */
-    kfree(link_value);
-    if (base_dir)
-        dentry_put(base_dir);
+//     /* Success - free resources and return target */
+//     kfree(link_value);
+//     if (base_dir)
+//         dentry_unref(base_dir);
     
-    return target_dentry;
+//     return target_dentry;
 
-out_error:
-    /* Clean up on error */
-    kfree(link_value);
-    if (current_dentry)
-        dentry_put(current_dentry);
-    if (base_dir)
-        dentry_put(base_dir);
-    return ERR_PTR(res);
-}
+// out_error:
+//     /* Clean up on error */
+//     kfree(link_value);
+//     if (current_dentry)
+//         dentry_unref(current_dentry);
+//     if (base_dir)
+//         dentry_unref(base_dir);
+//     return ERR_PTR(res);
+// }
 
 
 
 /**
- * dentry_rawPath - 构造dentry的完整路径
- * @dentry: 要构造路径的dentry
- * @buf: 输出缓冲区
- * @buflen: 缓冲区长度
+ * dentry_allocRawPath - Generate the full path string for a dentry
+ * @dentry: The dentry to generate path for
  *
- * 从给定的dentry构造完整路径名，结果放入buf中。
- * 路径是从根目录到dentry的完整路径。
+ * Returns a dynamically allocated string containing the full path
+ * from root to the dentry. The caller is responsible for freeing 
+ * this memory using kfree().
  *
- * 返回: 成功返回缓冲区中路径的起始地址，失败返回NULL
+ * Returns: Pointer to allocated path string, or NULL on failure
  */
-char *dentry_rawPath(struct dentry *dentry, char *buf, int buflen)
+char *dentry_allocRawPath(struct dentry *dentry)
 {
-    if (!dentry || !buf || buflen <= 0)
+    if (!dentry)
         return NULL;
     
-    /* 保留最后一个字符用于NULL结尾 */
-    char *end = buf + buflen - 1;
-	*end = '\0';
-    char *start = end;
-    struct dentry *d = dentry_get(dentry);
-    /* 回溯构建路径 */
+    // First pass: measure the path length
+    int32 path_len = 0;
+    struct dentry *d = dentry_ref(dentry);
+    struct dentry *temp;
+    
     while (d) {
-        /* 获取父dentry，需要处理根目录的情况 */
+        // Handle root directory case
+        if (d == d->d_parent) {
+            // Root directory is just "/"
+            path_len += 1;
+            dentry_unref(d);
+            break;
+        }
+        
+        // Add name length plus '/' separator
+        path_len += d->d_name->len + 1;
+        
+        // Move to parent
+        temp = dentry_ref(d->d_parent);
+        dentry_unref(d);
+        d = temp;
+    }
+    
+    // Allocate buffer with exact size needed (plus null terminator)
+    char *buf = kmalloc(path_len + 1);
+    if (!buf)
+        return NULL;
+    
+    // Second pass: build the path from end to beginning
+    char *end = buf + path_len;
+    *end = '\0';
+    char *start = end;
+    
+    d = dentry_ref(dentry);
+    
+    while (d) {
         spinlock_lock(&d->d_lock);
         
-        /* 如果是根目录，特殊处理 */
+        // Handle root directory case
         if (d == d->d_parent) {
-            /* 根目录路径为"/" */
+            // Root directory is just "/"
             if (start == end)
                 --start;
             *start = '/';
             spinlock_unlock(&d->d_lock);
-            dentry_put(d);
+            dentry_unref(d);
             break;
         }
         
-        /* 获取名称长度 */
-        int name_len = d->d_name->len;
-        /* 检查空间是否足够 */
-        if (start - buf < name_len + 1) {
-            spinlock_unlock(&d->d_lock);
-            dentry_put(d);
-            return NULL; /* 缓冲区太小 */
-        }
-        
-        /* 为当前组件添加目录分隔符 */
-        --start;
-        *start = '/';
-        
-        /* 复制名称 */
+        // Add path component
+        int32 name_len = d->d_name->len;
         start -= name_len;
         memcpy(start, d->d_name->name, name_len);
         
-        /* 增加父dentry引用并释放当前锁 */
-        spinlock_unlock(&d->d_lock);
-        
-        /* 释放当前dentry引用，移动到父级 */\
-		struct dentry* parent = d->d_parent;
-        dentry_put(d);
-        d = dentry_get(parent);
-    }
-    
-    /* 如果路径为空（非常奇怪的情况），返回根路径 */
-    if (start == end) {
+        // Add directory separator
         --start;
         *start = '/';
+        
+        // Get parent before releasing lock
+        struct dentry *parent = dentry_ref(d->d_parent);
+        spinlock_unlock(&d->d_lock);
+        
+        dentry_unref(d);
+        d = parent;
     }
     
-    return start;
+    // If path isn't starting at the beginning of the buffer
+    // (shouldn't happen with proper length calculation)
+    if (start > buf) {
+        int32 actual_len = end - start + 1; // +1 for null terminator
+        memmove(buf, start, actual_len);
+    }
+    
+    return buf;
 }
 
 
@@ -867,7 +887,7 @@ char *dentry_rawPath(struct dentry *dentry, char *buf, int buflen)
  *
  * 返回: 如果有权限返回0，否则返回负错误码
  */
-int dentry_permission(struct dentry *dentry, int mask)
+int32 dentry_permission(struct dentry *dentry, int32 mask)
 {
     struct inode *inode;
     
@@ -894,7 +914,7 @@ int dentry_permission(struct dentry *dentry, int mask)
  *
  * 返回: 成功返回属性值的长度，错误返回负错误码
  */
-int dentry_getxattr(struct dentry *dentry, const char *name, void *value, size_t size)
+int32 dentry_getxattr(struct dentry *dentry, const char *name, void *value, size_t size)
 {
     struct inode *inode;
     
@@ -927,7 +947,7 @@ int dentry_getxattr(struct dentry *dentry, const char *name, void *value, size_t
  *
  * 返回: 成功返回0，错误返回负错误码
  */
-int dentry_setxattr(struct dentry *dentry, const char *name, const void *value, size_t size, int flags)
+int32 dentry_setxattr(struct dentry *dentry, const char *name, const void *value, size_t size, int32 flags)
 {
     struct inode *inode;
     
@@ -939,7 +959,7 @@ int dentry_setxattr(struct dentry *dentry, const char *name, const void *value, 
         return -ENOENT;
     
     /* 检查写入权限 */
-    int err = inode_checkPermission(inode, MAY_WRITE);
+    int32 err = inode_checkPermission(inode, MAY_WRITE);
     if (err)
         return err;
     
@@ -955,7 +975,8 @@ int dentry_setxattr(struct dentry *dentry, const char *name, const void *value, 
         inode_setDirty(inode);
         
         /* 如果文件系统支持，更新ctime */
-        inode->i_ctime = current_time(inode->i_superblock);
+        //inode->i_ctime = current_time(inode->i_superblock);
+		inode->i_ctime = current_time(inode->i_superblock);
     }
     
     return err;
@@ -971,10 +992,10 @@ int dentry_setxattr(struct dentry *dentry, const char *name, const void *value, 
  *
  * 返回: 成功返回0，错误返回负错误码
  */
-int dentry_removexattr(struct dentry *dentry, const char *name)
+int32 dentry_removexattr(struct dentry *dentry, const char *name)
 {
     struct inode *inode;
-    int error;
+    int32 error;
     
     if (!dentry || !name)
         return -EINVAL;
@@ -1051,7 +1072,7 @@ void dentry_prune(struct dentry *dentry) {
  * @param dentry: 要标记为删除的 dentry
  * @return: 成功返回 0，失败返回错误码
  */
-int dentry_delete(struct dentry *dentry) {
+int32 dentry_delete(struct dentry *dentry) {
     struct inode *inode;
     
     if (!dentry)
@@ -1118,9 +1139,9 @@ bool is_mounted(struct dentry* dentry) {
  *
  * Returns 0 if the change is allowed, negative error code otherwise.
  */
-int setattr_prepare(struct dentry* dentry, struct iattr* attr) {
+int32 setattr_prepare(struct dentry* dentry, struct iattr* attr) {
 	struct inode* inode = dentry->d_inode;
-	int error = 0;
+	int32 error = 0;
   
 	if (!inode)
 	  return -EINVAL;
@@ -1163,9 +1184,9 @@ int setattr_prepare(struct dentry* dentry, struct iattr* attr) {
    *
    * Returns 0 on success, negative error code on failure.
    */
-  int notify_change(struct dentry* dentry, struct iattr* attr) {
+  int32 notify_change(struct dentry* dentry, struct iattr* attr) {
 	struct inode* inode = dentry->d_inode;
-	int error;
+	int32 error;
   
 	if (!inode)
 	  return -EINVAL;
@@ -1201,3 +1222,74 @@ int setattr_prepare(struct dentry* dentry, struct iattr* attr) {
 	return 0;
   }
   
+
+
+  /**
+ * dentry_lookup - Find dentry in the dentry cache
+ * @parent: Parent directory dentry
+ * @name: Name to look up in the parent directory
+ *
+ * This function searches for a dentry with the given name under the specified
+ * parent directory in the dentry cache. If found, increases its reference count.
+ *
+ * Return: Found dentry with increased refcount, or NULL if not found
+ */
+struct dentry *dentry_lookup(struct dentry *parent, const struct qstr *name)
+{
+    struct dentry *dentry = NULL;
+    
+    if (!parent || !name || !name->name)
+        return NULL;
+    
+    
+    /* Look up the dentry in the hash table */
+    dentry = __hashtable_lookupDentry(parent, name);
+    
+    /* If found, increase the reference count */
+    if (dentry) {
+        /* Check if the dentry is in LRU list - can't use directly if it is */
+        if (dentry->d_flags & DCACHE_IN_LRU) {
+            spinlock_lock(&g_dentry_lru_list_lock);
+            
+            /* Double-check under lock */
+            if (dentry->d_flags & DCACHE_IN_LRU) {
+                /* Remove from LRU list */
+                list_del_init(&dentry->d_lruListNode);
+                dentry->d_flags &= ~DCACHE_IN_LRU;
+                g_dentry_lru_count--;
+                
+                /* Reset reference count */
+                atomic_set(&dentry->d_refcount, 1);
+            } else {
+                /* Someone else removed it from LRU, increment ref count */
+                atomic_inc(&dentry->d_refcount);
+            }
+            
+            spinlock_unlock(&g_dentry_lru_list_lock);
+        } else {
+            /* Normal case: just increment ref count */
+            atomic_inc(&dentry->d_refcount);
+        }
+        extern uint64 jiffies;
+        /* Update access time for LRU algorithm */
+        dentry->d_time = jiffies;
+        
+        /* Set referenced flag for page replacement algorithms */
+        dentry->d_flags |= DCACHE_REFERENCED;
+    }
+    
+    return dentry;
+}
+
+
+static struct dentry* __hashtable_lookupDentry(struct dentry* parent, const struct qstr* name) {
+	struct dentry_key key;
+	key.parent = parent;
+	key.name = name;
+
+	struct list_node* node = hashtable_lookup(&dentry_hashtable, &key);
+	if (node)
+		return container_of(node, struct dentry, d_hashNode);
+	else
+		return NULL;
+}

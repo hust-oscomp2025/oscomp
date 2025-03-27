@@ -3,9 +3,9 @@
 #include <kernel/types.h>
 /* Structure for the fiemap extent information */
 struct fiemap_extent_info {
-    unsigned int fi_flags;         /* Flags for the current operation */
-    unsigned int fi_extents_mapped; /* Number of extents mapped so far */
-    unsigned int fi_extents_max;    /* Maximum number of extents to map */
+    uint32 fi_flags;         /* Flags for the current operation */
+    uint32 fi_extents_mapped; /* Number of extents mapped so far */
+    uint32 fi_extents_max;    /* Maximum number of extents to map */
     struct fiemap_extent *fi_extents_start; /* Pointer to array of extents */
 };
 

@@ -14,9 +14,9 @@
  #include <stddef.h>
  #include <stdbool.h>
  #include <stdint.h>
- #include <util/atomic.h>
- #include <util/spinlock.h>
- #include <util/list.h>
+ #include <kernel/util/atomic.h>
+ #include <kernel/util/spinlock.h>
+ #include <kernel/util/list.h>
  
  /* Forward declarations */
  struct page;
@@ -58,7 +58,7 @@
  #define buffer_delay(bh)    BH_STATE(BH_Delay, bh)
  
   /* Common buffer head end I/O function signature */
-  typedef void (*bh_end_io_t)(struct buffer_head *bh, int uptodate);
+  typedef void (*bh_end_io_t)(struct buffer_head *bh, int32 uptodate);
  
  /**
   * struct buffer_head - Buffer for block I/O operations
@@ -68,7 +68,7 @@
   */
  struct buffer_head {
 	 /* First cache line */
-	 unsigned long b_state;        /* Buffer state flags */
+	 uint64 b_state;        /* Buffer state flags */
 	 struct buffer_head *b_this_page; /* Circular list of page's buffers */
 	 struct page *b_page;          /* The page this buffer is mapped to */
 	 sector_t b_blocknr;           /* Block number (relative to b_bdev) */
@@ -164,7 +164,7 @@
   * @param bh The buffer_head to read
   * @return 0 on success, negative error code on failure
   */
- int sync_read_buffer(struct buffer_head *bh);
+ int32 sync_read_buffer(struct buffer_head *bh);
  
  /**
   * Write a buffer synchronously
@@ -172,7 +172,7 @@
   * @param bh The buffer_head to write
   * @return 0 on success, negative error code on failure
   */
- int sync_write_buffer(struct buffer_head *bh);
+ int32 sync_write_buffer(struct buffer_head *bh);
  
  /**
   * Submit a buffer for asynchronous I/O
@@ -182,7 +182,7 @@
   * @param end_io Completion function
   * @return 0 on success, negative error code on failure
   */
- int submit_bh(int op, struct buffer_head *bh, bh_end_io_t end_io);
+ int32 submit_bh(int32 op, struct buffer_head *bh, bh_end_io_t end_io);
  
  /**
   * Create and map a buffer for a given device block
@@ -203,6 +203,6 @@
   * @param create Create block if it doesn't exist
   * @return 0 on success, negative error code on failure
   */
- int get_block(struct inode *inode, sector_t block, struct buffer_head *bh, int create);
+ int32 get_block(struct inode *inode, sector_t block, struct buffer_head *bh, int32 create);
  
  #endif /* _FS_BUFFER_HEAD_H */

@@ -2,13 +2,13 @@
 #include <kernel/mm/page.h>
 #include <kernel/mm/pagetable.h>
 
-#include <util/atomic.h>
-#include <util/list.h>
-#include <util/spinlock.h>
-#include <util/string.h>
-#include <util/sync_utils.h>
+#include <kernel/util/atomic.h>
+#include <kernel/util/list.h>
+#include <kernel/util/spinlock.h>
+#include <kernel/util/string.h>
+#include <kernel/util/sync_utils.h>
 
-#include <spike_interface/spike_utils.h>
+#include <kernel/sprint.h>
 
 // 页结构数组，用于跟踪所有物理页
 static struct page *page_pool = NULL;
@@ -231,7 +231,7 @@ void clear_page_dirty(struct page *page) {
 }
 
 // 测试页是否为脏
-int test_page_dirty(struct page *page) {
+int32 test_page_dirty(struct page *page) {
   if (!page)
     return 0;
   return (page->flags & PAGE_DIRTY) != 0;
@@ -254,7 +254,7 @@ void unlock_page(struct page *page) {
 }
 
 // 尝试锁定页
-int trylock_page(struct page *page) {
+int32 trylock_page(struct page *page) {
   if (!page)
     return 0;
 
@@ -265,5 +265,5 @@ int trylock_page(struct page *page) {
   return 0;
 }
 // 获取当前空闲页数量
-int get_free_page_count(void) { return free_page_counter; }
+int32 get_free_page_count(void) { return free_page_counter; }
 

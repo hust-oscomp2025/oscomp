@@ -3,8 +3,8 @@
 
 // #include <kernel/fs/vfs/file.h>
 #include <kernel/types.h>
-#include <util/atomic.h>
-#include <util/spinlock.h>
+#include <kernel/util/atomic.h>
+#include <kernel/util/spinlock.h>
 #include <sys/select.h>
 
 struct file;
@@ -13,6 +13,7 @@ struct file;
 struct wait_queue_head;
 struct wait_queue_entry;
 struct epoll_event;
+struct poll_table_struct;
 
 /* 轮询队列处理函数类型 */
 typedef void (*poll_queue_proc)(struct file *file, struct wait_queue_head *wq, struct poll_table_struct *p);
@@ -23,7 +24,7 @@ typedef void (*poll_queue_proc)(struct file *file, struct wait_queue_head *wq, s
  */
 struct poll_table_struct {
     poll_queue_proc qproc;              /* 队列回调函数，用于注册到等待队列 */
-    unsigned long key;                  /* 事件掩码，标识感兴趣的事件类型 */
+    uint64 key;                  /* 事件掩码，标识感兴趣的事件类型 */
     struct wait_queue_entry *entry;     /* 等待队列条目 */
     struct task_struct *polling_task;   /* 执行轮询的任务 */
 };
@@ -32,19 +33,15 @@ struct poll_table_struct {
 void poll_initwait(struct poll_table_struct *pt);
 void poll_freewait(struct poll_table_struct *pt);
 
-/* 文件描述符标志 */
-#define FD_ALLOCATED   0x01   /* 描述符已分配但可能尚未关联文件 */
-#define FD_CLOEXEC     0x02   /* 执行时关闭标志 */
-
 /**
  * fdtable - File descriptor table structure
  */
 struct fdtable {
 	struct file** fd_array; /* Array of file pointers */
-	unsigned int* fd_flags; /* Array of fd flags */
+	uint32* fd_flags; /* Array of fd flags */
 
-	unsigned int fdt_size;   /* Size of the array */
-	unsigned int fdt_nextfd; /* Next free fd number */
+	uint32 fdt_size;   /* Size of the array */
+	uint32 fdt_nextfd; /* Next free fd number */
 	spinlock_t fdt_lock;     /* Lock for the struct */
 	atomic_t fdt_refcount;   /* Reference count */
 };
@@ -52,28 +49,32 @@ struct fdtable {
 /* Process-level file table management */
 struct fdtable* fdtable_get(struct fdtable*);  // thread
 struct fdtable* fdtable_copy(struct fdtable*); // fork
-int fdtable_put(struct fdtable* fdt);
+int32 fdtable_put(struct fdtable* fdt);
 
-int fdtable_allocFd(struct fdtable* fdt, unsigned int flags);
+int32 fdtable_allocFd(struct fdtable* fdt, uint32 flags);
 void fdtable_closeFd(struct fdtable* fdt, uint64 fd);
-int fdtable_installFd(struct fdtable* fdt, uint64 fd, struct file* file);
+int32 fdtable_installFd(struct fdtable* fdt, uint64 fd, struct file* file);
 
 struct file* fdtable_getFile(struct fdtable* fdt, uint64 fd);
 // put_file是file的方法
 /*fdtable容量管理*/
-int fdtable_expand(struct fdtable* fdt, unsigned int new_size);
+int32 fdtable_expand(struct fdtable* fdt, uint32 new_size);
 uint64 fdtable_getSize(struct fdtable* fdt);
 
 /*fd标志位管理*/
-int fdtable_setFdFlags(struct fdtable* fdt, uint64 fd, unsigned int flags);
-unsigned int fdtable_getFdFlags(struct fdtable* fdt, uint64 fd);
+int32 fdtable_setFdFlags(struct fdtable* fdt, uint64 fd, uint32 flags);
+uint32 fdtable_getFdFlags(struct fdtable* fdt, uint64 fd);
 
 /*文件系统调用*/
 /*重定向文件描述符*/
-int do_dup2(struct fdtable* fdt, uint64 oldfd, uint64 newfd);
+int32 do_dup2(struct fdtable* fdt, uint64 oldfd, uint64 newfd);
 /*文件描述符控制系统调用，用于修改文件描述符的属性*/
-int do_fcntl(struct fdtable* fdt, uint64 fd, unsigned int cmd, unsigned long arg);
-
+int32 do_fcntl(struct fdtable* fdt, uint64 fd, uint32 cmd, uint64 arg);
+int32 do_open(const char *pathname, int32 flags, ...);
+int32 do_close(int32 fd);
+off_t do_lseek(int32 fd, off_t offset, int32 whence);
+ssize_t do_read(int32 fd, void *buf, size_t count);
+ssize_t do_write(int32 fd, const void *buf, size_t count);
 /**
  * 实现select系统调用逻辑
  *
@@ -85,19 +86,19 @@ int do_fcntl(struct fdtable* fdt, uint64 fd, unsigned int cmd, unsigned long arg
  * @param timeout   超时时间结构体，NULL表示永久等待
  * @return          就绪的文件描述符数量，错误时返回负值
  */
-int do_select(struct fdtable* fdt, int nfds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, struct timeval* timeout);
+int32 do_select(struct fdtable* fdt, int32 nfds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, struct timeval* timeout);
 
-/**
- * 实现poll系统调用逻辑
- *
- * @param fdt       文件描述符表
- * @param fds       pollfd结构体数组
- * @param nfds      数组中的描述符数量
- * @param timeout   超时时间（毫秒），-1表示永久等待
- * @return          就绪的文件描述符数量，错误时返回负值
- */
-int do_poll(struct fdtable *fdt, struct pollfd *fds,
-	unsigned int nfds, int timeout);
+// /**
+//  * 实现poll系统调用逻辑
+//  *
+//  * @param fdt       文件描述符表
+//  * @param fds       pollfd结构体数组
+//  * @param nfds      数组中的描述符数量
+//  * @param timeout   超时时间（毫秒），-1表示永久等待
+//  * @return          就绪的文件描述符数量，错误时返回负值
+//  */
+// int32 do_poll(struct fdtable *fdt, struct pollfd *fds,
+// 	uint32 nfds, int32 timeout);
 
 
 
@@ -108,7 +109,7 @@ int do_poll(struct fdtable *fdt, struct pollfd *fds,
  * @param flags     创建标志
  * @return          新的epoll文件描述符，错误时返回负值
  */
-int do_epoll_create(struct fdtable *fdt, int flags);
+int32 do_epoll_create(struct fdtable *fdt, int32 flags);
 
 /**
  * 控制epoll实例上的文件描述符
@@ -120,7 +121,7 @@ int do_epoll_create(struct fdtable *fdt, int flags);
  * @param event     事件描述
  * @return          成功返回0，错误时返回负值
  */
-int do_epoll_ctl(struct fdtable *fdt, int epfd, int op, int fd,
+int32 do_epoll_ctl(struct fdtable *fdt, int32 epfd, int32 op, int32 fd,
                 struct epoll_event *event);
 
 /**
@@ -133,7 +134,7 @@ int do_epoll_ctl(struct fdtable *fdt, int epfd, int op, int fd,
  * @param timeout   超时时间（毫秒）
  * @return          就绪的文件描述符数量，错误时返回负值
  */
-int do_epoll_wait(struct fdtable *fdt, int epfd,
-                 struct epoll_event *events, int maxevents, int timeout);
+int32 do_epoll_wait(struct fdtable *fdt, int32 epfd,
+                 struct epoll_event *events, int32 maxevents, int32 timeout);
 
 #endif /* _FDTABLE_H */

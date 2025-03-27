@@ -1,12 +1,12 @@
 #ifndef _DENTRY_H
 #define _DENTRY_H
 
-#include <kernel/fs/vfs/vfs.h>
+#include <kernel/vfs.h>
 #include <kernel/types.h>
-#include <util/atomic.h>
-#include <util/list.h>
-#include <util/qstr.h>
-#include <util/spinlock.h>
+#include <kernel/util/atomic.h>
+#include <kernel/util/list.h>
+#include <kernel/util/qstr.h>
+#include <kernel/util/spinlock.h>
 
 
 struct dentry_operations;
@@ -22,7 +22,7 @@ struct dentry {
 	atomic_t d_refcount; /* Reference count */
 
 	/* RCU lookup touched fields */
-	unsigned int d_flags;  /* Dentry flags */
+	uint32 d_flags;  /* Dentry flags */
 	struct inode* d_inode; /* Associated inode */
 
 	/* Lookup cache information */
@@ -41,7 +41,7 @@ struct dentry {
 	struct superblock* d_superblock; /* Superblock of file */
 
 	/* D-cache management */
-	unsigned long d_time; /* Revalidation time */
+	uint64 d_time; /* Revalidation time */
 	void* d_fsdata;       /* Filesystem-specific data */
 
 	struct list_node d_lruListNode;   /* 全局dentry的LRU链表，在引用计数归零时加入，便于复用 */
@@ -49,27 +49,31 @@ struct dentry {
 	struct list_node d_aliasListNode; /* Inode 别名链表，用来维护硬链接 */
 
 	/* Mount management */
-	int d_mounted;            /* Mount count */
+	int32 d_mounted;            /* Mount count */
 	struct path* d_automount; /* Automount point */
 
 	const struct dentry_operations* d_operations; /* Dentry operations */
 };
 
-int init_dentry_hashtable(void);
+int32 init_dentry_hashtable(void);
 
 /*dentry lru链表相关*/
 void init_dentry_lruList(void);
-unsigned int shrink_dentry_lru(unsigned int count);
+uint32 shrink_dentry_lru(uint32 count);
 
 /*dentry生命周期*/
-struct dentry* dentry_locate(struct dentry* parent, const struct qstr* name, int is_dir, bool revalidate, bool alloc);
-struct dentry* dentry_get(struct dentry* dentry); // 主要用来获取父节点
-int dentry_put(struct dentry* dentry);
+struct dentry* dentry_acquire(struct dentry* parent, const struct qstr* name, int32 is_dir, bool revalidate, bool alloc);
+struct dentry* dentry_ref(struct dentry* dentry); // 主要用来获取父节点
+int32 dentry_unref(struct dentry* dentry);
+
+
+struct dentry *dentry_lookup(struct dentry *parent, const struct qstr *name);
+
 void dentry_prune(struct dentry *dentry);	/*unsafe*/
-int dentry_delete(struct dentry *dentry);
+int32 dentry_delete(struct dentry *dentry);
 
 
-int dentry_instantiate(struct dentry* dentry, struct inode* inode);
+int32 dentry_instantiate(struct dentry* dentry, struct inode* inode);
 
 /*dentry标志判断*/
 static inline bool dentry_isDir(const struct dentry* dentry);
@@ -77,47 +81,46 @@ static inline bool dentry_isSymlink(const struct dentry* dentry);
 static inline bool dentry_isMountpoint(const struct dentry* dentry);
 
 /*名字和目录操作*/
-int dentry_rename(struct dentry* old_dentry, struct dentry* new_dentry);
+int32 dentry_rename(struct dentry* old_dentry, struct dentry* new_dentry);
 /*符号链接支持*/
-struct dentry* dentry_follow_link(struct dentry* link_dentry);
-char* dentry_rawPath(struct dentry* dentry, char* buf, int buflen);
+//struct dentry* dentry_follow_link(struct dentry* link_dentry);
+char* dentry_allocRawPath(struct dentry* dentry);
 void dentry_prune(struct dentry *dentry); /*从父目录的子列表和哈希表中分离，但保留结构体和资源*/
-bool is_mounted(struct dentry *dentry);
 
 /*用于网络文件系统等需要验证缓存有效性的场景*/
-int dentry_revalidate(struct dentry* dentry, unsigned int flags);
+int32 dentry_revalidate(struct dentry* dentry, uint32 flags);
 
 
-int setattr_prepare(struct dentry* dentry, struct iattr* attr);
-int notify_change(struct dentry* dentry, struct iattr* attr);
+int32 setattr_prepare(struct dentry* dentry, struct iattr* attr);
+int32 notify_change(struct dentry* dentry, struct iattr* attr);
 
 /*inode hook functions*/
-int dentry_permission(struct dentry* dentry, int mask);
-int dentry_getxattr(struct dentry* dentry, const char* name, void* value, size_t size);
-int dentry_setxattr(struct dentry* dentry, const char* name, const void* value, size_t size, int flags);
-int dentry_removexattr(struct dentry* dentry, const char* name);
+int32 dentry_permission(struct dentry* dentry, int32 mask);
+int32 dentry_getxattr(struct dentry* dentry, const char* name, void* value, size_t size);
+int32 dentry_setxattr(struct dentry* dentry, const char* name, const void* value, size_t size, int32 flags);
+int32 dentry_removexattr(struct dentry* dentry, const char* name);
 
 /*
  * Operations that can be specialized for a particular dentry
  */
 struct dentry_operations {
 	/* Called to determine if dentry is still valid - important for NFS etc */
-	int (*d_revalidate)(struct dentry*, unsigned int);
+	int32 (*d_revalidate)(struct dentry*, uint32);
 
 	/* Called to hash the dentry name for dcache */
-	int (*d_hash)(const struct dentry*, struct qstr*);
+	int32 (*d_hash)(const struct dentry*, struct qstr*);
 
 	/* Called for name comparisons */
-	int (*d_compare)(const struct dentry*, unsigned int, const char*, const struct qstr*);
+	int32 (*d_compare)(const struct dentry*, uint32, const char*, const struct qstr*);
 
 	/* Called when dentry's reference count reaches 0 */
-	int (*d_free)(const struct dentry*);
+	int32 (*d_free)(const struct dentry*);
 
 	/* Called to release dentry's inode */
 	void (*d_inode_put)(struct dentry*, struct inode*);
 
 	/* Called to create the relative path of a dentry */
-	char* (*d_dname)(struct dentry*, char*, int);
+	char* (*d_dname)(struct dentry*, char*, int32);
 
 	/* Called when a dentry is unhashed */
 	void (*d_prune)(struct dentry*);

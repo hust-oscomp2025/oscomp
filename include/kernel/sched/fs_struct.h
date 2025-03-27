@@ -2,10 +2,10 @@
 #define _FS_STRUCT_H
 
 #include <kernel/types.h>
-#include <kernel/fs/vfs/vfs.h>
+#include <kernel/vfs.h>
 #include <kernel/fs/vfs/file.h>
-#include <util/atomic.h>
-#include <util/spinlock.h>
+#include <kernel/util/atomic.h>
+#include <kernel/util/spinlock.h>
 
 
 

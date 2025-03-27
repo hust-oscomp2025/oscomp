@@ -1,60 +1,63 @@
 #include <kernel/fs/ext4_adaptor.h>
-#include <kernel/fs/vfs/vfs.h>
+#include <kernel/vfs.h>
 #include <kernel/mm/kmalloc.h>
+#include <kernel/time.h>
+#include <kernel/sched/signal.h>
+#include <kernel/util/string.h>
+#include <kernel/types.h>
 
-#include <kernel/fs/lwext4/ext4.h>
-#include <kernel/fs/lwext4/ext4_inode.h>
-#include <kernel/fs/lwext4/ext4_xattr.h>
-#include <kernel/fs/lwext4/ext4_super.h>
-#include <kernel/fs/lwext4/ext4_fs.h>
-#include <kernel/fs/lwext4/ext4_dir.h>
+
 
 /* Forward declarations for file and dir operations */
 extern const struct file_operations ext4_file_operations;
 extern const struct file_operations ext4_dir_operations;
 
-static int __inode_getExt4InodeRef(struct inode *inode, struct ext4_inode_ref *ref);
+int32 __ext4_flush_dirty_inode(struct ext4_inode_ref *inode_ref);
+int32 ext4_sync_inode(struct ext4_inode_ref *inode_ref);
 
-static struct inode *ext4_vfs_lookup(struct inode *dir, struct dentry *dentry, unsigned int flags);
-static int ext4_vfs_create(struct inode *dir, struct dentry *dentry, mode_t mode);
-static int ext4_vfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_dentry);
-static int ext4_vfs_unlink(struct inode *dir, struct dentry *dentry);
-static int ext4_vfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname);
-static int ext4_vfs_mkdir(struct inode *dir, struct dentry *dentry, mode_t mode);
-static int ext4_vfs_rmdir(struct inode *dir, struct dentry *dentry);
-static int ext4_vfs_rename(struct inode *old_dir, struct dentry *old_dentry, 
+
+static int32 __inode_getExt4InodeRef(struct inode *inode, struct ext4_inode_ref *ref);
+
+static struct inode *ext4_vfs_lookup(struct inode *dir, struct dentry *dentry, uint32 flags);
+static int32 ext4_vfs_create(struct inode *dir, struct dentry *dentry, mode_t mode);
+static int32 ext4_vfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_dentry);
+static int32 ext4_vfs_unlink(struct inode *dir, struct dentry *dentry);
+static int32 ext4_vfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname);
+static int32 ext4_vfs_mkdir(struct inode *dir, struct dentry *dentry, mode_t mode);
+static int32 ext4_vfs_rmdir(struct inode *dir, struct dentry *dentry);
+static int32 ext4_vfs_rename(struct inode *old_dir, struct dentry *old_dentry, 
                         struct inode *new_dir, struct dentry *new_dentry);
 
-static int ext4_vfs_readlink(struct dentry *dentry, char *buffer, int buflen);
-static int ext4_vfs_permission(struct inode *inode, int mask);
-static int ext4_vfs_setattr(struct dentry *dentry, struct iattr *attr);
-static int ext4_vfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat);
-static int ext4_vfs_setxattr(struct dentry *dentry, const char *name, const void *value, 
-                          size_t size, int flags);
+static int32 ext4_vfs_readlink(struct dentry *dentry, char *buffer, int32 buflen);
+static int32 ext4_vfs_permission(struct inode *inode, int32 mask);
+static int32 ext4_vfs_setattr(struct dentry *dentry, struct iattr *attr);
+static int32 ext4_vfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat);
+static int32 ext4_vfs_setxattr(struct dentry *dentry, const char *name, const void *value, 
+                          size_t size, int32 flags);
 static ssize_t ext4_vfs_getxattr(struct dentry *dentry, const char *name, void *buffer, size_t size);
 static ssize_t ext4_vfs_listxattr(struct dentry *dentry, char *buffer, size_t size);
-static int ext4_vfs_removexattr(struct dentry *dentry, const char *name);
+static int32 ext4_vfs_removexattr(struct dentry *dentry, const char *name);
 
 /* New VFS interfaces */
-static int ext4_vfs_get_acl(struct inode *inode, int type);
-static int ext4_vfs_set_acl(struct inode *inode, struct posix_acl *acl, int type);
-static int ext4_vfs_get_link(struct dentry *dentry, struct inode *inode, struct path *path);
-static int ext4_vfs_mknod(struct inode *inode, struct dentry *dentry, fmode_t mode, dev_t dev);
-static int ext4_vfs_fiemap(struct inode *inode, struct fiemap_extent_info *fiemap_info, 
+//static int32 ext4_vfs_get_acl(struct inode *inode, int32 type);
+//static int32 ext4_vfs_set_acl(struct inode *inode, struct posix_acl *acl, int32 type);
+static int32 ext4_vfs_get_link(struct dentry *dentry, struct inode *inode, struct path *path);
+static int32 ext4_vfs_mknod(struct inode *inode, struct dentry *dentry, fmode_t mode, dev_t dev);
+static int32 ext4_vfs_fiemap(struct inode *inode, struct fiemap_extent_info *fiemap_info, 
                          uint64_t start, uint64_t len);
-static int ext4_vfs_get_block(struct inode *inode, sector_t block, 
-                           struct buffer_head *buffer_head, int create);
+static int32 ext4_vfs_get_block(struct inode *inode, sector_t block, 
+                           struct buffer_head *buffer_head, int32 create);
 static sector_t ext4_vfs_bmap(struct inode *inode, sector_t block);
 static void ext4_vfs_truncate_blocks(struct inode *inode, loff_t size);
-static int ext4_vfs_direct_IO(struct kiocb *kiocb, struct io_vector_iterator *iov_iter);
+static int32 ext4_vfs_direct_IO(struct kiocb *kiocb, struct io_vector_iterator *iov_iter);
 static vm_fault_t ext4_vfs_page_fault(struct vm_area_struct *vma, struct vm_fault *vmf);
-static unsigned long ext4_vfs_get_unmapped_area(struct file *file, unsigned long addr,
-                                             unsigned long len, unsigned long pgoff,
-                                             unsigned long flags);
-static int ext4_vfs_atomic_open(struct inode *inode, struct dentry *dentry,
+// static uint64 ext4_vfs_get_unmapped_area(struct file *file, uint64 addr,
+//                                              uint64 len, uint64 pgoff,
+//                                              uint64 flags);
+static int32 ext4_vfs_atomic_open(struct inode *inode, struct dentry *dentry,
                              struct file *file, unsigned open_flag,
                              umode_t create_mode);
-static int ext4_vfs_tmpfile(struct inode *inode, struct dentry *dentry, umode_t mode);
+static int32 ext4_vfs_tmpfile(struct inode *inode, struct dentry *dentry, umode_t mode);
 
 
 /**
@@ -62,45 +65,45 @@ static int ext4_vfs_tmpfile(struct inode *inode, struct dentry *dentry, umode_t 
  */
 const struct inode_operations ext4_file_inode_operations = {
     .permission     = ext4_vfs_permission,
-    .get_acl        = ext4_vfs_get_acl,
-    .set_acl        = ext4_vfs_set_acl,
+    //.get_acl        = ext4_vfs_get_acl,
+    //.set_acl        = ext4_vfs_set_acl,
     .setattr        = ext4_vfs_setattr,
-    .getattr        = ext4_vfs_getattr,
+    //.getattr        = ext4_vfs_getattr,
     .setxattr       = ext4_vfs_setxattr,
     .getxattr       = ext4_vfs_getxattr,
     .listxattr      = ext4_vfs_listxattr,
     .removexattr    = ext4_vfs_removexattr,
-    .fiemap         = ext4_vfs_fiemap,
+    //.fiemap         = ext4_vfs_fiemap,
     .get_block      = ext4_vfs_get_block,
     .bmap           = ext4_vfs_bmap,
     .truncate_blocks = ext4_vfs_truncate_blocks,
     .direct_IO      = ext4_vfs_direct_IO,
     .page_fault     = ext4_vfs_page_fault,
-    .get_unmapped_area = ext4_vfs_get_unmapped_area,
+    //.get_unmapped_area = ext4_vfs_get_unmapped_area,
 };
 
 /**
  * ext4_dir_inode_operations - Operations for directories
  */
 const struct inode_operations ext4_dir_inode_operations = {
-    .create         = ext4_vfs_create,
-    .lookup         = ext4_vfs_lookup,
+    //.create         = ext4_vfs_create,
+    //.lookup         = ext4_vfs_lookup,
     .link           = ext4_vfs_link,
     .unlink         = ext4_vfs_unlink,
     .symlink        = ext4_vfs_symlink,
     .mkdir          = ext4_vfs_mkdir,
     .rmdir          = ext4_vfs_rmdir,
-    .rename         = ext4_vfs_rename,
+    //.rename         = ext4_vfs_rename,
     .permission     = ext4_vfs_permission,
     .setattr        = ext4_vfs_setattr,
-    .getattr        = ext4_vfs_getattr,
+    //.getattr        = ext4_vfs_getattr,
     .setxattr       = ext4_vfs_setxattr,
     .getxattr       = ext4_vfs_getxattr,
     .listxattr      = ext4_vfs_listxattr,
     .mknod          = ext4_vfs_mknod,
     .removexattr    = ext4_vfs_removexattr,
-    .get_acl        = ext4_vfs_get_acl,
-    .set_acl        = ext4_vfs_set_acl,
+    //.get_acl        = ext4_vfs_get_acl,
+    //.set_acl        = ext4_vfs_set_acl,
     .atomic_open    = ext4_vfs_atomic_open,
     .tmpfile        = ext4_vfs_tmpfile,
 };
@@ -109,17 +112,17 @@ const struct inode_operations ext4_dir_inode_operations = {
  * ext4_symlink_inode_operations - Operations for symbolic links
  */
 const struct inode_operations ext4_symlink_inode_operations = {
-    .get_link       = ext4_vfs_get_link,
-    .readlink       = ext4_vfs_readlink,
-    .permission     = ext4_vfs_permission,
-    .setattr        = ext4_vfs_setattr,
-    .getattr        = ext4_vfs_getattr,
-    .setxattr       = ext4_vfs_setxattr,
-    .getxattr       = ext4_vfs_getxattr,
-    .listxattr      = ext4_vfs_listxattr,
-    .removexattr    = ext4_vfs_removexattr,
-    .get_acl        = ext4_vfs_get_acl,
-    .set_acl        = ext4_vfs_set_acl,
+    // .get_link       = ext4_vfs_get_link,
+    // .readlink       = ext4_vfs_readlink,
+    // .permission     = ext4_vfs_permission,
+    // .setattr        = ext4_vfs_setattr,
+    // //.getattr        = ext4_vfs_getattr,
+    // .setxattr       = ext4_vfs_setxattr,
+    // .getxattr       = ext4_vfs_getxattr,
+    // .listxattr      = ext4_vfs_listxattr,
+    // .removexattr    = ext4_vfs_removexattr,
+    // .get_acl        = ext4_vfs_get_acl,
+    //.set_acl        = ext4_vfs_set_acl,
 };
 
 /**
@@ -130,11 +133,11 @@ const struct inode_operations ext4_symlink_inode_operations = {
  * 
  * Returns: 0 on success, negative error code on failure
  */
-int ext4_inode_init(struct superblock *sb, struct inode *inode, uint32_t ino) {
+int32 ext4_inode_init(struct superblock *sb, struct inode *inode, uint32_t ino) {
     struct ext4_inode_ref e_inode_ref;
     struct ext4_fs *e_fs = sb->s_fs_info;	// 每一个vfs sb都有一个ext4 fs对应，然后再对应一个ext4 sb
-	struct ext4_superblock *e_sb = &e_fs->sb;
-    int ret;
+	struct ext4_sblock *e_sb = &e_fs->sb;
+    int32 ret;
     
     /* Get the ext4 inode reference */
     ret = ext4_fs_get_inode_ref(e_fs, ino, &e_inode_ref);
@@ -152,7 +155,7 @@ int ext4_inode_init(struct superblock *sb, struct inode *inode, uint32_t ino) {
     inode->i_gid = ext4_inode_get_gid(e_inode);
     inode->i_size = ext4_inode_get_size(e_sb, e_inode);
 
-    /* Convert uint32 timestamps to timespec64 format */
+    /* Convert uint32 timestamps to timespec format */
     ext4_timestamp_to_timespec64(ext4_inode_get_access_time(e_inode), &inode->i_atime);
     ext4_timestamp_to_timespec64(ext4_inode_get_modif_time(e_inode), &inode->i_mtime);
     ext4_timestamp_to_timespec64(ext4_inode_get_change_inode_time(e_inode), &inode->i_ctime);
@@ -193,14 +196,14 @@ int ext4_inode_init(struct superblock *sb, struct inode *inode, uint32_t ino) {
  * 
  * Returns: 0 on success, negative error code on failure
  */
-int ext4_read_inode(struct inode *inode) {
+int32 ext4_read_inode(struct inode *inode) {
     if (!inode || !inode->i_superblock)
         return -EINVAL;
     
     return ext4_inode_init(inode->i_superblock, inode, inode->i_ino);
 }
 
-static int __inode_getExt4InodeRef(struct inode *inode, struct ext4_inode_ref *ref) {
+static int32 __inode_getExt4InodeRef(struct inode *inode, struct ext4_inode_ref *ref) {
     struct ext4_fs *e_fs = inode->i_superblock->s_fs_info;
     return ext4_fs_get_inode_ref(e_fs, inode->i_ino, ref);
 }
@@ -215,12 +218,12 @@ static int __inode_getExt4InodeRef(struct inode *inode, struct ext4_inode_ref *r
  * 
  * Returns: The inode corresponding to @dentry on success or NULL on failure
  */
-static struct inode *ext4_vfs_lookup(struct inode *dir, struct dentry *dentry, unsigned int flags) {
+static struct inode *ext4_vfs_lookup(struct inode *dir, struct dentry *dentry, uint32 flags) {
     struct ext4_inode_ref e_dir_ref;
     struct ext4_dir_search_result result;
 	struct ext4_fs* e_fs = dir->i_superblock->s_fs_info;
     struct inode *inode = NULL;
-    int ret;
+    int32 ret;
     
     if (!dir || !dentry)
         return ERR_PTR(-EINVAL);
@@ -261,11 +264,11 @@ static struct inode *ext4_vfs_lookup(struct inode *dir, struct dentry *dentry, u
  * 
  * Returns: 0 on success, negative error code on failure
  */
-static int ext4_vfs_create(struct inode *dir, struct dentry *dentry, mode_t mode) {
+static int32 ext4_vfs_create(struct inode *dir, struct dentry *dentry, mode_t mode) {
 	struct ext4_fs *e_fs = dir->i_superblock->s_fs_info;
 	struct ext4_sblock* e_sb = &e_fs->sb;
     struct inode *inode;
-    int ret;
+    int32 ret;
     
     /* Get directory inode reference */
 	struct ext4_inode_ref e_dir_ref;
@@ -324,9 +327,9 @@ static int ext4_vfs_create(struct inode *dir, struct dentry *dentry, mode_t mode
  * 
  * Returns: 0 on success, negative error code on failure
  */
-static int ext4_vfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_dentry) {
+static int32 ext4_vfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_dentry) {
     struct ext4_inode_ref e_dir_ref, e_inode_ref;
-    int ret;
+    int32 ret;
     
     /* Get directory and source inode references */
     ret = __inode_getExt4InodeRef(dir, &e_dir_ref);
@@ -352,7 +355,7 @@ static int ext4_vfs_link(struct dentry *old_dentry, struct inode *dir, struct de
     ext4_fs_inode_links_count_inc(&e_inode_ref);
     
     /* Link the dentry to the inode */
-    dentry_instantiate(new_dentry, inode_get(old_dentry->d_inode));
+    dentry_instantiate(new_dentry, inode_ref(old_dentry->d_inode));
     
     /* Release references */
     ext4_fs_put_inode_ref(&e_inode_ref);
@@ -368,9 +371,9 @@ static int ext4_vfs_link(struct dentry *old_dentry, struct inode *dir, struct de
  * 
  * Returns: 0 on success, negative error code on failure
  */
-static int ext4_vfs_unlink(struct inode *dir, struct dentry *dentry) {
+static int32 ext4_vfs_unlink(struct inode *dir, struct dentry *dentry) {
     struct ext4_inode_ref e_dir_ref, e_inode_ref;
-    int ret;
+    int32 ret;
     
     /* Get directory and target inode references */
     ret = __inode_getExt4InodeRef(dir, &e_dir_ref);
@@ -397,7 +400,7 @@ static int ext4_vfs_unlink(struct inode *dir, struct dentry *dentry) {
     /* If this was the last link, mark the inode for deletion */
     if (ext4_inode_get_links_cnt(e_inode_ref.inode) == 0) {
         /* Set deletion time */
-        ext4_inode_set_del_time(e_inode_ref.inode, time(NULL));
+        ext4_inode_set_del_time(e_inode_ref.inode, do_time(NULL));
         /* Remove the inode from the filesystem */
         ext4_fs_free_inode(&e_inode_ref);
     }
@@ -417,10 +420,10 @@ static int ext4_vfs_unlink(struct inode *dir, struct dentry *dentry) {
  * 
  * Returns: 0 on success, negative error code on failure
  */
-static int ext4_vfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname) {
+static int32 ext4_vfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname) {
     struct ext4_inode_ref e_dir_ref, e_inode_ref;
     struct inode *inode;
-    int ret;
+    int32 ret;
     size_t symname_len = strlen(symname);
     
     /* Get directory inode reference */
@@ -508,10 +511,10 @@ static int ext4_vfs_symlink(struct inode *dir, struct dentry *dentry, const char
  * 
  * Returns: 0 on success, negative error code on failure
  */
-static int ext4_vfs_mkdir(struct inode *dir, struct dentry *dentry, mode_t mode) {
+static int32 ext4_vfs_mkdir(struct inode *dir, struct dentry *dentry, mode_t mode) {
     struct ext4_inode_ref e_dir_ref, e_inode_ref;
     struct inode *inode;
-    int ret;
+    int32 ret;
     
     /* Ensure mode includes directory flag */
     mode |= S_IFDIR;
@@ -612,11 +615,11 @@ static int ext4_vfs_mkdir(struct inode *dir, struct dentry *dentry, mode_t mode)
  * 
  * Returns: 0 on success, negative error code on failure
  */
-static int ext4_vfs_rmdir(struct inode *dir, struct dentry *dentry) {
+static int32 ext4_vfs_rmdir(struct inode *dir, struct dentry *dentry) {
     struct ext4_inode_ref e_dir_ref, e_inode_ref;
     struct ext4_dir_iter it;
     bool is_empty = true;
-    int ret;
+    int32 ret;
     
     /* Get directory and target directory references */
     ret = __inode_getExt4InodeRef(dir, &e_dir_ref);
@@ -698,11 +701,11 @@ static int ext4_vfs_rmdir(struct inode *dir, struct dentry *dentry) {
  * 
  * Returns: 0 on success, negative error code on failure
  */
-static int ext4_vfs_rename(struct inode *old_dir, struct dentry *old_dentry, 
+static int32 ext4_vfs_rename(struct inode *old_dir, struct dentry *old_dentry, 
                        struct inode *new_dir, struct dentry *new_dentry) {
     struct ext4_inode_ref e_old_dir_ref, e_new_dir_ref, e_inode_ref;
     struct ext4_dir_search_result result;
-    int ret;
+    int32 ret;
     
     /* Get inode references */
     ret = __inode_getExt4InodeRef(old_dir, &e_old_dir_ref);
@@ -834,7 +837,7 @@ static int ext4_vfs_rename(struct inode *old_dir, struct dentry *old_dentry,
         /* Free the inode if it was the last link */
         if (ext4_inode_get_links_cnt(target_ref.inode) == 0) {
             /* Set deletion time */
-            ext4_inode_set_del_time(target_ref.inode, time(NULL));
+            ext4_inode_set_del_time(target_ref.inode, do_time(NULL));
             /* Remove the inode from the filesystem */
             ext4_fs_free_inode(&target_ref);
         }
@@ -910,7 +913,7 @@ static int ext4_vfs_rename(struct inode *old_dir, struct dentry *old_dentry,
     }
     
     /* Update the dentry in VFS */
-    dentry_instantiate(new_dentry, inode_get(old_dentry->d_inode));
+    dentry_instantiate(new_dentry, inode_ref(old_dentry->d_inode));
     
     /* Release references */
     ext4_fs_put_inode_ref(&e_inode_ref);
@@ -931,11 +934,11 @@ static int ext4_vfs_rename(struct inode *old_dir, struct dentry *old_dentry,
  * @param buflen Maximum buffer length
  * @return The number of bytes read on success, negative error code on failure
  */
-static int ext4_vfs_readlink(struct dentry *dentry, char *buffer, int buflen)
+static int32 ext4_vfs_readlink(struct dentry *dentry, char *buffer, int32 buflen)
 {
     struct ext4_inode_ref e_inode_ref;
     struct ext4_fs *fs = dentry->d_superblock->s_fs_info;
-    int ret;
+    int32 ret;
     
     /* Get inode reference for the symlink */
     ret = ext4_fs_get_inode_ref(fs, dentry->d_inode->i_ino, &e_inode_ref);
@@ -1000,7 +1003,7 @@ static int ext4_vfs_readlink(struct dentry *dentry, char *buffer, int buflen)
  * @param mask Permission mask to check
  * @return 0 if permitted, negative error code otherwise
  */
-static int ext4_vfs_permission(struct inode *inode, int mask)
+static int32 ext4_vfs_permission(struct inode *inode, int32 mask)
 {
     /* Basic permission check - simplified for initial implementation 
      * A full implementation would involve:
@@ -1042,17 +1045,20 @@ static int ext4_vfs_permission(struct inode *inode, int mask)
  * @param attr Attributes to set
  * @return 0 on success, negative error code on failure
  */
-static int ext4_vfs_setattr(struct dentry *dentry, struct iattr *attr)
+static int32 ext4_vfs_setattr(struct dentry *dentry, struct iattr *attr)
 {
     struct inode *inode = dentry->d_inode;
     struct ext4_inode_ref e_inode_ref;
-    int ret;
+    int32 ret;
     
     /* Get a reference to the inode */
     ret = ext4_fs_get_inode_ref(inode->i_superblock->s_fs_info, inode->i_ino, &e_inode_ref);
-    if (ret != 0)
-        return ret;
-    
+	CHECK_RET(ret,ret);
+	struct ext4_sblock* e_sb = &e_inode_ref.fs->sb;
+	struct ext4_inode* e_inode = e_inode_ref.inode;
+
+
+
     /* Check permissions first */
     ret = setattr_prepare(dentry, attr);
     if (ret != 0) {
@@ -1062,20 +1068,20 @@ static int ext4_vfs_setattr(struct dentry *dentry, struct iattr *attr)
     
     /* Update mode if requested */
     if (attr->ia_valid & ATTR_MODE) {
-        ext4_inode_set_mode(inode->i_superblock, e_inode_ref.inode, attr->ia_mode);
+        ext4_inode_set_mode(e_sb, e_inode, attr->ia_mode);
         inode->i_mode = attr->ia_mode;
         e_inode_ref.dirty = true;
     }
     
     /* Update ownership if requested */
     if (attr->ia_valid & ATTR_UID) {
-        ext4_inode_set_uid(e_inode_ref.inode, attr->ia_uid);
+        ext4_inode_set_uid(e_inode, attr->ia_uid);
         inode->i_uid = attr->ia_uid;
         e_inode_ref.dirty = true;
     }
     
     if (attr->ia_valid & ATTR_GID) {
-        ext4_inode_set_gid(e_inode_ref.inode, attr->ia_gid);
+        ext4_inode_set_gid(e_inode, attr->ia_gid);
         inode->i_gid = attr->ia_gid;
         e_inode_ref.dirty = true;
     }
@@ -1096,26 +1102,26 @@ static int ext4_vfs_setattr(struct dentry *dentry, struct iattr *attr)
         }
         
         inode->i_size = attr->ia_size;
-        ext4_inode_set_size(e_inode_ref.inode, attr->ia_size);
+        ext4_inode_set_size(e_inode, attr->ia_size);
         e_inode_ref.dirty = true;
     }
     
     /* Update timestamps if requested */
     if (attr->ia_valid & ATTR_ATIME) {
         inode->i_atime = attr->ia_atime;
-        ext4_inode_set_access_time(e_inode_ref.inode, attr->ia_atime.tv_sec);
+        ext4_inode_set_access_time(e_inode, attr->ia_atime.tv_sec);
         e_inode_ref.dirty = true;
     }
     
     if (attr->ia_valid & ATTR_MTIME) {
         inode->i_mtime = attr->ia_mtime;
-        ext4_inode_set_modif_time(e_inode_ref.inode, attr->ia_mtime.tv_sec);
+        ext4_inode_set_modif_time(e_inode, attr->ia_mtime.tv_sec);
         e_inode_ref.dirty = true;
     }
     
     if (attr->ia_valid & ATTR_CTIME) {
         inode->i_ctime = attr->ia_ctime;
-        ext4_inode_set_change_inode_time(e_inode_ref.inode, attr->ia_ctime.tv_sec);
+        ext4_inode_set_change_inode_time(e_inode, attr->ia_ctime.tv_sec);
         e_inode_ref.dirty = true;
     }
     
@@ -1130,7 +1136,7 @@ static int ext4_vfs_setattr(struct dentry *dentry, struct iattr *attr)
  * @param stat Structure to store attributes
  * @return 0 on success, negative error code on failure
  */
-static int ext4_vfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
+static int32 ext4_vfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 {
     struct inode *inode = dentry->d_inode;
     
@@ -1161,8 +1167,8 @@ static int ext4_vfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct 
  * @param flags Flags for the operation
  * @return 0 on success, negative error code on failure
  */
-static int ext4_vfs_setxattr(struct dentry *dentry, const char *name, const void *value, 
-                         size_t size, int flags)
+static int32 ext4_vfs_setxattr(struct dentry *dentry, const char *name, const void *value, 
+                         size_t size, int32 flags)
 {
     #if CONFIG_XATTR_ENABLE
     struct inode *inode = dentry->d_inode;
@@ -1171,7 +1177,7 @@ static int ext4_vfs_setxattr(struct dentry *dentry, const char *name, const void
     size_t name_len;
     const char *real_name;
     bool found;
-    int ret;
+    int32 ret;
     
     /* Get inode reference */
     ret = ext4_fs_get_inode_ref(inode->i_superblock->s_fs_info, inode->i_ino, &e_inode_ref);
@@ -1207,14 +1213,14 @@ static int ext4_vfs_setxattr(struct dentry *dentry, const char *name, const void
  * @param dentry Target dentry
  * @param mode File mode
  * @param dev Device number (for device files)
- * @return int Error code
+ * @return int32 Error code
  */
-static int ext4_vfs_mknod(struct inode *inode, struct dentry *dentry, fmode_t mode, dev_t dev)
+static int32 ext4_vfs_mknod(struct inode *inode, struct dentry *dentry, fmode_t mode, dev_t dev)
 {
     struct ext4_inode_ref parent_ref;
     struct ext4_inode_ref child_ref;
-    int ret;
-    int filetype;
+    int32 ret;
+    int32 filetype;
     
     /* Map VFS inode to ext4 inode reference */
     ret = __inode_getExt4InodeRef(inode, &parent_ref);
@@ -1280,13 +1286,13 @@ static int ext4_vfs_mknod(struct inode *inode, struct dentry *dentry, fmode_t mo
  * @param dentry Link dentry
  * @param inode Link inode
  * @param path Target path
- * @return int Error code
+ * @return int32 Error code
  */
-static int ext4_vfs_get_link(struct dentry *dentry, struct inode *inode, struct path *path)
+static int32 ext4_vfs_get_link(struct dentry *dentry, struct inode *inode, struct path *path)
 {
     struct ext4_inode_ref e_inode_ref;
     char *link_target;
-    int ret, len;
+    int32 ret, len;
     
     /* Get ext4 inode reference */
     ret = __inode_getExt4InodeRef(inode, &e_inode_ref);
@@ -1314,20 +1320,16 @@ static int ext4_vfs_get_link(struct dentry *dentry, struct inode *inode, struct 
     } else {
         /* Read from file blocks */
         size_t rcnt;
-        char pathname[PATH_MAX];
-        
-        /* Construct path for ext4_readlink */
-        snprintf(pathname, PATH_MAX, "%s/%s", 
-                dentry_path(dentry->d_parent, NULL, 0), 
-                dentry->d_name->name);
-        
+		char* pathname = dentry_allocRawPath(dentry);
         ret = ext4_readlink(pathname, link_target, inode->i_size, &rcnt);
+		kfree(pathname);
+
         if (ret != 0) {
             kfree(link_target);
             ext4_fs_put_inode_ref(&e_inode_ref);
             return ret;
         }
-        
+		
         link_target[rcnt] = '\0';
     }
     
@@ -1339,35 +1341,35 @@ static int ext4_vfs_get_link(struct dentry *dentry, struct inode *inode, struct 
     return ret;
 }
 
-/**
- * @brief Get POSIX access control list for inode
- * 
- * @param inode Inode to get ACL for
- * @param type ACL type (access or default)
- * @return struct posix_acl* ACL structure or error code
- */
-static int ext4_vfs_get_acl(struct inode *inode, int type)
-{
-    struct ext4_inode_ref e_inode_ref;
-    struct posix_acl *acl = NULL;
-    int ret;
+// /**
+//  * @brief Get POSIX access control list for inode
+//  * 
+//  * @param inode Inode to get ACL for
+//  * @param type ACL type (access or default)
+//  * @return struct posix_acl* ACL structure or error code
+//  */
+// static int32 ext4_vfs_get_acl(struct inode *inode, int32 type)
+// {
+//     struct ext4_inode_ref e_inode_ref;
+//     struct posix_acl *acl = NULL;
+//     int32 ret;
     
-    /* Currently posix ACLs are not supported in lwext4 */
-    /* This is a placeholder implementation */
+//     /* Currently posix ACLs are not supported in lwext4 */
+//     /* This is a placeholder implementation */
     
-    /* Get ext4 inode reference */
-    ret = __inode_getExt4InodeRef(inode, &e_inode_ref);
-    if (ret != 0)
-        return ret;
+//     /* Get ext4 inode reference */
+//     ret = __inode_getExt4InodeRef(inode, &e_inode_ref);
+//     if (ret != 0)
+//         return ret;
     
-    /* Fallback to mode bits for access ACLs */
-    if (type == ACL_TYPE_ACCESS) {
-        acl = posix_acl_from_mode(inode->i_mode, GFP_KERNEL);
-    }
+//     /* Fallback to mode bits for access ACLs */
+//     if (type == ACL_TYPE_ACCESS) {
+//         acl = posix_acl_from_mode(inode->i_mode, GFP_KERNEL);
+//     }
     
-    ext4_fs_put_inode_ref(&e_inode_ref);
-    return (int)acl;
-}
+//     ext4_fs_put_inode_ref(&e_inode_ref);
+//     return (int32)acl;
+// }
 
 /**
  * @brief Set POSIX access control list for inode
@@ -1375,35 +1377,35 @@ static int ext4_vfs_get_acl(struct inode *inode, int type)
  * @param inode Inode to set ACL for
  * @param acl ACL to set
  * @param type ACL type (access or default)
- * @return int Error code
+ * @return int32 Error code
  */
-static int ext4_vfs_set_acl(struct inode *inode, struct posix_acl *acl, int type)
-{
-    struct ext4_inode_ref e_inode_ref;
-    int ret;
+// static int32 ext4_vfs_set_acl(struct inode *inode, struct posix_acl *acl, int32 type)
+// {
+//     struct ext4_inode_ref e_inode_ref;
+//     int32 ret;
     
-    /* Currently posix ACLs are not supported in lwext4 */
-    /* This is a placeholder implementation */
+//     /* Currently posix ACLs are not supported in lwext4 */
+//     /* This is a placeholder implementation */
     
-    /* Get ext4 inode reference */
-    ret = __inode_getExt4InodeRef(inode, &e_inode_ref);
-    if (ret != 0)
-        return ret;
+//     /* Get ext4 inode reference */
+//     ret = __inode_getExt4InodeRef(inode, &e_inode_ref);
+//     if (ret != 0)
+//         return ret;
     
-    /* Update mode bits if setting access ACL */
-    if (type == ACL_TYPE_ACCESS && acl) {
-        mode_t mode = inode->i_mode;
-        ret = posix_acl_update_mode(inode, &mode, &acl);
-        if (ret == 0 && mode != inode->i_mode) {
-            inode->i_mode = mode;
-            ext4_inode_set_mode(inode->i_superblock, e_inode_ref.inode, mode);
-            e_inode_ref.dirty = true;
-        }
-    }
+//     /* Update mode bits if setting access ACL */
+//     if (type == ACL_TYPE_ACCESS && acl) {
+//         mode_t mode = inode->i_mode;
+//         ret = posix_acl_update_mode(inode, &mode, &acl);
+//         if (ret == 0 && mode != inode->i_mode) {
+//             inode->i_mode = mode;
+//             ext4_inode_set_mode(inode->i_superblock, e_inode_ref.inode, mode);
+//             e_inode_ref.dirty = true;
+//         }
+//     }
     
-    ext4_fs_put_inode_ref(&e_inode_ref);
-    return ret;
-}
+//     ext4_fs_put_inode_ref(&e_inode_ref);
+//     return ret;
+// }
 
 /**
  * @brief File extent block mapping information
@@ -1412,90 +1414,90 @@ static int ext4_vfs_set_acl(struct inode *inode, struct posix_acl *acl, int type
  * @param fiemap_info Mapping info structure
  * @param start Start offset
  * @param len Length to map
- * @return int Error code
+ * @return int32 Error code
  */
-static int ext4_vfs_fiemap(struct inode *inode, struct fiemap_extent_info *fiemap_info, 
-                     uint64_t start, uint64_t len)
-{
-    struct ext4_inode_ref e_inode_ref;
-    int ret;
+// static int32 ext4_vfs_fiemap(struct inode *inode, struct fiemap_extent_info *fiemap_info, 
+//                      uint64_t start, uint64_t len)
+// {
+//     struct ext4_inode_ref e_inode_ref;
+//     int32 ret;
     
-    /* Get ext4 inode reference */
-    ret = __inode_getExt4InodeRef(inode, &e_inode_ref);
-    if (ret != 0)
-        return ret;
+//     /* Get ext4 inode reference */
+//     ret = __inode_getExt4InodeRef(inode, &e_inode_ref);
+//     if (ret != 0)
+//         return ret;
     
-    /* Simple implementation - just report basic extent info */
-    fiemap_info->fi_flags |= FIEMAP_FLAG_SYNC;
+//     /* Simple implementation - just report basic extent info */
+//     fiemap_info->fi_flags |= FIEMAP_FLAG_SYNC;
     
-    /* Process block mappings */
-    uint32_t block_size = e_inode_ref.fs->sb.log_block_size;
-    uint64_t start_block = start / block_size;
-    uint64_t end_block = (start + len + block_size - 1) / block_size;
+//     /* Process block mappings */
+//     uint32_t block_size = e_inode_ref.fs->sb.log_block_size;
+//     uint64_t start_block = start / block_size;
+//     uint64_t end_block = (start + len + block_size - 1) / block_size;
     
-    /* Limit to file size */
-    uint64_t file_blocks = (inode->i_size + block_size - 1) / block_size;
-    if (end_block > file_blocks)
-        end_block = file_blocks;
+//     /* Limit to file size */
+//     uint64_t file_blocks = (inode->i_size + block_size - 1) / block_size;
+//     if (end_block > file_blocks)
+//         end_block = file_blocks;
     
-    /* Add extents to the mapping info */
-    uint64_t blk = start_block;
-    while (blk < end_block) {
-        ext4_fsblk_t phys_block;
-        uint64_t extent_len = 0;
-        uint64_t logical_start = blk;
+//     /* Add extents to the mapping info */
+//     uint64_t blk = start_block;
+//     while (blk < end_block) {
+//         ext4_fsblk_t phys_block;
+//         uint64_t extent_len = 0;
+//         uint64_t logical_start = blk;
         
-        /* Get physical block mapping */
-        ret = ext4_fs_get_inode_dblk_idx(&e_inode_ref, blk, &phys_block, false);
-        if (ret != 0 || phys_block == 0) {
-            /* Sparse region - skip ahead */
-            blk++;
-            continue;
-        }
+//         /* Get physical block mapping */
+//         ret = ext4_fs_get_inode_dblk_idx(&e_inode_ref, blk, &phys_block, false);
+//         if (ret != 0 || phys_block == 0) {
+//             /* Sparse region - skip ahead */
+//             blk++;
+//             continue;
+//         }
         
-        /* Find extent length (contiguous blocks) */
-        ext4_fsblk_t prev_phys = phys_block;
-        while (blk < end_block) {
-            ret = ext4_fs_get_inode_dblk_idx(&e_inode_ref, blk, &phys_block, false);
-            if (ret != 0 || phys_block == 0 || phys_block != prev_phys + extent_len)
-                break;
+//         /* Find extent length (contiguous blocks) */
+//         ext4_fsblk_t prev_phys = phys_block;
+//         while (blk < end_block) {
+//             ret = ext4_fs_get_inode_dblk_idx(&e_inode_ref, blk, &phys_block, false);
+//             if (ret != 0 || phys_block == 0 || phys_block != prev_phys + extent_len)
+//                 break;
             
-            extent_len++;
-            blk++;
-        }
+//             extent_len++;
+//             blk++;
+//         }
         
-        /* Add this extent to the mapping */
-        struct fiemap_extent extent;
-        extent.fe_logical = logical_start * block_size;
-        extent.fe_physical = prev_phys * block_size;
-        extent.fe_length = extent_len * block_size;
+//         /* Add this extent to the mapping */
+//         struct fiemap_extent extent;
+//         extent.fe_logical = logical_start * block_size;
+//         extent.fe_physical = prev_phys * block_size;
+//         extent.fe_length = extent_len * block_size;
         
-        /* Set flags */
-        extent.fe_flags = 0;
-        if (logical_start == 0)
-            extent.fe_flags |= FIEMAP_EXTENT_DATA_INLINE;
-        if (logical_start + extent_len >= file_blocks)
-            extent.fe_flags |= FIEMAP_EXTENT_LAST;
+//         /* Set flags */
+//         extent.fe_flags = 0;
+//         if (logical_start == 0)
+//             extent.fe_flags |= FIEMAP_EXTENT_DATA_INLINE;
+//         if (logical_start + extent_len >= file_blocks)
+//             extent.fe_flags |= FIEMAP_EXTENT_LAST;
         
-        /* Add the extent to the result */
-        ret = fiemap_fill_next_extent(fiemap_info, 
-                                     extent.fe_logical, 
-                                     extent.fe_physical,
-                                     extent.fe_length, 
-                                     extent.fe_flags);
+//         /* Add the extent to the result */
+//         ret = fiemap_fill_next_extent(fiemap_info, 
+//                                      extent.fe_logical, 
+//                                      extent.fe_physical,
+//                                      extent.fe_length, 
+//                                      extent.fe_flags);
         
-        if (ret != 0) {
-            if (ret == 1) /* No more space */ 
-                break;
+//         if (ret != 0) {
+//             if (ret == 1) /* No more space */ 
+//                 break;
             
-            ext4_fs_put_inode_ref(&e_inode_ref);
-            return ret;
-        }
-    }
+//             ext4_fs_put_inode_ref(&e_inode_ref);
+//             return ret;
+//         }
+//     }
     
-    ext4_fs_put_inode_ref(&e_inode_ref);
-    return 0;
-}
+//     ext4_fs_put_inode_ref(&e_inode_ref);
+//     return 0;
+// }
 
 /**
  * @brief Get physical block address for logical block
@@ -1504,14 +1506,14 @@ static int ext4_vfs_fiemap(struct inode *inode, struct fiemap_extent_info *fiema
  * @param block Logical block number
  * @param buffer_head Buffer head to fill
  * @param create Create block if it doesn't exist
- * @return int Error code
+ * @return int32 Error code
  */
-static int ext4_vfs_get_block(struct inode *inode, sector_t block, 
-                         struct buffer_head *buffer_head, int create)
+static int32 ext4_vfs_get_block(struct inode *inode, sector_t block, 
+                         struct buffer_head *buffer_head, int32 create)
 {
     struct ext4_inode_ref e_inode_ref;
     ext4_fsblk_t phys_block;
-    int ret;
+    int32 ret;
     
     /* Get ext4 inode reference */
     ret = __inode_getExt4InodeRef(inode, &e_inode_ref);
@@ -1532,7 +1534,7 @@ static int ext4_vfs_get_block(struct inode *inode, sector_t block,
     
     if (ret == 0 && phys_block > 0) {
         /* Set buffer head */
-        buffer_head->b_bdev = inode->i_superblock->s_device_id;
+        buffer_head->b_bdev = inode->i_superblock->s_bdev; //需要做一个devid到device的转换
         buffer_head->b_blocknr = phys_block;
         buffer_head->b_size = e_inode_ref.fs->sb.log_block_size;
         if (create)
@@ -1556,7 +1558,7 @@ static sector_t ext4_vfs_bmap(struct inode *inode, sector_t block)
 {
     struct ext4_inode_ref e_inode_ref;
     ext4_fsblk_t phys_block;
-    int ret;
+    int32 ret;
     
     /* Get ext4 inode reference */
     ret = __inode_getExt4InodeRef(inode, &e_inode_ref);
@@ -1583,7 +1585,7 @@ static sector_t ext4_vfs_bmap(struct inode *inode, sector_t block)
 static void ext4_vfs_truncate_blocks(struct inode *inode, loff_t size)
 {
     struct ext4_inode_ref e_inode_ref;
-    int ret;
+    int32 ret;
     
     /* Get ext4 inode reference */
     ret = __inode_getExt4InodeRef(inode, &e_inode_ref);
@@ -1608,9 +1610,9 @@ static void ext4_vfs_truncate_blocks(struct inode *inode, loff_t size)
  * 
  * @param kiocb Kernel I/O control block
  * @param iov_iter I/O vector iterator
- * @return int Number of bytes transferred or error code
+ * @return int32 Number of bytes transferred or error code
  */
-static int ext4_vfs_direct_IO(struct kiocb *kiocb, struct io_vector_iterator *iov_iter)
+static int32 ext4_vfs_direct_IO(struct kiocb *kiocb, struct io_vector_iterator *iov_iter)
 {
     /* Direct I/O is not fully implemented for this adapter */
     /* Fallback to buffered I/O */
@@ -1633,12 +1635,11 @@ static vm_fault_t ext4_vfs_page_fault(struct vm_area_struct *vma, struct vm_faul
     page = addrSpace_getPage(inode->i_mapping, vmf->pgoff);
     if (!page) {
         page = addrSpace_readPage(inode->i_mapping, vmf->pgoff);
-        if (IS_ERR_OR_NULL(page))
-            return VM_FAULT_ERROR;
+		CHECK_PTR_VALID(page,VM_FAULT_ERROR);
     }
     
     /* Map page to userspace */
-    int ret = vm_insert_page(vma, vmf->address, page);
+    int32 ret = vm_insert_page(vma, vmf->address, page);
     if (ret != 0) {
         addrSpace_putPage(inode->i_mapping, page);
         return VM_FAULT_ERROR;
@@ -1647,23 +1648,23 @@ static vm_fault_t ext4_vfs_page_fault(struct vm_area_struct *vma, struct vm_faul
     return VM_FAULT_NOPAGE;
 }
 
-/**
- * @brief Get unmapped memory area for mmap
- * 
- * @param file File being mapped
- * @param addr Suggested address (optional)
- * @param len Length to map
- * @param pgoff Page offset in file
- * @param flags Mapping flags
- * @return unsigned long Address for mapping or error
- */
-static unsigned long ext4_vfs_get_unmapped_area(struct file *file, unsigned long addr,
-                                         unsigned long len, unsigned long pgoff,
-                                         unsigned long flags)
-{
-    /* Use generic implementation */
-    return generic_get_unmapped_area(file, addr, len, pgoff, flags);
-}
+// /**
+//  * @brief Get unmapped memory area for mmap
+//  * 
+//  * @param file File being mapped
+//  * @param addr Suggested address (optional)
+//  * @param len Length to map
+//  * @param pgoff Page offset in file
+//  * @param flags Mapping flags
+//  * @return uint64 Address for mapping or error
+//  */
+// static uint64 ext4_vfs_get_unmapped_area(struct file *file, uint64 addr,
+//                                          uint64 len, uint64 pgoff,
+//                                          uint64 flags)
+// {
+//     /* Use generic implementation */
+//     return generic_get_unmapped_area(file, addr, len, pgoff, flags);
+// }
 
 /**
  * @brief Atomic open operation
@@ -1673,13 +1674,13 @@ static unsigned long ext4_vfs_get_unmapped_area(struct file *file, unsigned long
  * @param file File structure to fill
  * @param open_flag Open flags
  * @param create_mode Creation mode
- * @return int Error code
+ * @return int32 Error code
  */
-static int ext4_vfs_atomic_open(struct inode *inode, struct dentry *dentry,
+static int32 ext4_vfs_atomic_open(struct inode *inode, struct dentry *dentry,
                          struct file *file, unsigned open_flag,
                          umode_t create_mode)
 {
-    int ret;
+    int32 ret;
     struct inode *found_inode = ext4_vfs_lookup(inode, dentry, 0);
     
     if (IS_ERR(found_inode))
@@ -1714,13 +1715,13 @@ static int ext4_vfs_atomic_open(struct inode *inode, struct dentry *dentry,
  * @param inode Directory inode
  * @param dentry Dentry to use
  * @param mode File mode
- * @return int Error code
+ * @return int32 Error code
  */
-static int ext4_vfs_tmpfile(struct inode *inode, struct dentry *dentry, umode_t mode)
+static int32 ext4_vfs_tmpfile(struct inode *inode, struct dentry *dentry, umode_t mode)
 {
     struct ext4_inode_ref parent_ref;
     struct ext4_inode_ref child_ref;
-    int ret;
+    int32 ret;
     
     /* Get ext4 inode reference for parent */
     ret = __inode_getExt4InodeRef(inode, &parent_ref);
@@ -1781,7 +1782,7 @@ static ssize_t ext4_vfs_getxattr(struct dentry *dentry, const char *name, void *
     const char *real_name;
     bool found;
     size_t data_len;
-    int ret;
+    int32 ret;
     
     /* Get inode reference */
     ret = ext4_fs_get_inode_ref(inode->i_superblock->s_fs_info, inode->i_ino, &e_inode_ref);
@@ -1822,7 +1823,7 @@ static ssize_t ext4_vfs_listxattr(struct dentry *dentry, char *buffer, size_t si
     struct ext4_inode_ref e_inode_ref;
     struct ext4_xattr_list_entry list;
     size_t list_len;
-    int ret;
+    int32 ret;
     
     /* Get inode reference */
     ret = ext4_fs_get_inode_ref(inode->i_superblock->s_fs_info, inode->i_ino, &e_inode_ref);
@@ -1889,7 +1890,7 @@ static ssize_t ext4_vfs_listxattr(struct dentry *dentry, char *buffer, size_t si
  * @param name Name of the attribute
  * @return 0 on success, negative error code on failure
  */
-static int ext4_vfs_removexattr(struct dentry *dentry, const char *name)
+static int32 ext4_vfs_removexattr(struct dentry *dentry, const char *name)
 {
     #if CONFIG_XATTR_ENABLE
     struct inode *inode = dentry->d_inode;
@@ -1898,7 +1899,7 @@ static int ext4_vfs_removexattr(struct dentry *dentry, const char *name)
     size_t name_len;
     const char *real_name;
     bool found;
-    int ret;
+    int32 ret;
     
     /* Get inode reference */
     ret = ext4_fs_get_inode_ref(inode->i_superblock->s_fs_info, inode->i_ino, &e_inode_ref);
@@ -1925,4 +1926,74 @@ static int ext4_vfs_removexattr(struct dentry *dentry, const char *name)
     /* Extended attributes not enabled in this build */
     return -ENOTSUP;
     #endif
+}
+
+
+/**
+ * ext4_sync_inode - Synchronize an inode to disk
+ * @inode_ref: The inode reference containing filesystem, inode, and tracking info
+ *
+ * This function marks the inode's block as dirty in the block cache and ensures
+ * it gets flushed to disk. It uses the ext4_inode_ref which already contains
+ * all necessary context information about the inode location.
+ *
+ * Returns: 0 on success, negative error code on failure
+ */
+int32 ext4_sync_inode(struct ext4_inode_ref *inode_ref)
+{
+    int32 ret;
+    
+    if (!inode_ref || !inode_ref->fs || !inode_ref->inode)
+        return -EINVAL;
+    
+    /* Mark the inode as dirty in the block cache */
+    if (inode_ref->block.buf) {
+        /* Set dirty flag directly on the buffer */
+        ext4_bcache_set_dirty(inode_ref->block.buf);
+        
+        /* Add to dirty list if not already there */
+        if (!inode_ref->block.buf->on_dirty_list) {
+            ext4_bcache_insert_dirty_node(inode_ref->fs->bdev->bc, inode_ref->block.buf);
+        }
+    }
+    
+    /* Set the dirty flag in the inode ref */
+    inode_ref->dirty = true;
+    
+    /* 
+     * In lwext4, putting an inode ref will handle writing it back if dirty.
+     * The ext4_fs_put_inode_ref function handles flushing dirty inodes to disk.
+     */
+    ret = ext4_fs_put_inode_ref(inode_ref);
+    
+    return ret;
+}
+
+/**
+ * __ext4_flush_dirty_inode - Flush a dirty inode to disk
+ * @inode_ref: The inode reference to flush
+ * 
+ * This is an alternative implementation that explicitly flushes the buffer
+ * without releasing the inode reference.
+ *
+ * Returns: 0 on success, negative error code on failure
+ */
+int32 __ext4_flush_dirty_inode(struct ext4_inode_ref *inode_ref)
+{
+    int32 ret = 0;
+    
+    if (!inode_ref || !inode_ref->fs || !inode_ref->inode)
+        return -EINVAL;
+    
+    /* If the inode is dirty, flush its block to disk */
+    if (inode_ref->dirty && inode_ref->block.buf) {
+        /* Flush the buffer containing the inode */
+        ret = ext4_block_flush_buf(inode_ref->fs->bdev, inode_ref->block.buf);
+        if (ret == 0) {
+            /* Clear dirty flag if flush succeeded */
+            inode_ref->dirty = false;
+        }
+    }
+    
+    return ret;
 }

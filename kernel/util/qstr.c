@@ -1,9 +1,8 @@
-#include <util/qstr.h>
-#include <util/string.h>
+#include <kernel/util.h>
 #include <kernel/mm/kmalloc.h>
 
 /* Current hash algorithm */
-static int current_hash_algorithm = QSTR_DEFAULT_HASH_ALGORITHM;
+static int32 current_hash_algorithm = QSTR_DEFAULT_HASH_ALGORITHM;
 
 /**
  * qstr_init - Initialize qstr subsystem
@@ -17,7 +16,7 @@ void qstr_init(void)
  * qstr_set_hash_algorithm - Change the hash algorithm
  * @algorithm: The algorithm to use
  */
-void qstr_set_hash_algorithm(int algorithm)
+void qstr_set_hash_algorithm(int32 algorithm)
 {
     if (algorithm >= 0 && algorithm <= 1)
         current_hash_algorithm = algorithm;
@@ -30,10 +29,10 @@ void qstr_set_hash_algorithm(int algorithm)
  * 
  * Fast, good distribution hash algorithm with minimal collisions.
  */
-static unsigned int fnv1a_hash(const unsigned char *str, unsigned int len)
+static uint32 fnv1a_hash(const unsigned char *str, uint32 len)
 {
-    unsigned int hash = 2166136261u; /* FNV offset basis */
-    unsigned int i;
+    uint32 hash = 2166136261u; /* FNV offset basis */
+    uint32 i;
     
     for (i = 0; i < len; i++) {
         hash ^= str[i];
@@ -50,10 +49,10 @@ static unsigned int fnv1a_hash(const unsigned char *str, unsigned int len)
  *
  * Very fast hash function with good distribution.
  */
-static unsigned int djbx33a_hash(const unsigned char *str, unsigned int len)
+static uint32 djbx33a_hash(const unsigned char *str, uint32 len)
 {
-    unsigned int hash = 5381; /* Initial value */
-    unsigned int i;
+    uint32 hash = 5381; /* Initial value */
+    uint32 i;
     
     for (i = 0; i < len; i++) {
         hash = ((hash << 5) + hash) ^ str[i]; /* hash * 33 ^ c */
@@ -67,7 +66,7 @@ static unsigned int djbx33a_hash(const unsigned char *str, unsigned int len)
  * @name: String to hash
  * @len: Length of string
  */
-unsigned int qstr_hash(const char *name, unsigned int len)
+uint32 qstr_hash(const char *name, uint32 len)
 {
     if (!name)
         return 0;
@@ -85,7 +84,7 @@ unsigned int qstr_hash(const char *name, unsigned int len)
  * qstr_hash_str - Hash a null-terminated string
  * @name: String to hash
  */
-unsigned int qstr_hash_str(const char *name)
+uint32 qstr_hash_str(const char *name)
 {
     if (!name)
         return 0;
@@ -95,7 +94,7 @@ unsigned int qstr_hash_str(const char *name)
 /**
  * full_name_hash - Alias for qstr_hash for compatibility
  */
-unsigned int full_name_hash(const char *name, unsigned int len)
+uint32 full_name_hash(const char *name, uint32 len)
 {
     return qstr_hash(name, len);
 }
@@ -119,7 +118,7 @@ void qstr_update_hash(struct qstr *qstr)
 struct qstr *qstr_create(const char *name)
 {
     struct qstr *q;
-    unsigned int len;
+    uint32 len;
     
     if (!name)
         return NULL;
@@ -143,13 +142,13 @@ struct qstr *qstr_create(const char *name)
 }
 
 /**
- * qstr_create_with_len - Create a new qstr with explicit length
+ * qstr_create_with_length - Create a new qstr with explicit length
  * @name: String to use
  * @len: Length of string
  *
  * Returns a new qstr or NULL on allocation failure.
  */
-struct qstr *qstr_create_with_len(const char *name, unsigned int len)
+struct qstr *qstr_create_with_length(const char *name, uint32 len)
 {
     struct qstr *q;
     
@@ -208,7 +207,7 @@ void qstr_init_from_str(struct qstr *qstr, const char *name)
  * @name: String to use
  * @len: Length of string
  */
-void qstr_init_from_str_with_len(struct qstr *qstr, const char *name, unsigned int len)
+void qstr_init_from_str_with_len(struct qstr *qstr, const char *name, uint32 len)
 {
     if (!qstr || !name)
         return;
@@ -225,9 +224,9 @@ void qstr_init_from_str_with_len(struct qstr *qstr, const char *name, unsigned i
  *
  * Returns -1 if a < b, 0 if a == b, 1 if a > b.
  */
-int qstr_compare(const struct qstr *a, const struct qstr *b)
+int32 qstr_compare(const struct qstr *a, const struct qstr *b)
 {
-    int result;
+    int32 result;
     
     if (!a || !a->name)
         return b ? -1 : 0;
@@ -259,7 +258,7 @@ int qstr_compare(const struct qstr *a, const struct qstr *b)
  * @a: First qstr
  * @b: Second qstr
  */
-int qstr_eq(const struct qstr *a, const struct qstr *b)
+int32 qstr_eq(const struct qstr *a, const struct qstr *b)
 {
     if (!a || !b)
         return 0;
@@ -277,9 +276,9 @@ int qstr_eq(const struct qstr *a, const struct qstr *b)
  * @a: First qstr
  * @b: Second qstr
  */
-int qstr_case_compare(const struct qstr *a, const struct qstr *b)
+int32 qstr_case_compare(const struct qstr *a, const struct qstr *b)
 {
-    unsigned int i;
+    uint32 i;
     
     if (!a || !a->name)
         return b ? -1 : 0;
@@ -317,9 +316,9 @@ int qstr_case_compare(const struct qstr *a, const struct qstr *b)
  * @a: First qstr
  * @b: Second qstr
  */
-int qstr_case_eq(const struct qstr *a, const struct qstr *b)
+int32 qstr_case_eq(const struct qstr *a, const struct qstr *b)
 {
-    unsigned int i;
+    uint32 i;
     
     if (!a || !b)
         return 0;
@@ -349,7 +348,7 @@ int qstr_case_eq(const struct qstr *a, const struct qstr *b)
  * @prefix: The prefix qstr
  * @str: The string to check
  */
-int qstr_prefix_compare(const struct qstr *prefix, const struct qstr *str)
+int32 qstr_prefix_compare(const struct qstr *prefix, const struct qstr *str)
 {
     if (!prefix || !str)
         return 0;

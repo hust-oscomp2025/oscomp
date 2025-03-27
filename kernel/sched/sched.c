@@ -8,9 +8,9 @@
 #include <kernel/sched/sched.h>
 #include <kernel/sched/process.h>
 #include <kernel/trapframe.h>
-#include <spike_interface/spike_utils.h>
-#include <util/list.h>
-#include <util/string.h>
+#include <kernel/sprint.h>
+#include <kernel/util/list.h>
+#include <kernel/util/string.h>
 
 struct list_head ready_queue;
 struct task_struct *procs[NPROC];
@@ -25,14 +25,14 @@ void init_scheduler() {
   pid_init();
   memset(procs, 0, sizeof(struct task_struct *) * NPROC);
 
-  for (int i = 0; i < NPROC; ++i) {
+  for (int32 i = 0; i < NPROC; ++i) {
     procs[i] = NULL;
   }
   sprint("Scheduler initiated\n");
 }
 
 struct task_struct *alloc_empty_process() {
-  for (int i = 0; i < NPROC; i++) {
+  for (int32 i = 0; i < NPROC; i++) {
     if (procs[i] == NULL) {
       procs[i] = (struct task_struct *)kmalloc(sizeof(struct task_struct));
       memset(procs[i], 0, sizeof(struct task_struct));
@@ -46,7 +46,7 @@ struct task_struct *alloc_empty_process() {
 //
 void insert_to_ready_queue(struct task_struct *proc) {
   sprint("going to insert process %d to ready queue.\n", proc->pid);
-  list_add(&proc->queue_node, &ready_queue);
+  list_add(&proc->ready_queue_node, &ready_queue);
 }
 
 //
@@ -58,7 +58,7 @@ void insert_to_ready_queue(struct task_struct *proc) {
 void schedule() {
   sprint("schedule: start\n");
   extern struct task_struct *procs[NPROC];
-  int hartid = read_tp();
+  int32 hartid = read_tp();
   struct task_struct *cur = CURRENT;
   // sprint("debug\n");
   if (cur &&
@@ -73,9 +73,9 @@ void schedule() {
     // by default, if there are no ready process, and all processes are in the
     // state of FREE and ZOMBIE, we should shutdown the emulated RISC-V
     // machine.
-    int should_shutdown = 1;
+    int32 should_shutdown = 1;
 
-    for (int i = 0; i < NPROC; i++)
+    for (int32 i = 0; i < NPROC; i++)
       if ((procs[i]) && (procs[i]->exit_state != EXIT_TRACE)) {
         should_shutdown = 0;
         sprint("ready queue empty, but process %d is not in free/zombie "
@@ -102,7 +102,7 @@ void schedule() {
     }
   }
 
-  CURRENT = container_of(ready_queue.next, struct task_struct, queue_node);
+  CURRENT = container_of(ready_queue.next, struct task_struct, ready_queue_node);
   list_del_init(ready_queue.next);
   if (cur->ktrapframe != NULL) {
     sprint("going to schedule process %d to run in s-mode.\n", CURRENT->pid);

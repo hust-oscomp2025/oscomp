@@ -6,7 +6,7 @@
 
 #include <kernel/elf.h>
 
-#include <kernel/fs/vfs/vfs.h>
+#include <kernel/vfs.h>
 #include <kernel/mm/kmalloc.h>
 #include <kernel/mm/mm_struct.h>
 #include <kernel/mm/mmap.h>
@@ -15,32 +15,32 @@
 #include <kernel/sched/process.h>
 #include <kernel/trapframe.h>
 
-#include <spike_interface/spike_utils.h>
-#include <util/string.h>
+#include <kernel/sprint.h>
+#include <kernel/util/string.h>
 
 /**
  * ELF加载器的上下文信息
  * 用于保存加载过程中的必要数据
  */
 typedef struct elf_context {
-  int fd;                   // 文件描述符
+  int32 fd;                   // 文件描述符
   struct task_struct *proc; // 目标进程
   elf_header ehdr;          // ELF头部
   uint64 entry_point;       // 入口点
 } elf_context;
 
-static int init_elf_context(elf_context *ctx, int fd, struct task_struct *proc);
+static int32 init_elf_context(elf_context *ctx, int32 fd, struct task_struct *proc);
 static void setup_global_pointer(elf_context *ctx);
 
-static int load_segment(elf_context *ctx, elf_prog_header *ph);
+static int32 load_segment(elf_context *ctx, elf_prog_header *ph);
 
-static int validate_elf_header(elf_header *ehdr);
-static int elf_setup_vma(struct mm_struct *mm, uint64 ph_vaddr, uint64 ph_memsz,
+static int32 validate_elf_header(elf_header *ehdr);
+static int32 elf_setup_vma(struct mm_struct *mm, uint64 ph_vaddr, uint64 ph_memsz,
                          uint32 ph_flags);
 static ssize_t elf_read_at(elf_context *ctx, void* dest, size_t size,
                            off_t offset);
-static int load_debug_information(elf_context *ctx);
-static int load_elf_binary(elf_context *ctx);
+static int32 load_debug_information(elf_context *ctx);
+static int32 load_elf_binary(elf_context *ctx);
 
 
 
@@ -57,7 +57,7 @@ void load_elf_from_file(struct task_struct *proc, char *filename) {
   sprint("load_elf_from_file: Loading application: %s\n", filename);
 
   // 使用内核标准文件接口打开ELF文件
-  int fd = do_open(filename, O_RDONLY);
+  int32 fd = do_open(filename, O_RDONLY);
   if (fd < 0) {
     panic("Failed to open application file: %s (error %d)\n", filename, fd);
   }
@@ -103,8 +103,8 @@ void load_elf_from_file(struct task_struct *proc, char *filename) {
  * @param filename ELF文件名
  * @return 0表示成功，非0表示失败
  */
-int load_elf_symbols(char *filename) {
-  int fd = do_open(filename, O_RDONLY);
+int32 load_elf_symbols(char *filename) {
+  int32 fd = do_open(filename, O_RDONLY);
   if (fd < 0) {
     sprint("Failed to open file for symbols: %s (error %d)\n", filename, fd);
     return -1;
@@ -148,11 +148,11 @@ char *locate_function_name(uint64 epc) {
   return unknown;
 }
 
-static int elf_setup_vma(struct mm_struct *mm, uint64 ph_vaddr, uint64 ph_memsz,
+static int32 elf_setup_vma(struct mm_struct *mm, uint64 ph_vaddr, uint64 ph_memsz,
                          uint32 ph_flags) {
   // 确定VMA类型和权限
   enum vma_type vma_type;
-  int prot = 0;
+  int32 prot = 0;
   uint64 vma_flags = 0;
   // 设置权限和段类型
   if (ph_flags & SEGMENT_READABLE) {
@@ -178,7 +178,7 @@ static int elf_setup_vma(struct mm_struct *mm, uint64 ph_vaddr, uint64 ph_memsz,
     sprint("Failed to create VMA for segment\n");
     return -1;
   }
-  int ret = populate_vma(vma, ph_vaddr, ph_memsz, prot);
+  int32 ret = populate_vma(vma, ph_vaddr, ph_memsz, prot);
   if (ret != 0) {
     sprint("Failed to populate VMA: errno = %d\n", ret);
     return ret;
@@ -198,7 +198,7 @@ static int elf_setup_vma(struct mm_struct *mm, uint64 ph_vaddr, uint64 ph_memsz,
 static ssize_t elf_read_at(elf_context *ctx, void *dest, size_t size,
                            off_t offset) {
   // 保存当前文件位置
-  int current_pos = do_lseek(ctx->fd, 0, SEEK_CUR);
+  int32 current_pos = do_lseek(ctx->fd, 0, SEEK_CUR);
   if (current_pos < 0) {
     sprint("Failed to get current file position\n");
     return -1;
@@ -225,7 +225,7 @@ static ssize_t elf_read_at(elf_context *ctx, void *dest, size_t size,
  * @param ehdr ELF头部
  * @return 0表示有效，非0表示无效
  */
-static int validate_elf_header(elf_header *ehdr) {
+static int32 validate_elf_header(elf_header *ehdr) {
   // 验证魔数
   if (ehdr->magic != ELF_MAGIC) {
     sprint("Invalid ELF magic number: 0x%x\n", ehdr->magic);
@@ -254,10 +254,10 @@ static int validate_elf_header(elf_header *ehdr) {
  * @param ph 程序头
  * @return 0表示成功，非0表示失败
  */
-static int load_segment(elf_context *ctx, elf_prog_header *ph) {
+static int32 load_segment(elf_context *ctx, elf_prog_header *ph) {
   struct task_struct *proc = ctx->proc;
   struct mm_struct *mm = proc->mm;
-  int ret;
+  int32 ret;
 
   // 只加载可加载的段
   if (ph->type != ELF_PROG_LOAD) {
@@ -349,7 +349,7 @@ static void setup_global_pointer(elf_context *ctx) {
   }
 
   // 遍历所有节头，查找.sdata段
-  for (int i = 0; i < ehdr->shnum; i++) {
+  for (int32 i = 0; i < ehdr->shnum; i++) {
     elf_sect_header sh;
     uint64 sh_offset = ehdr->shoff + i * sizeof(elf_sect_header);
 
@@ -380,7 +380,7 @@ static void setup_global_pointer(elf_context *ctx) {
  * @param proc 目标进程
  * @return 0表示成功，非0表示失败
  */
-static int init_elf_context(elf_context *ctx, int fd,
+static int32 init_elf_context(elf_context *ctx, int32 fd,
                             struct task_struct *proc) {
   memset(ctx, 0, sizeof(elf_context));
   ctx->fd = fd;
@@ -407,7 +407,7 @@ static int init_elf_context(elf_context *ctx, int fd,
  * @param ctx ELF上下文
  * @return 0表示成功，非0表示失败
  */
-static int load_debug_information(elf_context *ctx) {
+static int32 load_debug_information(elf_context *ctx) {
   // 这里可以实现加载调试信息的功能
   return 0;
 }
@@ -419,12 +419,12 @@ static int load_debug_information(elf_context *ctx) {
  * @param ctx ELF上下文
  * @return 0表示成功，非0表示失败
  */
-static int load_elf_binary(elf_context *ctx) {
+static int32 load_elf_binary(elf_context *ctx) {
   elf_header *ehdr = &ctx->ehdr;
   elf_prog_header ph;
 
   // 遍历程序头表，加载各个段
-  for (int i = 0; i < ehdr->phnum; i++) {
+  for (int32 i = 0; i < ehdr->phnum; i++) {
     uint64 ph_offset = ehdr->phoff + i * sizeof(ph);
 
     // 读取程序头

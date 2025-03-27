@@ -1,9 +1,11 @@
 // See LICENSE for license details.
 
-#include <util/string.h>
+#include <kernel/util/string.h>
 #include <stdarg.h>
 #include <ctype.h>
 #include <stdint.h>
+#include <stdbool.h>
+
 
 void *memcpy(void *dest, const void *src, size_t len) {
   const char *s = src;
@@ -23,7 +25,7 @@ void *memcpy(void *dest, const void *src, size_t len) {
   return dest;
 }
 
-void *memset(void *dest, int byte, size_t len) {
+void *memset(void *dest, int32 byte, size_t len) {
   if ((((uintptr_t)dest | len) & (sizeof(uintptr_t) - 1)) == 0) {
     uintptr_t word = byte & 0xFF;
     word |= word << 8;
@@ -48,7 +50,7 @@ size_t strlen(const char *s) {
   return p - s;
 }
 
-int strcmp(const char *s1, const char *s2) {
+int32 strcmp(const char *s1, const char *s2) {
   unsigned char c1, c2;
 
   do {
@@ -66,7 +68,7 @@ char *strcpy(char *dest, const char *src) {
   return dest;
 }
 
-char *strchr(const char *p, int ch) {
+char *strchr(const char *p, int32 ch) {
   char c;
   c = ch;
   for (;; ++p) {
@@ -110,9 +112,9 @@ char *strcat(char *dst, const char *src) {
   return dst;
 }
 
-long atol(const char *str) {
-  long res = 0;
-  int sign = 0;
+int64 atol(const char *str) {
+  int64 res = 0;
+  int32 sign = 0;
 
   while (*str == ' ')
     str++;
@@ -149,7 +151,7 @@ void *memmove(void *dst, const void *src, size_t n) {
 }
 
 // Like strncpy but guaranteed to NUL-terminate.
-char *safestrcpy(char *s, const char *t, int n) {
+char *safestrcpy(char *s, const char *t, int32 n) {
   char *os;
 
   os = s;
@@ -203,9 +205,9 @@ char *strncpy(char *dest, const char *src, size_t n) {
  * 返回值: 如果缓冲区足够大，返回写入的字符数（不包括终止符'\0'）；
  *         否则返回格式化完成后本应该写入的字符数（不包括终止符'\0'）
  */
-int snprintf(char* str, size_t size, const char* format, ...) {
+int32 snprintf(char* str, size_t size, const char* format, ...) {
   va_list args;
-  int result;
+  int32 result;
 
   // 如果缓冲区大小为0或为NULL，不进行任何写入
   if (size == 0 || str == NULL) {
@@ -220,12 +222,12 @@ int snprintf(char* str, size_t size, const char* format, ...) {
 }
 
 // 内部实现，处理格式化并写入字符
-static int vsnprintf_internal(char* str, size_t size, const char* format, va_list args) {
+static int32 vsnprintf_internal(char* str, size_t size, const char* format, va_list args) {
   size_t count = 0;  // 已写入或需要写入的字符数
   char* s;
-  int num, len;
+  int32 num, len;
   char padding, temp[32];
-  unsigned int unum;
+  uint32 unum;
   
   if (size == 0) {
     return 0;
@@ -269,7 +271,7 @@ static int vsnprintf_internal(char* str, size_t size, const char* format, va_lis
         
       case 'd':  // 有符号整数
       case 'i':
-        num = va_arg(args, int);
+        num = va_arg(args, int32);
         
         // 处理负数
         if (num < 0) {
@@ -297,7 +299,7 @@ static int vsnprintf_internal(char* str, size_t size, const char* format, va_lis
         break;
         
       case 'u':  // 无符号整数
-        unum = va_arg(args, unsigned int);
+        unum = va_arg(args, uint32);
         
         // 转换为字符串
         len = 0;
@@ -316,12 +318,12 @@ static int vsnprintf_internal(char* str, size_t size, const char* format, va_lis
         
       case 'x':  // 十六进制（小写）
       case 'X':  // 十六进制（大写）
-        unum = va_arg(args, unsigned int);
+        unum = va_arg(args, uint32);
         
         // 转换为字符串
         len = 0;
         do {
-          int digit = unum % 16;
+          int32 digit = unum % 16;
           if (digit < 10) {
             temp[len++] = '0' + digit;
           } else {
@@ -340,10 +342,10 @@ static int vsnprintf_internal(char* str, size_t size, const char* format, va_lis
         
       case 'c':  // 字符
         if (count < size) {
-          str[count++] = (char)va_arg(args, int);
+          str[count++] = (char)va_arg(args, int32);
         } else {
           count++;
-          va_arg(args, int);  // 跳过参数
+          va_arg(args, int32);  // 跳过参数
         }
         break;
         
@@ -382,7 +384,7 @@ static int vsnprintf_internal(char* str, size_t size, const char* format, va_lis
         }
       } else if (*format == 'c' || *format == 'd' || *format == 'i' ||
                 *format == 'u' || *format == 'x' || *format == 'X') {
-        va_arg(args, int);  // 跳过参数
+        va_arg(args, int32);  // 跳过参数
         count++;
       } else if (*format == '%') {
         count++;
@@ -395,3 +397,113 @@ static int vsnprintf_internal(char* str, size_t size, const char* format, va_lis
   
   return count;
 }
+
+
+/**
+ * memcmp - Compare two memory regions
+ * @s1: First memory region
+ * @s2: Second memory region
+ * @n: Number of bytes to compare
+ *
+ * Compares two memory regions byte by byte.
+ * 
+ * Returns:
+ *   0 if the regions are identical
+ *   < 0 if the first differing byte in s1 is less than in s2
+ *   > 0 if the first differing byte in s1 is greater than in s2
+ */
+int32 memcmp(const void *s1, const void *s2, size_t n)
+{
+    const unsigned char *p1 = s1;
+    const unsigned char *p2 = s2;
+    
+    if (s1 == s2 || n == 0)
+        return 0;
+    
+    /* Compare byte by byte */
+    while (n--) {
+        if (*p1 != *p2)
+            return *p1 - *p2;
+        p1++;
+        p2++;
+    }
+    
+    return 0;
+}
+
+
+
+int32_t vsnprintf(char* out, size_t n, const char* s, va_list vl) {
+	bool format = false;
+	bool longarg = false;
+	size_t pos = 0;
+  
+	for (; *s; s++) {
+	  if (format) {
+		switch (*s) {
+		  case 'l':
+			longarg = true;
+			break;
+		  case 'p':
+			longarg = true;
+			if (++pos < n) out[pos - 1] = '0';
+			if (++pos < n) out[pos - 1] = 'x';
+		  case 'x': {
+			int64 num = longarg ? va_arg(vl, int64) : va_arg(vl, int32);
+			for (int32 i = 2 * (longarg ? sizeof(int64) : sizeof(int32)) - 1; i >= 0; i--) {
+			  int32 d = (num >> (4 * i)) & 0xF;
+			  if (++pos < n) out[pos - 1] = (d < 10 ? '0' + d : 'a' + d - 10);
+			}
+			longarg = false;
+			format = false;
+			break;
+		  }
+		  case 'd': {
+			int64 num = longarg ? va_arg(vl, int64) : va_arg(vl, int32);
+			if (num < 0) {
+			  num = -num;
+			  if (++pos < n) out[pos - 1] = '-';
+			}
+			int64 digits = 1;
+			for (int64 nn = num; nn /= 10; digits++)
+			  ;
+			for (int32 i = digits - 1; i >= 0; i--) {
+			  if (pos + i + 1 < n) out[pos + i] = '0' + (num % 10);
+			  num /= 10;
+			}
+			pos += digits;
+			longarg = false;
+			format = false;
+			break;
+		  }
+		  case 's': {
+			const char* s2 = va_arg(vl, const char*);
+			while (*s2) {
+			  if (++pos < n) out[pos - 1] = *s2;
+			  s2++;
+			}
+			longarg = false;
+			format = false;
+			break;
+		  }
+		  case 'c': {
+			if (++pos < n) out[pos - 1] = (char)va_arg(vl, int32);
+			longarg = false;
+			format = false;
+			break;
+		  }
+		  default:
+			break;
+		}
+	  } else if (*s == '%')
+		format = true;
+	  else if (++pos < n)
+		out[pos - 1] = *s;
+	}
+	if (pos < n)
+	  out[pos] = 0;
+	else if (n)
+	  out[n - 1] = 0;
+	return pos;
+  }
+  

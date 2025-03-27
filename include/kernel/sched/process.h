@@ -3,7 +3,8 @@
 
 #include <kernel/riscv.h>
 #include <kernel/trapframe.h>
-#include <util/list.h>
+#include <kernel/sched/signal.h>
+#include <kernel/util/list.h>
 
 struct fdtable;
 struct fs_struct;
@@ -87,74 +88,77 @@ struct fs_struct;
 
 #define TASK_ANY (TASK_STATE_MAX - 1)
 /* 复合状态(组合状态) */
-#define TASK_KILLABLE                                                          \
-  (TASK_WAKEKILL | TASK_UNINTERRUPTIBLE) // 不可中断但可被SIGKILL终止
-#define TASK_STOPPED                                                           \
-  (TASK_WAKEKILL | __TASK_STOPPED) // 已停止并会在唤醒时被杀死
-#define TASK_TRACED (TASK_WAKEKILL | __TASK_TRACED) // 被跟踪并会在唤醒时被杀死
+#define TASK_KILLABLE (TASK_WAKEKILL | TASK_UNINTERRUPTIBLE) // 不可中断但可被SIGKILL终止
+#define TASK_STOPPED (TASK_WAKEKILL | __TASK_STOPPED)        // 已停止并会在唤醒时被杀死
+#define TASK_TRACED (TASK_WAKEKILL | __TASK_TRACED)          // 被跟踪并会在唤醒时被杀死
 
 /* 状态掩码 */
 #define TASK_STATE_TO_CHAR_STR "RSDTtXZPI" // 状态显示字符
 
 // types of a segment
 enum fork_choice {
-  FORK_MAP = 0, // 直接映射代码段
-  FORK_COPY,    // 直接复制所有数据
-  FORK_COW,
+	FORK_MAP = 0, // 直接映射代码段
+	FORK_COPY,    // 直接复制所有数据
+	FORK_COW,
 };
 
 struct task_struct {
-  uint64 kstack; // 分配一个页面当内核栈，注意内核栈的范围是[kstack-PAGE_SIZE,
-                 // kstack)
-  struct trapframe* trapframe;
-  struct trapframe* ktrapframe;
+	uint64 kstack; // 分配一个页面当内核栈，注意内核栈的范围是[kstack-PAGE_SIZE,
+	               // kstack)
+	struct trapframe* trapframe;
+	struct trapframe* ktrapframe;
 
-  struct mm_struct* mm;
-  // struct mm_struct *active_mm;
-  //  我们不需要使用复杂的active_mm特性
-  /* File system info */
-  struct fs_struct* fs;
-  struct fdtable* fdtable;
+	struct mm_struct* mm;
+	// struct mm_struct *active_mm;
+	//  我们不需要使用复杂的active_mm特性
+	/* File system info */
+	struct fs_struct* fs;
+	struct fdtable* fdtable;
 
-  // process id
-  pid_t pid;
-  // process state
-  unsigned int state;
-  unsigned int flags;
-  // parent process
-  struct task_struct* parent;
-  struct list_head children;
-  struct list_head sibling;
-  // ready queue
-  struct list_head queue_node;
+	// process id
+	pid_t pid;
+	// process state
+	uint32 state;
+	uint32 flags;
+	// parent process
+	struct task_struct* parent;
+	struct list_head children;
+	struct list_head sibling;
+	// ready queue
+	struct list_head ready_queue_node;
 
-  // accounting. added @lab3_3
-  int tick_count;
+	// accounting. added @lab3_3
+	int32 tick_count;
 
-  int sem_index;
+	// int32 sem_index;
 
-  int pagefault_disabled;
-  /* The signal sent when the parent dies: */
-  int exit_state;
-  int exit_code;
-  int exit_signal;
+	// int32 pagefault_disabled;
 
-  uid_t uid;
-  uid_t euid;
-  gid_t gid;
-  gid_t egid;
-  // 目前还用不上这些字段
+	/* Signal handling */
+	sigset_t pending;                // Pending signals
+	sigset_t blocked;                // Blocked signals (signal mask)
+	sigset_t saved_sigmask;          // Saved signal mask for sigsuspend
+	struct sigaction sighand[_NSIG]; // Signal handlers
+
+	uint64 signal_flags; // Signal-related flags
+	int32 exit_signal;            // Signal delivered to parent on exit
+
+	uid_t uid;
+	uid_t euid;
+	gid_t gid;
+	gid_t egid;
+	// 目前还用不上这些字段
 };
 struct task_struct* alloc_init_task();
 
 struct task_struct* alloc_process();
-int free_process(struct task_struct* proc);
+int32 free_process(struct task_struct* proc);
 
 // fork a child from parent
-int do_fork(struct task_struct* parent);
-int do_exec(uint64 path);
-ssize_t do_wait(int pid);
-int current_is_in_group(gid_t gid);
+int32 do_fork(struct task_struct* parent);
+int32 do_exec(uint64 path);
+ssize_t do_wait(int32 pid);
+int32 current_is_in_group(gid_t gid);
 
 /**
  * 打印进程的内存布局信息，用于调试

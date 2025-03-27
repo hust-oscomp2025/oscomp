@@ -1,6 +1,6 @@
 #include <kernel/fs/vfs/kiocb.h>
 #include <kernel/fs/vfs/file.h>
-#include <util/spinlock.h>
+#include <kernel/util/spinlock.h>
 
 /**
  * init_kiocb - Initialize a kernel I/O control block
@@ -64,7 +64,7 @@ ssize_t kiocb_read(struct kiocb *kiocb, char *buf, size_t len)
         return -EBADF;
     
     /* Check if file is readable */
-    if (!file_readable(file))
+    if (!file_isReadable(file))
         return -EBADF;
     
     /* If we have a file-specific read method, use it */
@@ -104,7 +104,7 @@ ssize_t kiocb_write(struct kiocb *kiocb, const char *buf, size_t len)
         return -EBADF;
     
     /* Check if file is writable */
-    if (!file_writable(file))
+    if (!file_isWriteable(file))
         return -EBADF;
     
     /* Handle append mode */
@@ -138,7 +138,7 @@ ssize_t kiocb_write(struct kiocb *kiocb, const char *buf, size_t len)
  *
  * Returns true if this is a direct I/O operation.
  */
-int kiocb_is_direct(const struct kiocb *kiocb)
+int32 kiocb_is_direct(const struct kiocb *kiocb)
 {
     return kiocb && (kiocb->ki_flags & KIOCB_DIRECT);
 }
@@ -149,7 +149,7 @@ int kiocb_is_direct(const struct kiocb *kiocb)
  *
  * Returns true if this is an append operation.
  */
-int kiocb_is_append(const struct kiocb *kiocb)
+int32 kiocb_is_append(const struct kiocb *kiocb)
 {
     return kiocb && (kiocb->ki_flags & KIOCB_APPEND);
 }
@@ -160,7 +160,7 @@ int kiocb_is_append(const struct kiocb *kiocb)
  *
  * Returns true if this is a non-blocking I/O operation.
  */
-int kiocb_is_nonblock(const struct kiocb *kiocb)
+int32 kiocb_is_nonblock(const struct kiocb *kiocb)
 {
     return kiocb && (kiocb->ki_flags & KIOCB_NONBLOCK);
 }

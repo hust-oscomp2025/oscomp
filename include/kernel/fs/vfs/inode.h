@@ -1,12 +1,12 @@
 #ifndef INODE_H
 #define INODE_H
 
-//#include <kernel/fs/vfs/vfs.h>
+//#include <kernel/vfs.h>
 #include <kernel/mm/vma.h>
 #include <kernel/types.h>
-#include <util/atomic.h>
-#include <util/list.h>
-#include <util/spinlock.h>
+#include <kernel/util/atomic.h>
+#include <kernel/util/list.h>
+#include <kernel/util/spinlock.h>
 
 extern struct hashtable inode_hashtable;
 
@@ -39,14 +39,14 @@ typedef unsigned short umode_t;
  * @ia_ctime: new change time
  */
 struct iattr {
-	unsigned int ia_valid;
+	uint32 ia_valid;
 	fmode_t ia_mode;
 	uid_t ia_uid;
 	gid_t ia_gid;
 	loff_t ia_size;
-	struct timespec64 ia_atime;
-	struct timespec64 ia_mtime;
-	struct timespec64 ia_ctime;
+	struct timespec ia_atime;
+	struct timespec ia_mtime;
+	struct timespec ia_ctime;
 };
 
 /* Forward declarations */
@@ -59,17 +59,17 @@ struct inode {
 	fmode_t i_mode;      /* File type and permissions */
 	uid_t i_uid;         /* Owner user ID */
 	gid_t i_gid;         /* Owner group ID */
-	unsigned long i_ino; /* Inode number */
+	uint64 i_ino; /* Inode number */
 	dev_t i_rdev;        /* Device number (for special files) */
 
 	/* File attributes */
 	loff_t i_size;           /* File size in bytes */
     // Replace existing timestamp fields with nanosecond precision
-    struct timespec64 i_atime; /* Last access time */
-    struct timespec64 i_mtime; /* Last modification time */
-    struct timespec64 i_ctime; /* Last status change time */
-    struct timespec64 i_btime; /* Creation time (birth time) */
-	unsigned int i_nlink;    /* Number of hard links */
+    struct timespec i_atime; /* Last access time */
+    struct timespec i_mtime; /* Last modification time */
+    struct timespec i_ctime; /* Last status change time */
+    struct timespec i_btime; /* Creation time (birth time) */
+	uint32 i_nlink;    /* Number of hard links */
 	blkcnt_t i_blocks;       /* Number of blocks allocated */
 
 	/* Memory management */
@@ -92,7 +92,7 @@ struct inode {
 	spinlock_t i_lock; /* Protects changes to inode */
 
 	/* State tracking */
-	unsigned long i_state; /* Inode state flags */
+	uint64 i_state; /* Inode state flags */
 
 	/* File system specific data */
 	void* i_fs_info; /* Filesystem-specific data */
@@ -118,28 +118,36 @@ struct inode {
 /*
  * Inode APIs
  */
-int inode_cache_init(void);
-
-struct inode* inode_create(struct superblock* sb);
+int32 inode_cache_init(void);
 
 /* Reference counting */
-struct inode* inode_get(struct inode* inode);
-void inode_put(struct inode* inode);
+struct inode* inode_ref(struct inode* inode);
+void inode_unref(struct inode* inode);
 
 /* Inode lookup and creation */
-struct inode* inode_acquire(struct superblock* sb, unsigned long ino);
+struct inode* inode_acquire(struct superblock* sb, uint64 ino);
+
+
+/*供下层文件系统调用，在IO读写后通知进程*/
+int unlock_new_inode(struct inode* inode);
+void wake_up_inode(struct inode* inode);
 
 /* Inode state management */
 void inode_setDirty(struct inode* inode);
-
-int inode_sync(struct inode* inode, int wait);
-int inode_sync_metadata(struct inode* inode, int wait);
+int32 inode_sync(struct inode* inode, int32 wait);
+int32 inode_sync_metadata(struct inode* inode, int32 wait);
 /* Permission checking */
-// int generic_permission(struct inode *inode, int mask);
+// int32 generic_permission(struct inode *inode, int32 mask);
 
 /* Utility functions */
-int inode_isBad(struct inode* inode);
-int inode_checkPermission(struct inode* inode, int mask);
+/**
+ * inode_isBad - Check if an inode is invalid
+ * @inode: inode to check
+ *
+ * Returns true if the specified inode has been marked as bad.
+ */
+static inline int32 inode_isBad(struct inode* inode) { return (!inode || inode->i_op == NULL); }
+int32 inode_checkPermission(struct inode* inode, int32 mask);
 
 
 // Add to inode.h or extend existing declarations
@@ -147,10 +155,10 @@ int inode_checkPermission(struct inode* inode, int mask);
 #define XATTR_REPLACE 0x2   /* Replace attribute if it exists */
 
 // Implementation functions for extended attributes
-int inode_setxattr(struct inode* inode, const char* name, const void* value, size_t size, int flags);
+int32 inode_setxattr(struct inode* inode, const char* name, const void* value, size_t size, int32 flags);
 ssize_t inode_getxattr(struct inode* inode, const char* name, void* value, size_t size);
 ssize_t inode_listxattr(struct inode* inode, char* list, size_t size);
-int inode_removexattr(struct inode* inode, const char* name);
+int32 inode_removexattr(struct inode* inode, const char* name);
 
 
 

@@ -3,7 +3,7 @@
 
 /* System time variables */
 static struct timespec system_time;
-static unsigned long system_jiffies;
+static uint64 system_jiffies;
 
 /**
  * current_time - Get current system time
@@ -67,7 +67,7 @@ struct timespec current_fs_time(struct superblock *sb)
     /* Apply filesystem-specific granularity */
     /* For most modern filesystems this will be 1ns (no change) */
     /* For others it might be 1μs (1000) or even 1s (1000000000) */
-    unsigned long granularity = 1; /* Default finest granularity */
+    uint64 granularity = 1; /* Default finest granularity */
     
     /* If filesystem has a specific time granularity, use it */
     /* This would usually be defined in the filesystem's superblock operations */
@@ -83,7 +83,7 @@ struct timespec current_fs_time(struct superblock *sb)
  *
  * Returns 0 on success, negative error code on failure
  */
-int do_gettimeofday(struct timeval *tv)
+int32 do_gettimeofday(struct timeval *tv)
 {
     struct timespec ts;
     
@@ -107,7 +107,7 @@ int do_gettimeofday(struct timeval *tv)
  *
  * Returns 0 on success, negative error code on failure
  */
-int do_clock_gettime(clockid_t which_clock, struct timespec *tp)
+int32 do_clock_gettime(clockid_t which_clock, struct timespec *tp)
 {
     if (!tp)
         return -EINVAL;
@@ -160,4 +160,76 @@ void update_sys_time_from_hw(void)
     /* Set to January 1, 2023 00:00:00 UTC */
     system_time.tv_sec = 1672531200;
     system_time.tv_nsec = 0;
+}
+
+// ...existing code...
+
+/**
+ * do_time - Get current time in seconds since the Unix epoch
+ * @timer: Optional pointer to store the result
+ *
+ * Returns the current time in seconds since the Unix epoch.
+ * If timer is not NULL, the time is also stored at the location it points to.
+ */
+time_t do_time(time_t *timer)
+{
+    time_t current = system_time.tv_sec;
+    
+    /* Store the result in timer if it's not NULL */
+    if (timer)
+        *timer = current;
+    
+    return current;
+}
+
+
+/*
+ * Compare two timespec values
+ * Returns:  1 if a > b
+ *           0 if a == b
+ *          -1 if a < b
+ */
+static inline int32 timespec_compare(const struct timespec *a, const struct timespec *b)
+{
+    if (a->tv_sec != b->tv_sec)
+        return a->tv_sec > b->tv_sec ? 1 : -1;
+    return a->tv_nsec > b->tv_nsec ? 1 : (a->tv_nsec < b->tv_nsec ? -1 : 0);
+}
+
+/* 
+ * Add two timespec values: result = a + b
+ */
+static inline void timespec_add(struct timespec *result, const struct timespec *a, const struct timespec *b)
+{
+    result->tv_sec = a->tv_sec + b->tv_sec;
+    result->tv_nsec = a->tv_nsec + b->tv_nsec;
+    if (result->tv_nsec >= NSEC_PER_SEC) {
+        result->tv_sec++;
+        result->tv_nsec -= NSEC_PER_SEC;
+    }
+}
+
+/* 
+ * Subtract two timespec values: result = a - b
+ */
+static inline void timespec_sub(struct timespec *result, const struct timespec *a, const struct timespec *b)
+{
+    result->tv_sec = a->tv_sec - b->tv_sec;
+    if (a->tv_nsec >= b->tv_nsec) {
+        result->tv_nsec = a->tv_nsec - b->tv_nsec;
+    } else {
+        result->tv_sec--;
+        result->tv_nsec = NSEC_PER_SEC + a->tv_nsec - b->tv_nsec;
+    }
+}
+
+/* Convert between time structures */
+
+/* 
+ * Convert timespec to timeval
+ */
+static inline void timespec_to_timeval(struct timeval *tv, const struct timespec *ts)
+{
+    tv->tv_sec = ts->tv_sec;
+    tv->tv_usec = ts->tv_nsec / NSEC_PER_USEC;
 }

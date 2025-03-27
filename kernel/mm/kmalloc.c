@@ -13,11 +13,11 @@
 #include <kernel/mm/pagetable.h>
 #include <kernel/mm/slab.h>
 
-#include <spike_interface/spike_utils.h>
-#include <util/atomic.h>
-#include <util/list.h>
-#include <util/spinlock.h>
-#include <util/string.h>
+#include <kernel/sprint.h>
+#include <kernel/util/atomic.h>
+#include <kernel/util/list.h>
+#include <kernel/util/spinlock.h>
+#include <kernel/util/string.h>
 
 /**
  * Memory allocation header structure
@@ -248,7 +248,7 @@ void* alloc_kernel_stack(){
  * Allocates memory and copies the given string into it.
  * Returns the pointer to the new string or NULL on allocation failure.
  */
-char *kstrdup(const char *s, unsigned int gfp)
+char *kstrdup(const char *s, uint32 gfp)
 {
     size_t len;
     char *buf;
@@ -274,7 +274,7 @@ char *kstrdup(const char *s, unsigned int gfp)
  * The result is always null-terminated.
  * Returns the pointer to the new string or NULL on allocation failure.
  */
-char *kstrndup(const char *s, size_t max, unsigned int gfp)
+char *kstrndup(const char *s, size_t max, uint32 gfp)
 {
     size_t len;
     char *buf;

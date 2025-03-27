@@ -23,6 +23,10 @@
 - [x] 用嵌入式哈希表重写inode hash
 - [x] 实现ext4 inode虚函数表
 - [ ] 在初始化ext4 mount时传入ext4全局锁
+- [ ] 用riscv-linux-gnu编译lwext4
+- [ ] 在lwext4中修改malloc为kmalloc
+- [ ] 提供一个通用的s_device_id获取方法
+- [ ] 在fs-specific动作中设置i_new
 
 
 
@@ -42,6 +46,9 @@
 - [ ] 在copy_to_user中，检查pagefault disabled
 - [ ] 在access_ok中验证用户指针
 - [ ] 完善sys_mount中的文件系统特定数据
+- [ ] 在kernel blockdevice创建和销毁时，创建和销毁ext4_blockdevice
+- [ ] 实现fs_specific_mount fallback
+- [ ] 支持negative dentry
 
 ## 小任务
 - [ ] 把readp和writep分离出去

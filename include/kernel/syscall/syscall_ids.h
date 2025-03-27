@@ -56,7 +56,7 @@
 #define SYS_fchmodat 53
 #define SYS_fchownat 54
 #define SYS_fchown 55
-#define SYS_openat 56
+#define SYS_open 56
 #define SYS_close 57
 #define SYS_vhangup 58
 #define SYS_pipe2 59

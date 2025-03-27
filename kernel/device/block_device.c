@@ -2,10 +2,10 @@
 #include <kernel/device/block_device.h>
 #include <kernel/mm/kmalloc.h>
 #include <kernel/types.h>
-#include <util/list.h>
-#include <util/string.h>
+#include <kernel/util/list.h>
+#include <kernel/util/string.h>
 
-#include <spike_interface/spike_utils.h>
+#include <kernel/sprint.h>
 
 // 全局块设备链表
 struct list_head all_block_devices;
@@ -37,8 +37,16 @@ void free_block_device(struct block_device *bdev) {
     kfree(bdev);
 }
 
-// 获取块设备
-struct block_device *get_block_device(dev_t dev, fmode_t mode) {
+/**
+ * current_time - Get current system time
+ * @dev: device identifier
+ * @mode: 
+ * 		The fmode_t parameter in blockdevice_get() represents the mode in which you want to access the block device
+ * 		Access permissions - Determines if the device is opened for reading (FMODE_READ), writing (FMODE_WRITE), or both
+ * 		Exclusivity - Controls whether exclusive access is required (FMODE_EXCL)
+ * 		Driver behavior - Some drivers might use this to prepare for specific operations
+ */
+struct block_device *blockdevice_get(dev_t dev, fmode_t mode) {
     struct block_device *bdev = NULL;
     
     spinlock_lock(&block_devices_lock);
@@ -62,8 +70,8 @@ struct block_device *get_block_device(dev_t dev, fmode_t mode) {
 }
 
 // 增加设备引用并打开
-int blkdev_get(struct block_device *bdev, fmode_t mode) {
-    int res = 0;
+int32 blkdev_get(struct block_device *bdev, fmode_t mode) {
+    int32 res = 0;
     
     if (bdev->bd_ops && bdev->bd_ops->open)
         res = bdev->bd_ops->open(bdev, mode);
@@ -95,7 +103,7 @@ void blkdev_put(struct block_device *bdev) {
 }
 
 // 注册块设备
-int register_blkdev(unsigned int major, const char *name, 
+int32 register_blkdev(uint32 major, const char *name, 
                    struct block_operations *ops) {
     // 实现注册逻辑
     // ...

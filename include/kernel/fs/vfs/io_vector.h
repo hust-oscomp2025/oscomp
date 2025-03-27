@@ -16,7 +16,7 @@ struct io_vector {
 
 // Memory management
 void io_vector_init(struct io_vector *vec, void *base, size_t len);
-int io_vector_allocate(struct io_vector *vec, size_t size);
+int32 io_vector_allocate(struct io_vector *vec, size_t size);
 void io_vector_free(struct io_vector *vec);
 
 // Basic I/O
@@ -31,8 +31,8 @@ void *io_vector_base(const struct io_vector *vec);
  */
 struct io_vector_iterator {
 	struct io_vector *iov_base;  /* 数组基地址 */
-    unsigned long index;         /* 当前索引 */
-    unsigned long nr_segs;  /* Number of segments */
+    uint64 index;         /* 当前索引 */
+    uint64 nr_segs;  /* Number of segments */
     size_t iov_offset;   /* Offset within current io_vector */
     size_t count;        /* Total bytes remaining */
 };
@@ -41,14 +41,14 @@ struct io_vector_iterator {
 
 
 // Iterator operations
-int setup_io_vector_iterator(struct io_vector_iterator *iter, const struct io_vector *vec, unsigned long vlen);
+int32 setup_io_vector_iterator(struct io_vector_iterator *iter, const struct io_vector *vec, uint64 vlen);
 size_t io_vector_iterator_copy_from(struct io_vector_iterator *iter, void *kaddr, size_t len);
 size_t io_vector_iterator_copy_to(struct io_vector_iterator *iter, const void *kaddr, size_t len);
 void io_vector_iterator_advance(struct io_vector_iterator *iter, size_t bytes);
 void io_vector_iterator_rewind(struct io_vector_iterator *iter);
 
 
-unsigned long io_vector_segment_count(const struct io_vector_iterator *iter);
+uint64 io_vector_segment_count(const struct io_vector_iterator *iter);
 size_t io_vector_remaining(const struct io_vector_iterator *iter);
 
 

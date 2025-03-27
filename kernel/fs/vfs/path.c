@@ -1,13 +1,11 @@
-#include <kernel/fs/vfs/vfs.h>
+#include <kernel/vfs.h>
 #include <kernel/types.h>
+#include <kernel/sched.h>
+#include <kernel/sprint.h>
+#include <kernel/util.h>
+#include <kernel/mmu.h>
 
-#include <kernel/sched/process.h>
-#include <kernel/sched/sched.h>
-#include <spike_interface/spike_utils.h>
-#include <util/list.h>
-#include <util/string.h>
-
-static int vfs_path_lookup(struct dentry* base_dentry, struct vfsmount* base_mnt, const char* path_str, unsigned int flags, struct path* result);
+static int32 vfs_path_lookup(struct dentry* base_dentry, struct vfsmount* base_mnt, const char* path_str, uint32 flags, struct path* result);
 
 /**
  * path_create - Look up a path from the current working directory
@@ -18,8 +16,8 @@ static int vfs_path_lookup(struct dentry* base_dentry, struct vfsmount* base_mnt
  * This is a wrapper around vfs_path_lookup that uses the current
  * working directory as the starting point.
  */
-int path_create(const char* name, unsigned int flags, struct path* path) {
-	int error;
+int32 path_create(const char* name, uint32 flags, struct path* path) {
+	int32 error;
 	struct task_struct* current;
 	struct dentry* start_dentry;
 	struct vfsmount* start_mnt;
@@ -41,9 +39,9 @@ int path_create(const char* name, unsigned int flags, struct path* path) {
  * @flags: Lookup flags
  * @result: Result path
  */
-int kern_path_qstr(const struct qstr* name, unsigned int flags, struct path* result) {
+int32 kern_path_qstr(const struct qstr* name, uint32 flags, struct path* result) {
 	/* For the initial implementation, convert to string and use existing path_create */
-	int ret;
+	int32 ret;
 	char* path_str;
 
 	if (!name || !result)
@@ -77,7 +75,7 @@ void path_destroy(struct path* path) {
 
 	/* Release dentry reference */
 	if (path->dentry)
-		dentry_put(path->dentry);
+		dentry_unref(path->dentry);
 
 	/* Release mount reference */
 	if (path->mnt)
@@ -101,11 +99,11 @@ void path_destroy(struct path* path) {
  *
  * Returns 0 on success, negative error code on failure.
  */
-int filename_lookup(int dfd, const char* name, unsigned int flags, struct path* path, struct path* started) {
+int32 filename_lookup(int32 dfd, const char* name, uint32 flags, struct path* path, struct path* started) {
 	struct task_struct* current;
 	struct dentry* start_dentry;
 	struct vfsmount* start_mnt;
-	int error;
+	int32 error;
 
 	/* Validate parameters */
 	if (!name || !path)
@@ -142,7 +140,7 @@ int filename_lookup(int dfd, const char* name, unsigned int flags, struct path* 
 			start_mnt = file->f_path.mnt;
 
 			/* Take reference to starting path components */
-			start_dentry = get_dentry(start_dentry);
+			start_dentry = dentry_ref(start_dentry);
 			if (start_mnt)
 				get_mount(start_mnt);
 
@@ -152,7 +150,7 @@ int filename_lookup(int dfd, const char* name, unsigned int flags, struct path* 
 
 	/* Save the starting path if requested */
 	if (started) {
-		started->dentry = get_dentry(start_dentry);
+		started->dentry = dentry_ref(start_dentry);
 		started->mnt = start_mnt ? get_mount(start_mnt) : NULL;
 	}
 
@@ -160,7 +158,7 @@ int filename_lookup(int dfd, const char* name, unsigned int flags, struct path* 
 	error = vfs_path_lookup(start_dentry, start_mnt, name, flags, path);
 
 	/* Release references to starting directory */
-	dentry_put(start_dentry);
+	dentry_unref(start_dentry);
 	if (start_mnt)
 		put_mount(start_mnt);
 
@@ -179,28 +177,28 @@ int filename_lookup(int dfd, const char* name, unsigned int flags, struct path* 
  *
  * Returns 0 on success, negative error code on failure.
  */
-static int vfs_path_lookup(struct dentry* base_dentry, struct vfsmount* base_mnt, const char* path_str, unsigned int flags, struct path* result) {
+static int32 vfs_path_lookup(struct dentry* base_dentry, struct vfsmount* base_mnt, const char* path_str, uint32 flags, struct path* result) {
 	struct dentry* dentry;
 	struct vfsmount* mnt;
 	char* component;
 	char* path_copy;
 	char* next_slash;
-	int len;
+	int32 len;
 
 	/* Validate parameters */
 	if (!base_dentry || !path_str || !result)
 		return -EINVAL;
 
 	/* Initialize with starting point */
-	dentry = get_dentry(base_dentry);
+	dentry = dentry_ref(base_dentry);
 	mnt = base_mnt ? get_mount(base_mnt) : NULL;
 
 	/* Handle absolute paths - start from root */
 	if (path_str[0] == '/') {
 		/* Use filesystem root */
 		if (mnt) {
-			dentry_put(dentry);
-			dentry = get_dentry(mnt->mnt_root);
+			dentry_unref(dentry);
+			dentry = dentry_ref(mnt->mnt_root);
 		}
 		/* Skip leading slash */
 		path_str++;
@@ -216,7 +214,7 @@ static int vfs_path_lookup(struct dentry* base_dentry, struct vfsmount* base_mnt
 	/* Make a copy of the path so we can modify it */
 	path_copy = kmalloc(strlen(path_str) + 1);
 	if (!path_copy) {
-		dentry_put(dentry);
+		dentry_unref(dentry);
 		if (mnt)
 			put_mount(mnt);
 		return -ENOMEM;
@@ -254,17 +252,17 @@ static int vfs_path_lookup(struct dentry* base_dentry, struct vfsmount* base_mnt
 
 				if (parent_mnt && parent_mnt != mnt) {
 					/* Cross mount boundary upward */
-					dentry_put(dentry);
+					dentry_unref(dentry);
 					put_mount(mnt);
 
 					mnt = get_mount(parent_mnt);
-					dentry = get_dentry(mountpoint);
+					dentry = dentry_ref(mountpoint);
 
 					/* Now go to parent of the mountpoint */
 					struct dentry* parent = dentry->d_parent;
 					if (parent) {
-						dentry_put(dentry);
-						dentry = get_dentry(parent);
+						dentry_unref(dentry);
+						dentry = dentry_ref(parent);
 					}
 				} else {
 					/* We're at the root of the root filesystem */
@@ -274,8 +272,8 @@ static int vfs_path_lookup(struct dentry* base_dentry, struct vfsmount* base_mnt
 				/* Regular parent dentry */
 				struct dentry* parent = dentry->d_parent;
 				if (parent) {
-					dentry_put(dentry);
-					dentry = get_dentry(parent);
+					dentry_unref(dentry);
+					dentry = dentry_ref(parent);
 				}
 			}
 
@@ -297,33 +295,33 @@ static int vfs_path_lookup(struct dentry* base_dentry, struct vfsmount* base_mnt
 		qname.hash = full_name_hash(component, len);
 
 		/* First try to find in dentry cache */
-		next = dentry_locate(dentry, &qname, -1, true, false);
+		next = dentry_acquire(dentry, &qname, -1, true, false);
 
 		if (!next) {
 			/* Not in cache, ask the filesystem */
 			if (!dentry->d_inode || !dentry->d_inode->i_op || !dentry->d_inode->i_op->lookup) {
-				dentry_put(dentry);
+				dentry_unref(dentry);
 				if (mnt)
 					put_mount(mnt);
 				kfree(path_copy);
 				return -ENOTDIR;
 			}
 
-			/* Create a negative dentry for the lookup */
-			next = dentry_locate(dentry, &qname, -1, false, true);
-			if (!next) {
-				dentry_put(dentry);
-				if (mnt)
-					put_mount(mnt);
-				kfree(path_copy);
-				return -ENOMEM;
-			}
+			// /* Create a negative dentry for the lookup */
+			// next = dentry_acquire(dentry, &qname, -1, false, true);
+			// if (!next) {
+			// 	dentry_unref(dentry);
+			// 	if (mnt)
+			// 		put_mount(mnt);
+			// 	kfree(path_copy);
+			// 	return -ENOMEM;
+			// }
 
 			/* Call the filesystem's lookup method */
-			int error = dentry_instantiate(next, dentry->d_inode->i_op->lookup(dentry->d_inode, next, 0));
+			int32 error = dentry_instantiate(next, dentry->d_inode->i_op->lookup(dentry->d_inode, next, 0)->d_inode);
 			if (error) {
-				dentry_put(next);
-				dentry_put(dentry);
+				dentry_unref(next);
+				dentry_unref(dentry);
 				if (mnt)
 					put_mount(mnt);
 				kfree(path_copy);
@@ -332,7 +330,7 @@ static int vfs_path_lookup(struct dentry* base_dentry, struct vfsmount* base_mnt
 		}
 
 		/* Release the parent dentry */
-		dentry_put(dentry);
+		dentry_unref(dentry);
 		dentry = next;
 
 		/* Check if this is a mount point */
@@ -346,8 +344,8 @@ static int vfs_path_lookup(struct dentry* base_dentry, struct vfsmount* base_mnt
 				mnt = mounted; /* already has incremented ref count */
 
 				/* Switch to the root of the mounted filesystem */
-				struct dentry* mnt_root = get_dentry(mounted->mnt_root);
-				dentry_put(dentry);
+				struct dentry* mnt_root = dentry_ref(mounted->mnt_root);
+				dentry_unref(dentry);
 				dentry = mnt_root;
 			}
 		}
@@ -357,14 +355,14 @@ static int vfs_path_lookup(struct dentry* base_dentry, struct vfsmount* base_mnt
 			/* Implement symlink resolution */
 			struct dentry* link_target = dentry_follow_link(dentry);
 			if (IS_ERR(link_target)) {
-				dentry_put(dentry);
+				dentry_unref(dentry);
 				if (mnt)
 					put_mount(mnt);
 				kfree(path_copy);
 				return PTR_ERR(link_target);
 			}
 
-			dentry_put(dentry);
+			dentry_unref(dentry);
 			dentry = link_target;
 		}
 

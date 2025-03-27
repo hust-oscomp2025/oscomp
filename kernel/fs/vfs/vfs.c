@@ -1,8 +1,8 @@
-#include <kernel/fs/vfs/vfs.h>
+#include <kernel/vfs.h>
 #include <kernel/mm/kmalloc.h>
 #include <kernel/sched/sched.h>
 #include <kernel/types.h>
-#include <util/string.h>
+#include <kernel/util/string.h>
 
 /* Global mount list */
 static struct list_head mount_list;
@@ -28,10 +28,10 @@ static struct hashtable mount_hashtable;
  *
  * Returns a vfsmount structure on success, NULL on failure.
  */
-struct vfsmount* vfs_kern_mount(struct fsType* type, int flags, const char* name, void* data) {
+struct vfsmount* vfs_kern_mount(struct fsType* type, int32 flags, const char* name, void* data) {
 	struct vfsmount* mnt;
 	struct superblock* sb;
-	static int mount_id = 0;
+	static int32 mount_id = 0;
 
 	if (!type)
 		return NULL;
@@ -88,8 +88,8 @@ struct vfsmount* vfs_kern_mount(struct fsType* type, int flags, const char* name
  *
  * Returns 0 on success or negative error code
  */
-int vfs_mkdir(struct inode* dir, struct dentry* dentry, fmode_t mode) {
-	int error;
+int32 vfs_mkdir(struct inode* dir, struct dentry* dentry, fmode_t mode) {
+	int32 error;
 
 	if (!dir || !dentry)
 		return -EINVAL;
@@ -124,22 +124,22 @@ int vfs_mkdir(struct inode* dir, struct dentry* dentry, fmode_t mode) {
  * Returns the superblock on success, ERR_PTR on failure
  * 正在优化的vfs_kern_mount函数
  */
-struct vfsmount* vfs_kern_mount(struct fstype* fstype, int flags, const char* device_path, void* data){
-	CHECK_PTR(fstype, ERR_PTR(-EINVAL));
+struct vfsmount* vfs_kern_mount(struct fstype* fstype, int32 flags, const char* device_path, void* data){
+	CHECK_PTR_VALID(fstype, ERR_PTR(-EINVAL));
 	dev_t dev_id = 0;
 	/***** 对于挂载实体设备的处理 *****/
 	if(device_path && *device_path){
-		int ret = lookup_dev_id(device_path, &dev_id);
+		int32 ret = lookup_dev_id(device_path, &dev_id);
 		if (ret < 0) {
 			sprint("VFS: Failed to get device ID for %s\n", device_path);
 			return ERR_PTR(ret);
 		}
 	}
 	struct superblock* sb = fstype_acquireSuperblock(fstype, dev_id, data);
-	CHECK_PTR(sb, ERR_PTR(-ENOMEM));
+	CHECK_PTR_VALID(sb, ERR_PTR(-ENOMEM));
 
 	struct vfsmount* mount = superblock_acquireMount(sb, flags, device_path);
-	CHECK_PTR(mount, ERR_PTR(-ENOMEM));
+	CHECK_PTR_VALID(mount, ERR_PTR(-ENOMEM));
 
 
 
@@ -157,8 +157,8 @@ struct vfsmount* vfs_kern_mount(struct fstype* fstype, int flags, const char* de
  *
  * Returns 0 on success or negative error code
  */
-int vfs_rmdir(struct inode* dir, struct dentry* dentry) {
-	int error;
+int32 vfs_rmdir(struct inode* dir, struct dentry* dentry) {
+	int32 error;
 
 	if (!dir || !dentry || !dentry->d_inode)
 		return -EINVAL;
@@ -187,8 +187,8 @@ int vfs_rmdir(struct inode* dir, struct dentry* dentry) {
  *
  * Returns 0 on success or negative error code
  */
-int vfs_link(struct dentry* old_dentry, struct inode* dir, struct dentry* new_dentry, struct inode** new_inode) {
-	int error;
+int32 vfs_link(struct dentry* old_dentry, struct inode* dir, struct dentry* new_dentry, struct inode** new_inode) {
+	int32 error;
 
 	if (!old_dentry || !dir || !new_dentry)
 		return -EINVAL;
@@ -223,9 +223,9 @@ int vfs_link(struct dentry* old_dentry, struct inode* dir, struct dentry* new_de
  * Must be called early during kernel initialization before
  * any filesystem operations can be performed.
  */
-int vfs_init(void)
+int32 vfs_init(void)
 {
-    int err;
+    int32 err;
     init_mount_hash();
 
     /* Initialize the dcache subsystem */
@@ -263,18 +263,18 @@ int vfs_init(void)
 /**
  * hash_mountpoint - Hash a mountpoint
  */
-static unsigned int hash_mountpoint(const void *key, unsigned int size) {
+static uint32 hash_mountpoint(const void *key, uint32 size) {
   const struct path *path = (const struct path *)key;
-  unsigned long hash = (unsigned long)path->dentry;
+  uint64 hash = (uint64)path->dentry;
 
-  hash = hash * 31 + (unsigned long)path->mnt;
+  hash = hash * 31 + (uint64)path->mnt;
   return hash % size;
 }
 
 /**
  * mountpoint_equal - Compare two mountpoints
  */
-static int mountpoint_equal(const void *k1, const void *k2) {
+static int32 mountpoint_equal(const void *k1, const void *k2) {
   const struct path *path1 = (const struct path *)k1;
   const struct path *path2 = (const struct path *)k2;
 
@@ -330,7 +330,7 @@ void put_mount(struct vfsmount *mnt) {
     list_del(&mnt->mnt_node_superblock);
     spinlock_unlock(&mnt->mnt_superblock->s_list_mounts_lock);
 
-    dentry_put(mnt->mnt_root);
+    dentry_unref(mnt->mnt_root);
     if (mnt->mnt_devname)
       kfree(mnt->mnt_devname);
     kfree(mnt);

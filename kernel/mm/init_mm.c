@@ -1,8 +1,8 @@
 #include <kernel/mm/page.h>
 #include <kernel/mm/mm_struct.h>
 #include <kernel/mm/pagetable.h>
-#include <util/string.h>
-#include <spike_interface/spike_utils.h>
+#include <kernel/util/string.h>
+#include <kernel/sprint.h>
 
 struct mm_struct init_mm;
 
@@ -75,8 +75,8 @@ void create_init_mm() {
 // void setup_initial_init_mm(uint64 start_code, uint64 end_code,
 // 			   uint64 end_data, uint64 brk)
 // {
-// 	init_mm.start_code = (unsigned long)start_code;
-// 	init_mm.end_code = (unsigned long)end_code;
-// 	init_mm.end_data = (unsigned long)end_data;
-// 	init_mm.brk = (unsigned long)brk;
+// 	init_mm.start_code = (uint64)start_code;
+// 	init_mm.end_code = (uint64)end_code;
+// 	init_mm.end_data = (uint64)end_data;
+// 	init_mm.brk = (uint64)brk;
 // }

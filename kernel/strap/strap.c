@@ -12,12 +12,12 @@
 #include <kernel/sched/process.h>
 #include <kernel/riscv.h>
 #include <kernel/sched/sched.h>
-#include <util/string.h>
+#include <kernel/util/string.h>
 #include <kernel/syscall/syscall.h>
 
 
 
-#include <spike_interface/spike_utils.h>
+#include <kernel/sprint.h>
 
 //
 // handling the syscalls. will call do_syscall() defined in kernel/syscall.c
@@ -33,14 +33,16 @@ static void handle_syscall(struct trapframe *tf) {
 
 //
 // global variable that store the recorded "ticks". added @lab1_3
-static uint64 g_ticks = 0;
+static uint64 jiffies = 0;
 //
 // added @lab1_3
 //
 void handle_mtimer_trap() {
-  sprint("Ticks %d\n", g_ticks);
-  g_ticks++;
-  int hartid = read_tp();
+  sprint("Ticks %d\n", jiffies);
+  int32 hartid = read_tp();
+  if(hartid == 0){
+	jiffies++;
+  }
   CURRENT->tick_count++;
 
   write_csr(sip, read_csr(sip) & ~SIP_SSIP);
@@ -61,7 +63,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 	sprint("sepc=%lx, handle_page_fault: %lx\n", sepc, addr);
 	
 	// 标记访问类型
-	int fault_prot = 0;
+	int32 fault_prot = 0;
 	if (mcause == CAUSE_LOAD_PAGE_FAULT)
 			fault_prot |= PROT_READ;
 	else if (mcause == CAUSE_STORE_PAGE_FAULT)
@@ -85,7 +87,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 					uint64 page_va = ROUNDDOWN(addr, PAGE_SIZE);
 					
 					// 计算页索引
-					int page_idx = (page_va - vma->vm_start) / PAGE_SIZE;
+					int32 page_idx = (page_va - vma->vm_start) / PAGE_SIZE;
 					if (page_idx < 0 || page_idx >= vma->page_count) {
 							sprint("页索引越界: %d\n", page_idx);
 							goto error;
@@ -174,7 +176,7 @@ void rrsched() {
   // its state into READY, place it in the rear of ready queue, and finally
   // schedule next process to run.
   // panic( "You need to further implement the timer handling in lab3_3.\n" );
-  int hartid = read_tp();
+  int32 hartid = read_tp();
   if (CURRENT->tick_count >= TIME_SLICE_LEN) {
     CURRENT->tick_count = 0;
     //sys_user_yield();
@@ -186,7 +188,7 @@ void rrsched() {
 // happens in S-mode.
 //
 void smode_trap_handler(void) {
-  int hartid = read_tp();
+  int32 hartid = read_tp();
   // make sure we are in User mode before entering the trap handling.
   // we will consider other previous case in lab1_3 (interrupt).
   if ((read_csr(sstatus) & SSTATUS_SPP) != 0)

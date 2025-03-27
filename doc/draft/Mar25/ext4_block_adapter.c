@@ -35,7 +35,7 @@ static int ext4_linux_bread(struct ext4_blockdev *ext4_bdev, void *buf,
     blk_id += ext4_bdev->part_offset;
     
     // 使用 Linux VFS 块操作读取数据
-    return priv->bdev->bd_ops->read_block(priv->bdev, blk_id, buf, blk_cnt);
+    return priv->bdev->bd_ops->read_blocks(priv->bdev, blk_id, buf, blk_cnt);
 }
 
 // 适配函数: 写块

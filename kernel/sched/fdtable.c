@@ -1,17 +1,17 @@
-#include <errno.h>
 #include <kernel/sched/fdtable.h>
 #include <kernel/fs/vfs/file.h>
 #include <kernel/mm/kmalloc.h>
 #include <sys/poll.h>
-#include <util/string.h>
-#include <spike_interface/spike_utils.h>
+#include <kernel/util/string.h>
+#include <kernel/sprint.h>
+#include <kernel/types.h>
 
 #define FDTABLE_INIT_SIZE 16
 
 static struct fdtable* __fdtable_alloc(void);
 static void __fdtable_free(struct fdtable* fdt);
-static int __find_next_fd(struct fdtable* fdt, unsigned int start);
-static int _fdtable_do_poll(struct fdtable* fdt, struct pollfd* fds, unsigned int nfds, int timeout);
+static int32 __find_next_fd(struct fdtable* fdt, uint32 start);
+static int32 _fdtable_do_poll(struct fdtable* fdt, struct pollfd* fds, uint32 nfds, int32 timeout);
 
 /**
  * 获取fdtable引用
@@ -29,7 +29,7 @@ struct fdtable* fdtable_get(struct fdtable* fdt) {
 /**
  * 释放fdtable引用
  */
-int fdtable_put(struct fdtable* fdt) {
+int32 fdtable_put(struct fdtable* fdt) {
 	if (!fdt)
 		return -EINVAL;
 	if(atomic_read(&fdt->fdt_refcount) <= 0){
@@ -46,7 +46,7 @@ int fdtable_put(struct fdtable* fdt) {
  */
 struct fdtable* fdtable_copy(struct fdtable* old) {
 	struct fdtable* new;
-	int size, i;
+	int32 size, i;
 
 	if (!old)
 		return NULL;
@@ -104,7 +104,7 @@ static struct fdtable* __fdtable_alloc(void) {
 		return NULL;
 	}
 
-	fdt->fd_flags = kmalloc(sizeof(unsigned int) * FDTABLE_INIT_SIZE);
+	fdt->fd_flags = kmalloc(sizeof(uint32) * FDTABLE_INIT_SIZE);
 	if (!fdt->fd_flags) {
 		kfree(fdt->fd_array);
 		kfree(fdt);
@@ -113,7 +113,7 @@ static struct fdtable* __fdtable_alloc(void) {
 
 	// 初始化数组
 	memset(fdt->fd_array, 0, sizeof(struct file*) * FDTABLE_INIT_SIZE);
-	memset(fdt->fd_flags, 0, sizeof(unsigned int) * FDTABLE_INIT_SIZE);
+	memset(fdt->fd_flags, 0, sizeof(uint32) * FDTABLE_INIT_SIZE);
 
 	fdt->fdt_size = FDTABLE_INIT_SIZE;
 	fdt->fdt_nextfd = 0;
@@ -127,7 +127,7 @@ static struct fdtable* __fdtable_alloc(void) {
  * 释放文件描述符表
  */
 static void __fdtable_free(struct fdtable* fdt) {
-	int i;
+	int32 i;
 
 	// 关闭所有打开的文件
 	for (i = 0; i < fdt->fdt_size; i++) {
@@ -145,9 +145,9 @@ static void __fdtable_free(struct fdtable* fdt) {
 /**
  * 扩展文件描述符表容量
  */
-int fdtable_expand(struct fdtable* fdt, unsigned int new_size) {
+int32 fdtable_expand(struct fdtable* fdt, uint32 new_size) {
 	struct file** new_array;
-	unsigned int* new_flags;
+	uint32* new_flags;
 
 	if (!fdt || new_size <= fdt->fdt_size)
 		return -EINVAL;
@@ -157,7 +157,7 @@ int fdtable_expand(struct fdtable* fdt, unsigned int new_size) {
 	if (!new_array)
 		return -ENOMEM;
 
-	new_flags = kmalloc(sizeof(unsigned int) * new_size);
+	new_flags = kmalloc(sizeof(uint32) * new_size);
 	if (!new_flags) {
 		kfree(new_array);
 		return -ENOMEM;
@@ -165,12 +165,12 @@ int fdtable_expand(struct fdtable* fdt, unsigned int new_size) {
 
 	// 初始化新空间
 	memset(new_array, 0, sizeof(struct file*) * new_size);
-	memset(new_flags, 0, sizeof(unsigned int) * new_size);
+	memset(new_flags, 0, sizeof(uint32) * new_size);
 
 	// 复制旧数据
 	spinlock_lock(&fdt->fdt_lock);
 	memcpy(new_array, fdt->fd_array, sizeof(struct file*) * fdt->fdt_size);
-	memcpy(new_flags, fdt->fd_flags, sizeof(unsigned int) * fdt->fdt_size);
+	memcpy(new_flags, fdt->fd_flags, sizeof(uint32) * fdt->fdt_size);
 
 	// 替换数组
 	kfree(fdt->fd_array);
@@ -196,8 +196,8 @@ uint64 fdtable_getSize(struct fdtable* fdt) {
 /**
  * 查找下一个可用的文件描述符
  */
-static int __find_next_fd(struct fdtable* fdt, unsigned int start) {
-	unsigned int i;
+static int32 __find_next_fd(struct fdtable* fdt, uint32 start) {
+	uint32 i;
 
 	for (i = start; i < fdt->fdt_size; i++) {
 		if (!fdt->fd_array[i] && !(fdt->fd_flags[i] & FD_ALLOCATED))
@@ -210,8 +210,8 @@ static int __find_next_fd(struct fdtable* fdt, unsigned int start) {
 /**
  * 分配一个新的文件描述符
  */
-int fdtable_allocFd(struct fdtable* fdt, unsigned int flags) {
-	int fd;
+int32 fdtable_allocFd(struct fdtable* fdt, uint32 flags) {
+	int32 fd;
 
 	if (!fdt)
 		return -EINVAL;
@@ -279,7 +279,7 @@ void fdtable_closeFd(struct fdtable* fdt, uint64 fd) {
 /**
  * 安装文件到描述符
  */
-int fdtable_installFd(struct fdtable* fdt, uint64 fd, struct file* file) {
+int32 fdtable_installFd(struct fdtable* fdt, uint64 fd, struct file* file) {
 	if (!fdt || !file || fd >= fdt->fdt_size)
 		return -EINVAL;
 	if (!(fdt->fd_flags[fd] & FD_ALLOCATED)) {
@@ -325,7 +325,7 @@ struct file* fdtable_getFile(struct fdtable* fdt, uint64 fd) {
 /**
  * 设置文件描述符标志
  */
-int fdtable_setFdFlags(struct fdtable* fdt, uint64 fd, unsigned int flags) {
+int32 fdtable_setFdFlags(struct fdtable* fdt, uint64 fd, uint32 flags) {
 	if (!fdt || fd >= fdt->fdt_size)
 		return -EINVAL;
 
@@ -345,8 +345,8 @@ int fdtable_setFdFlags(struct fdtable* fdt, uint64 fd, unsigned int flags) {
 /**
  * 获取文件描述符标志
  */
-unsigned int fdtable_getFdFlags(struct fdtable* fdt, uint64 fd) {
-	unsigned int flags = 0;
+uint32 fdtable_getFdFlags(struct fdtable* fdt, uint64 fd) {
+	uint32 flags = 0;
 
 	if (!fdt || fd >= fdt->fdt_size)
 		return 0;
@@ -363,9 +363,9 @@ unsigned int fdtable_getFdFlags(struct fdtable* fdt, uint64 fd) {
 /**
  * 实现dup2系统调用
  */
-int do_dup2(struct fdtable* fdt, uint64 oldfd, uint64 newfd) {
+int32 do_dup2(struct fdtable* fdt, uint64 oldfd, uint64 newfd) {
 	struct file* file;
-	int ret = 0;
+	int32 ret = 0;
 
 	if (!fdt || oldfd >= fdt->fdt_size)
 		return -EBADF;
@@ -400,7 +400,7 @@ int do_dup2(struct fdtable* fdt, uint64 oldfd, uint64 newfd) {
 	}
 
 	// 复制fd标志位，但清除close-on-exec标志
-	unsigned int flags = fdtable_getFdFlags(fdt, oldfd) & ~FD_CLOEXEC;
+	uint32 flags = fdtable_getFdFlags(fdt, oldfd) & ~FD_CLOEXEC;
 	fdtable_setFdFlags(fdt, newfd, flags);
 
 	return newfd;
@@ -409,9 +409,9 @@ int do_dup2(struct fdtable* fdt, uint64 oldfd, uint64 newfd) {
 /**
  * 实现fcntl系统调用
  */
-int do_fcntl(struct fdtable* fdt, uint64 fd, unsigned int cmd, unsigned long arg) {
+int32 do_fcntl(struct fdtable* fdt, uint64 fd, uint32 cmd, uint64 arg) {
 	struct file* filp;
-	int ret = 0;
+	int32 ret = 0;
 
 	if (!fdt || fd >= fdt->fdt_size)
 		return -EBADF;
@@ -474,9 +474,9 @@ int do_fcntl(struct fdtable* fdt, uint64 fd, unsigned int cmd, unsigned long arg
 /**
  * 将fd_set转换为pollfd数组
  */
-static struct pollfd* convert_fdsets_to_pollfds(int nfds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds) {
+static struct pollfd* convert_fdsets_to_pollfds(int32 nfds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds) {
 	struct pollfd* pfds;
-	int i, count = 0;
+	int32 i, count = 0;
 
 	// 分配足够大的数组
 	pfds = kmalloc(sizeof(struct pollfd) * nfds);
@@ -515,8 +515,8 @@ static struct pollfd* convert_fdsets_to_pollfds(int nfds, fd_set* readfds, fd_se
 /**
  * 将pollfd结果更新回fd_set
  */
-static void update_fdsets_from_pollfds(struct pollfd* pfds, int count, fd_set* readfds, fd_set* writefds, fd_set* exceptfds) {
-	int i;
+static void update_fdsets_from_pollfds(struct pollfd* pfds, int32 count, fd_set* readfds, fd_set* writefds, fd_set* exceptfds) {
+	int32 i;
 
 	// 先清空所有集合
 	if (readfds)
@@ -528,7 +528,7 @@ static void update_fdsets_from_pollfds(struct pollfd* pfds, int count, fd_set* r
 
 	// 根据revents更新fd_set
 	for (i = 0; i < count; i++) {
-		int fd = pfds[i].fd;
+		int32 fd = pfds[i].fd;
 		short revents = pfds[i].revents;
 
 		if (fd < 0)
@@ -548,8 +548,8 @@ static void update_fdsets_from_pollfds(struct pollfd* pfds, int count, fd_set* r
 /**
  * 统一的底层轮询实现
  */
-static int _fdtable_do_poll(struct fdtable* fdt, struct pollfd* fds, unsigned int nfds, int timeout) {
-	int i, ready = 0;
+static int32 _fdtable_do_poll(struct fdtable* fdt, struct pollfd* fds, uint32 nfds, int32 timeout) {
+	int32 i, ready = 0;
 	struct poll_table_struct pt;
 
 	// 以下是伪代码，实际实现需要等待队列支持
@@ -561,7 +561,7 @@ static int _fdtable_do_poll(struct fdtable* fdt, struct pollfd* fds, unsigned in
 	// 首次非阻塞检查
 	for (i = 0; i < nfds; i++) {
 		struct file* file;
-		int fd = fds[i].fd;
+		int32 fd = fds[i].fd;
 
 		if (fd < 0)
 			continue;
@@ -593,7 +593,7 @@ static int _fdtable_do_poll(struct fdtable* fdt, struct pollfd* fds, unsigned in
 		// 被唤醒后重新检查
 		for (i = 0; i < nfds; i++) {
 			struct file* file;
-			int fd = fds[i].fd;
+			int32 fd = fds[i].fd;
 
 			if (fd < 0)
 				continue;
@@ -624,20 +624,20 @@ static int _fdtable_do_poll(struct fdtable* fdt, struct pollfd* fds, unsigned in
 }
 
 // do_select实现示例
-int do_select(struct fdtable* fdt, int nfds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, struct timeval* timeout) {
+int32 do_select(struct fdtable* fdt, int32 nfds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, struct timeval* timeout) {
 	// 1. 将fd_set转换为pollfd数组
 	struct pollfd* pfds = convert_fdsets_to_pollfds(nfds, readfds, writefds, exceptfds);
 	if (!pfds)
 		return -ENOMEM;
 
 	// 2. 计算超时值（毫秒）
-	int timeout_ms = -1;
+	int32 timeout_ms = -1;
 	if (timeout)
 		timeout_ms = timeout->tv_sec * 1000 + timeout->tv_usec / 1000;
 
 	// 3. 调用统一轮询函数
-	int count = nfds; // 实际可能更少，但这是最大值
-	int ready = _fdtable_do_poll(fdt, pfds, count, timeout_ms);
+	int32 count = nfds; // 实际可能更少，但这是最大值
+	int32 ready = _fdtable_do_poll(fdt, pfds, count, timeout_ms);
 
 	// 4. 将结果转回fd_set格式
 	if (ready > 0)
@@ -651,7 +651,7 @@ int do_select(struct fdtable* fdt, int nfds, fd_set* readfds, fd_set* writefds, 
 /**
  * 实现poll系统调用
  */
-int do_poll(struct fdtable* fdt, struct pollfd* fds, unsigned int nfds, int timeout) {
+int32 do_poll(struct fdtable* fdt, struct pollfd* fds, uint32 nfds, int32 timeout) {
 	// 直接调用统一轮询实现
 	return _fdtable_do_poll(fdt, fds, nfds, timeout);
 }
@@ -659,14 +659,14 @@ int do_poll(struct fdtable* fdt, struct pollfd* fds, unsigned int nfds, int time
 /**
  * 创建epoll实例 - 基本实现
  */
-int do_epoll_create(struct fdtable* fdt, int flags) {
+int32 do_epoll_create(struct fdtable* fdt, int32 flags) {
 	// 这里应创建一个epoll文件对象并分配描述符
 	/*
 	struct file* epfile = create_epoll_file();
 	if (IS_ERR(epfile))
 	    return PTR_ERR(epfile);
 
-	int fd = fdtable_allocFd(fdt, 0);
+	int32 fd = fdtable_allocFd(fdt, 0);
 	if (fd < 0) {
 	    // epoll文件清理
 	    return fd;
@@ -683,7 +683,7 @@ int do_epoll_create(struct fdtable* fdt, int flags) {
 /**
  * 控制epoll实例 - 基本实现
  */
-int do_epoll_ctl(struct fdtable* fdt, int epfd, int op, int fd, struct epoll_event* event) {
+int32 do_epoll_ctl(struct fdtable* fdt, int32 epfd, int32 op, int32 fd, struct epoll_event* event) {
 	/*
 	struct file* epfile = fdtable_getFile(fdt, epfd);
 	if (!epfile || !is_epoll_file(epfile))
@@ -704,7 +704,7 @@ int do_epoll_ctl(struct fdtable* fdt, int epfd, int op, int fd, struct epoll_eve
 /**
  * 等待epoll事件 - 基本实现
  */
-int do_epoll_wait(struct fdtable* fdt, int epfd, struct epoll_event* events, int maxevents, int timeout) {
+int32 do_epoll_wait(struct fdtable* fdt, int32 epfd, struct epoll_event* events, int32 maxevents, int32 timeout) {
 	/*
 	struct file* epfile = fdtable_getFile(fdt, epfd);
 	if (!epfile || !is_epoll_file(epfile))
@@ -716,4 +716,86 @@ int do_epoll_wait(struct fdtable* fdt, int epfd, struct epoll_event* events, int
 
 	// 返回伪值表示未实现
 	return -ENOSYS;
+}
+
+
+/**
+ * Kernel-internal implementation of open syscall
+ */
+int32 do_open(const char *pathname, int32 flags, ...) {
+    // Get mode if O_CREAT is set
+    mode_t mode = 0;
+    if (flags & O_CREAT) {
+        va_list args;
+        va_start(args, flags);
+        mode = va_arg(args, mode_t);
+        va_end(args);
+    }
+    
+    // Call into VFS to get a file struct
+    struct file *filp = file_open(pathname, flags, mode);
+    if (IS_ERR(filp))
+        return PTR_ERR(filp);
+    
+    // Allocate a file descriptor
+    int32 fd = get_unused_fd_flags(0);
+    if (fd < 0) {
+        file_put(filp);
+        return fd;
+    }
+    
+    // Install the file in the fd table
+    fd_install(fd, filp);
+    return fd;
+}
+
+/**
+ * Kernel-internal implementation of close syscall
+ */
+int32 do_close(int32 fd) {
+    struct file *filp = fget(fd);
+    if (!filp)
+        return -EBADF;
+    
+    fd_release(fd);
+    return file_put(filp);
+}
+
+/**
+ * Kernel-internal implementation of lseek syscall
+ */
+off_t do_lseek(int32 fd, off_t offset, int32 whence) {
+    struct file *filp = fget(fd);
+    if (!filp)
+        return -EBADF;
+    
+    loff_t pos = file_llseek(filp, offset, whence);
+    fput(filp);
+    return pos;
+}
+
+/**
+ * Kernel-internal implementation of read syscall
+ */
+ssize_t do_read(int32 fd, void *buf, size_t count) {
+    struct file *filp = fget(fd);
+    if (!filp)
+        return -EBADF;
+    
+    ssize_t ret = file_read(filp, buf, count, &filp->f_pos);
+    fput(filp);
+    return ret;
+}
+
+/**
+ * Kernel-internal implementation of write syscall
+ */
+ssize_t do_write(int32 fd, const void *buf, size_t count) {
+    struct file *filp = fget(fd);
+    if (!filp)
+        return -EBADF;
+    
+    ssize_t ret = file_write(filp, buf, count, &filp->f_pos);
+    fput(filp);
+    return ret;
 }

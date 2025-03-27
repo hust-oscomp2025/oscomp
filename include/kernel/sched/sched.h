@@ -8,7 +8,7 @@
 extern struct task_struct* current_percpu[NCPU];
 #define CURRENT (current_percpu[read_tp()])
 
-inline struct task_struct* current_task() {
+static inline struct task_struct* current_task() {
 		return CURRENT;
 }
 

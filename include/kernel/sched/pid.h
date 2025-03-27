@@ -2,7 +2,7 @@
 #define PID_H
 
 #include <stdint.h>
-#include <util/spinlock.h>    // 自旋锁支持
+#include <kernel/util/spinlock.h>    // 自旋锁支持
 #include <kernel/types.h>
 
 #define PID_MAX 8192    // 最大PID值

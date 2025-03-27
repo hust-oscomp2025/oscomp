@@ -4,13 +4,13 @@
 #include <kernel/mm/mmap.h>
 #include <kernel/mm/vma.h>
 #include <kernel/mm/kmalloc.h>
-#include <util/string.h>			//memset
-#include <spike_interface/spike_utils.h>
+#include <kernel/util/string.h>			//memset
+#include <kernel/sprint.h>
 
 /**
  * 将保护标志(PROT_*)转换为页表项标志
  */
-uint64 prot_to_type(int prot, int user) {
+uint64 prot_to_type(int32 prot, int32 user) {
   uint64 perm = 0;
   if (prot & PROT_READ)
     perm |= PTE_R | PTE_A;
@@ -26,7 +26,7 @@ uint64 prot_to_type(int prot, int user) {
 }
 
 // Convert PROT_* to VM_* flags
-uint64 prot_to_vm_flags(int prot) {
+uint64 prot_to_vm_flags(int32 prot) {
   uint64 vm_flags = 0;
   if (prot & PROT_READ)
     vm_flags |= VM_READ | VM_MAYREAD;
@@ -139,7 +139,7 @@ static uint64 find_free_area(struct mm_struct *mm, size_t length) {
  * @param pgoff File offset in pages or physical address for direct mapping
  * @return Mapped virtual address or negative error code
  */
-uint64 do_mmap(struct mm_struct *mm, uint64 addr, size_t length, int prot,
+uint64 do_mmap(struct mm_struct *mm, uint64 addr, size_t length, int32 prot,
                uint64 flags, struct file *file, uint64 pgoff) {
   if (!mm || length == 0)
     return -EINVAL;
@@ -228,11 +228,11 @@ uint64 do_mmap(struct mm_struct *mm, uint64 addr, size_t length, int prot,
  *
  * Return: 0 on success, negative error code on failure
  */
-int do_unmap(struct mm_struct *mm, uint64 start, size_t len) {
+int32 do_unmap(struct mm_struct *mm, uint64 start, size_t len) {
   uint64 end;
   struct vm_area_struct *vma, *prev, *next, *free_vma;
-  int count = 0;
-  int ret = 0;
+  int32 count = 0;
+  int32 ret = 0;
 
   /* Sanity checks */
   if (!mm || !len)
@@ -260,17 +260,17 @@ int do_unmap(struct mm_struct *mm, uint64 start, size_t len) {
       return -ENOMEM;
 
     /* Copy relevant pages from original VMA to new VMA */
-    int orig_start_idx = 0;
-    int new_vma_page_count = (start - vma->vm_start) / PAGE_SIZE;
-    for (int i = 0; i < new_vma_page_count; i++) {
+    int32 orig_start_idx = 0;
+    int32 new_vma_page_count = (start - vma->vm_start) / PAGE_SIZE;
+    for (int32 i = 0; i < new_vma_page_count; i++) {
       free_vma->pages[i] = vma->pages[i];
       vma->pages[i] = NULL;
     }
 
     /* Shift remaining pages in original VMA */
-    int remain_pages = vma->page_count - new_vma_page_count;
+    int32 remain_pages = vma->page_count - new_vma_page_count;
     if (remain_pages > 0) {
-      for (int i = 0; i < remain_pages; i++) {
+      for (int32 i = 0; i < remain_pages; i++) {
         vma->pages[i] = vma->pages[i + new_vma_page_count];
       }
       memset(&vma->pages[remain_pages], 0,
@@ -292,9 +292,9 @@ int do_unmap(struct mm_struct *mm, uint64 start, size_t len) {
         return -ENOMEM;
 
       /* Copy relevant pages */
-      int split_idx = (end - next->vm_start) / PAGE_SIZE;
-      int remain_pages = next->page_count - split_idx;
-      for (int i = 0; i < remain_pages; i++) {
+      int32 split_idx = (end - next->vm_start) / PAGE_SIZE;
+      int32 remain_pages = next->page_count - split_idx;
+      for (int32 i = 0; i < remain_pages; i++) {
         free_vma->pages[i] = next->pages[i + split_idx];
         next->pages[i + split_idx] = NULL;
       }
@@ -317,10 +317,10 @@ int do_unmap(struct mm_struct *mm, uint64 start, size_t len) {
     uint64 unmap_end = MIN(end, vma->vm_end);
 
     /* Free physical pages and unmap */
-    int start_idx = (unmap_start - vma->vm_start) / PAGE_SIZE;
-    int end_idx = (unmap_end - vma->vm_start + PAGE_SIZE - 1) / PAGE_SIZE;
+    int32 start_idx = (unmap_start - vma->vm_start) / PAGE_SIZE;
+    int32 end_idx = (unmap_end - vma->vm_start + PAGE_SIZE - 1) / PAGE_SIZE;
 
-    for (int i = start_idx; i < end_idx && i < vma->page_count; i++) {
+    for (int32 i = start_idx; i < end_idx && i < vma->page_count; i++) {
       if (vma->pages[i]) {
         uint64 page_va = vma->vm_start + (i * PAGE_SIZE);
         pgt_unmap(mm->pagetable, page_va, PAGE_SIZE, 1);
@@ -437,7 +437,7 @@ uint64 do_brk(struct mm_struct *mm, uint64 new_brk) {
 							 addr < old_brk; 
 							 addr += page_size) {
 							
-							int page_idx = (addr - vma->vm_start) / page_size;
+							int32 page_idx = (addr - vma->vm_start) / page_size;
 							if (page_idx >= 0 && page_idx < vma->page_count && vma->pages[page_idx]) {
 									// Unmap and free this page
 									pgt_unmap(mm->pagetable, addr, page_size, 1);
@@ -474,7 +474,7 @@ uint64 do_brk(struct mm_struct *mm, uint64 new_brk) {
  *
  * Return: 0 on success, negative error code on failure
  */
-int do_protect(struct mm_struct *mm, __page_aligned uint64 start, size_t len, int prot) {
+int32 do_protect(struct mm_struct *mm, __page_aligned uint64 start, size_t len, int32 prot) {
 	uint64 end;
 	struct vm_area_struct *vma;
 	uint64 current_addr;
@@ -507,7 +507,7 @@ int do_protect(struct mm_struct *mm, __page_aligned uint64 start, size_t len, in
 			vm_flags |= VM_EXEC;
 	
 	/* Convert protection to page table flags */
-	int is_user = !mm->is_kernel_mm;
+	int32 is_user = !mm->is_kernel_mm;
 	uint64 pte_perm = prot_to_type(prot, is_user);
 	
 	/* Walk through all VMAs in the range */

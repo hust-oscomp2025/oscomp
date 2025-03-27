@@ -2,8 +2,8 @@
 #define _VFSMOUNT_H
 
 #include <kernel/types.h>
-#include <util/atomic.h>
-#include <util/list.h>
+#include <kernel/util/atomic.h>
+#include <kernel/util/list.h>
 
 /**
  * Mount point structure
@@ -11,9 +11,9 @@
 struct vfsmount {
 	struct dentry* mnt_root; /* Root of this mount, 在常规挂载下是当前fs的根目录，在镜像挂载下是映射来源路径*/
 
-	int mnt_flags; /* Mount flags */
+	int32 mnt_flags; /* Mount flags */
 
-	int mnt_id; /* Unique identifier for this mount */
+	int32 mnt_id; /* Unique identifier for this mount */
 	/* Mount point location */
 	struct dentry* mnt_mountpoint; /* Dentry where this fs is mounted */
 
@@ -49,11 +49,11 @@ struct vfsmount {
 void init_mount_hash(void);
 
 /* Mount management */
-int do_mount(const char* dev_name, const char* path, const char* fstype, unsigned long flags,
+int32 do_mount(const char* dev_name, const char* path, const char* fstype, uint64 flags,
              void* data);
 
 /* Unmount operations */
-int do_umount(struct vfsmount* mnt, int flags);
+int32 do_umount(struct vfsmount* mnt, int32 flags);
 
 /* Reference counting */
 struct vfsmount* get_mount(struct vfsmount* mnt);
@@ -64,8 +64,7 @@ struct vfsmount* lookup_vfsmount(struct dentry* dentry);
 struct vfsmount* lookup_mnt(struct path* path);
 
 /* Mount traversal */
-bool is_mounted(struct dentry* dentry);
-int iterate_mounts(int (*f)(struct vfsmount*, void*), void* arg, struct vfsmount* root);
+int32 iterate_mounts(int32 (*f)(struct vfsmount*, void*), void* arg, struct vfsmount* root);
 
 
 #endif

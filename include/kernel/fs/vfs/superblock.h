@@ -3,8 +3,8 @@
 //#include <kernel/fs/vfs/fstype.h>
 #include <kernel/types.h>
 #include <kernel/fs/vfs/stat.h>
-#include <util/list.h>
-#include <util/spinlock.h>
+#include <kernel/util/list.h>
+#include <kernel/util/spinlock.h>
 
 struct fstype;
 struct superblock_operations;
@@ -18,40 +18,40 @@ struct superblock {
 
 	/***********************file system type and mounts******************************/
 
-	struct fstype* s_fstype;      // Filesystem type
-	struct list_node s_node_fstype; // Instances of this filesystem
-	void* s_fs_info; // Filesystem-specific information
-	const struct superblock_operations* s_operations; // Superblock operations
 	/* Mount info */
 	struct list_head s_list_mounts; // List of mounts
 	spinlock_t s_list_mounts_lock;       // Lock for all state lists
 	/* Quotas */
 	// struct quota_info s_dquot;       // Quota operations
-	struct block_device* s_bdev; // Block device
 	struct dentry* s_root; // global root dentry
 	//struct dentry* s_dentry; // Root dentry
-
-
-
-	/*********************** fs statistics******************************/
-	unsigned int s_magic;             // Magic number identifying filesystem
 	dev_t s_device_id;      // Device identifier, 目前简单通过对挂载路径做哈希得到
-	unsigned long s_blocksize;      // Block size in bytes
-	unsigned long s_blocksize_bits; // Block size bits (log2 of blocksize)
-	unsigned int s_max_links;
-	unsigned long s_file_maxbytes; // Max file size
-	int s_nblocks;               // Number of blocks
-	unsigned long s_time_granularity;  /* Time granularity in nanoseconds */
+	struct block_device* s_bdev; // Block device
+
+	/*********************** fs specified ******************************/
+	struct fstype* s_fstype;      // Filesystem type
+	struct list_node s_node_fstype; // Instances of this filesystem
+
+	void* s_fs_info; // Filesystem-specific information
+
+	uint32 s_magic;             // Magic number identifying filesystem
+	uint64 s_blocksize;      // Block size in bytes
+	uint64 s_blocksize_bits; // Block size bits (log2 of blocksize)
+	uint32 s_max_links;
+	uint64 s_file_maxbytes; // Max file size
+	int32 s_nblocks;               // Number of blocks
+	uint64 s_time_granularity;  /* Time granularity in nanoseconds */
 	time_t s_time_min; // Earliest time the fs can represent
 	time_t s_time_max; // Latest time the fs can represent
 	                   // 取决于文件系统自身的属性，例如ext4的时间戳范围是1970-2106
-	// int s_active;      // Active reference count: 用来做懒卸载，目前不需要
-	unsigned long s_flags; // 只由fs_fill_super决定，不允许用户修改
+	// int32 s_active;      // Active reference count: 用来做懒卸载，目前不需要
+	uint64 s_flags; // 只由fs_fill_super决定，不允许用户修改
+	const struct superblock_operations* s_operations; // Superblock operations
 
 	/*********************** vfs variables ******************************/
 	spinlock_t s_lock; // Lock protecting the superblock
-	atomic_int s_refcount; // Reference count: mount point count + open file count
-	atomic_int s_ninodes;          // Number of inodes
+	atomic_t s_refcount; // Reference count: mount point count + open file count
+	atomic_t s_ninodes;          // Number of inodes
 
 
 	/*********************** inode fields ******************************/
@@ -69,7 +69,8 @@ struct superblock {
 
 /* Function prototypes */
 void superblock_put(struct superblock* sb);
-struct vfsmount* superblock_acquireMount(struct superblock* sb, int flags, const char* device_path);
+struct vfsmount* superblock_acquireMount(struct superblock* sb, int32 flags, const char* device_path);
+struct inode* superblock_createInode(struct superblock* sb, uint64 ino);
 
 
 

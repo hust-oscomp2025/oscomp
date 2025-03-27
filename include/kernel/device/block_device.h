@@ -2,19 +2,19 @@
 #define _BLOCK_DEVICE_H
 
 #include <kernel/types.h>
-#include <util/list.h>
-#include <util/spinlock.h>
+#include <kernel/util/list.h>
+#include <kernel/util/spinlock.h>
 #include <kernel/fs/vfs/inode.h>
 
 /*linux-style block_device structure - minimum viable for ext4*/
 struct block_device {
     dev_t                   bd_dev;         // 设备号 (主设备号 + 次设备号)
-    int                     bd_openers;     // 打开计数
+    int32                     bd_openers;     // 打开计数
     struct inode           *bd_inode;       // 对应的 inode
     struct super_block     *bd_super;       // 挂载的 superblock
     
     struct list_head        bd_list;        // 所有 bdev 的全局链表
-    unsigned int            bd_block_size;  // 块大小（bytes）
+    uint32            bd_block_size;  // 块大小（bytes）
     uint64_t                bd_nr_blocks;   // 块数量 - ext4需要知道设备大小
     
     void                   *bd_private;     // 驱动私有数据
@@ -43,26 +43,26 @@ struct block_device {
 /* Block device operations - 最小子集 */
 struct block_operations {
     /* 必要的块I/O操作 */
-    int (*read_block)(struct block_device *bdev, sector_t sector, 
+    int32 (*read_blocks)(struct block_device *bdev, sector_t sector, 
                       void *buffer, size_t count);
-    int (*write_block)(struct block_device *bdev, sector_t sector, 
+    int32 (*write_block)(struct block_device *bdev, sector_t sector, 
                        const void *buffer, size_t count);
     
     /* 设备生命周期管理 */
-    int (*open)(struct block_device *bdev, fmode_t mode);
+    int32 (*open)(struct block_device *bdev, fmode_t mode);
     void (*release)(struct block_device *bdev);
     
     /* 设备控制 - ext4可能需要进行一些特定操作 */
-    int (*ioctl)(struct block_device *bdev, unsigned cmd, 
-                 unsigned long arg);
+    int32 (*ioctl)(struct block_device *bdev, unsigned cmd, 
+                 uint64 arg);
 
     /* 以下操作可以稍后实现 */
     /*
-    int (*flush)(struct block_device *bdev);
-    int (*getgeo)(struct block_device *bdev, struct hd_geometry *geo);
-    int (*direct_access)(struct block_device *bdev, sector_t sector,
-                        void **kaddr, unsigned long *pfn);
-    int (*secure_erase)(struct block_device *bdev, sector_t start,
+    int32 (*flush)(struct block_device *bdev);
+    int32 (*getgeo)(struct block_device *bdev, struct hd_geometry *geo);
+    int32 (*direct_access)(struct block_device *bdev, sector_t sector,
+                        void **kaddr, uint64 *pfn);
+    int32 (*secure_erase)(struct block_device *bdev, sector_t start,
                       sector_t nsect);
     */
 };
@@ -71,20 +71,20 @@ struct block_operations {
 struct block_device *alloc_block_device(void);
 void free_block_device(struct block_device *bdev);
 
-int register_blkdev(unsigned int major, const char *name, 
+int32 register_blkdev(uint32 major, const char *name, 
                    struct block_operations *ops);
-int unregister_blkdev(unsigned int major, const char *name);
+int32 unregister_blkdev(uint32 major, const char *name);
 
 /* 获取块设备 */
-struct block_device *get_block_device(dev_t dev, fmode_t mode);
+struct block_device *blockdevice_get(dev_t dev, fmode_t mode);
 void put_block_device(struct block_device *bdev);
 
 /* 块设备操作辅助函数 */
-int blkdev_get(struct block_device *bdev, fmode_t mode);
+int32 blkdev_get(struct block_device *bdev, fmode_t mode);
 void blkdev_put(struct block_device *bdev);
 
 /* 缓冲区管理 - 可选但建议实现 */
-int sync_dirty_buffers(struct block_device *bdev);
+int32 sync_dirty_buffers(struct block_device *bdev);
 
 /* Block layer initialization */
 void block_dev_init(void);

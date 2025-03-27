@@ -1,6 +1,6 @@
 /*copyright: 2023 farmos*/
 #include <kernel/syscall/syscall_ids.h>
-#include <kernel/syscall/syscall_file.h>
+#include <kernel/syscall/syscall_fs.h>
 #include <kernel/syscall/syscall.h>
 
 
@@ -62,7 +62,7 @@ struct syscall_function sys_table[] = {
     // [SYS_msync] = {sys_msync, "msync"},
     // [SYS_munmap] = {sys_unmap, "munmap"},
     // [SYS_nanosleep] = {sys_nanosleep, "nanosleep"},
-    // [SYS_openat] = {sys_openat, "openat"},
+    [SYS_open] = {sys_open, "open"},
     // [SYS_pipe2] = {sys_pipe2, "pipe2"},
     // [SYS_pread64] = {sys_pread64, "pread64"},
     // [SYS_pselect6] = {sys_pselect6, "pselect6"},

@@ -2,6 +2,18 @@
 #define _KERNEL_TIME_H
 
 #include <kernel/types.h>
+#include <kernel/sched/signal.h>
+
+/** defined in <sys/time.h>
+ * struct timezone;
+ * struct itimerval;
+ * 
+ * 
+ * 
+ * 
+ * 
+ */
+
 
 /* Time limits and constants */
 #define TIME_T_MAX      ((1UL << ((sizeof(time_t) << 3) - 1)) - 1)
@@ -19,62 +31,20 @@
 struct timerange {
     time_t min_time;     /* Earliest representable time */
     time_t max_time;     /* Latest representable time */
-    unsigned int granularity;  /* Time granularity in nanoseconds (e.g., 1 for ns, 1000 for us) */
+    uint32 granularity;  /* Time granularity in nanoseconds (e.g., 1 for ns, 1000 for us) */
 };
 
+
+int32 do_gettimeofday(struct timeval *tv);
+int32 do_clock_gettime(clockid_t which_clock, struct timespec *tp);
+void update_sys_time_from_hw(void);
+time_t do_time(time_t *timer);
+
 /* Time comparison and manipulation functions */
-
-/*
- * Compare two timespec values
- * Returns:  1 if a > b
- *           0 if a == b
- *          -1 if a < b
- */
-static inline int timespec_compare(const struct timespec *a, const struct timespec *b)
-{
-    if (a->tv_sec != b->tv_sec)
-        return a->tv_sec > b->tv_sec ? 1 : -1;
-    return a->tv_nsec > b->tv_nsec ? 1 : (a->tv_nsec < b->tv_nsec ? -1 : 0);
-}
-
-/* 
- * Add two timespec values: result = a + b
- */
-static inline void timespec_add(struct timespec *result, const struct timespec *a, const struct timespec *b)
-{
-    result->tv_sec = a->tv_sec + b->tv_sec;
-    result->tv_nsec = a->tv_nsec + b->tv_nsec;
-    if (result->tv_nsec >= NSEC_PER_SEC) {
-        result->tv_sec++;
-        result->tv_nsec -= NSEC_PER_SEC;
-    }
-}
-
-/* 
- * Subtract two timespec values: result = a - b
- */
-static inline void timespec_sub(struct timespec *result, const struct timespec *a, const struct timespec *b)
-{
-    result->tv_sec = a->tv_sec - b->tv_sec;
-    if (a->tv_nsec >= b->tv_nsec) {
-        result->tv_nsec = a->tv_nsec - b->tv_nsec;
-    } else {
-        result->tv_sec--;
-        result->tv_nsec = NSEC_PER_SEC + a->tv_nsec - b->tv_nsec;
-    }
-}
-
-/* Convert between time structures */
-
-/* 
- * Convert timespec to timeval
- */
-static inline void timespec_to_timeval(struct timeval *tv, const struct timespec *ts)
-{
-    tv->tv_sec = ts->tv_sec;
-    tv->tv_usec = ts->tv_nsec / NSEC_PER_USEC;
-}
-
+static inline void timespec_to_timeval(struct timeval *tv, const struct timespec *ts);
+static inline void timespec_sub(struct timespec *result, const struct timespec *a, const struct timespec *b);
+static inline void timespec_add(struct timespec *result, const struct timespec *a, const struct timespec *b);
+static inline int32 timespec_compare(const struct timespec *a, const struct timespec *b);
 /* 
  * Convert timeval to timespec
  */
@@ -119,7 +89,7 @@ struct timespec current_fs_time(struct superblock *sb);
  *
  * Returns the truncated timespec value.
  */
-static inline struct timespec timespec_trunc(struct timespec ts, unsigned int granularity)
+static inline struct timespec timespec_trunc(struct timespec ts, uint32 granularity)
 {
     if (granularity == 0 || granularity == 1)
         return ts; /* No truncation needed */
@@ -133,62 +103,62 @@ static inline struct timespec timespec_trunc(struct timespec ts, unsigned int gr
 /*
  * Get current time (CLOCK_REALTIME)
  */
-int do_gettimeofday(struct timeval *tv);
+int32 do_gettimeofday(struct timeval *tv);
 
 /*
  * Set system time
  */
-int do_settimeofday(const struct timeval *tv);
+int32 do_settimeofday(const struct timeval *tv);
 
 /*
  * Get time from specified clock
  */
-int do_clock_gettime(clockid_t which_clock, struct timespec *tp);
+int32 do_clock_gettime(clockid_t which_clock, struct timespec *tp);
 
 /*
  * Set time of specified clock
  */
-int do_clock_settime(clockid_t which_clock, const struct timespec *tp);
+int32 do_clock_settime(clockid_t which_clock, const struct timespec *tp);
 
 /*
  * Get resolution of specified clock
  */
-int do_clock_getres(clockid_t which_clock, struct timespec *tp);
+int32 do_clock_getres(clockid_t which_clock, struct timespec *tp);
 
 /*
  * Suspend execution for time interval
  */
-int do_nanosleep(const struct timespec *req, struct timespec *rem);
+int32 do_nanosleep(const struct timespec *req, struct timespec *rem);
 
 /* Timer functions */
 
 /*
  * Create a timer
  */
-int timer_create(clockid_t clockid, struct sigevent *evp, timer_t *timerid);
+int32 timer_create(clockid_t clockid, struct sigevent *evp, timer_t *timerid);
 
 /*
  * Delete a timer
  */
-int timer_delete(timer_t timerid);
+int32 timer_delete(timer_t timerid);
 
 /*
  * Arm/disarm a timer
  */
-int timer_settime(timer_t timerid, int flags, 
+int32 timer_settime(timer_t timerid, int32 flags, 
                  const struct itimerspec *value, struct itimerspec *ovalue);
 
 /*
  * Get remaining time on a timer
  */
-int timer_gettime(timer_t timerid, struct itimerspec *value);
+int32 timer_gettime(timer_t timerid, struct itimerspec *value);
 
 /* Internal kernel time management */
 
 /*
  * Convert jiffies to timespec
  */
-void jiffies_to_timespec(unsigned long jiffies, struct timespec *value);
+void jiffies_to_timespec(uint64 jiffies, struct timespec *value);
 
 /*
  * Update system time from hardware clock

@@ -17,7 +17,7 @@
 struct kiocb {
     struct file *ki_filp;      /* File pointer */
     loff_t ki_pos;             /* File position */
-    int ki_flags;              /* Operation flags */
+    int32 ki_flags;              /* Operation flags */
 };
 
 /* Initialization and position */
@@ -29,9 +29,9 @@ ssize_t kiocb_read(struct kiocb *kiocb, char *buf, size_t len);
 ssize_t kiocb_write(struct kiocb *kiocb, const char *buf, size_t len);
 
 /* Flag operations */
-int kiocb_is_direct(const struct kiocb *kiocb);
-int kiocb_is_append(const struct kiocb *kiocb);
-int kiocb_is_nonblock(const struct kiocb *kiocb);
+int32 kiocb_is_direct(const struct kiocb *kiocb);
+int32 kiocb_is_append(const struct kiocb *kiocb);
+int32 kiocb_is_nonblock(const struct kiocb *kiocb);
 
 /* KIOCB operation flags */
 #define KIOCB_APPEND        (1 << 0)    /* File opened in append mode */

@@ -1,4 +1,4 @@
-#include <kernel/fs/vfs/vfs.h>
+#include <kernel/vfs.h>
 #include <kernel/types.h>
 
 
@@ -15,11 +15,11 @@
  *
  * 返回: 成功时返回0，失败时返回负的错误码
  */
-int do_mount(const char* source, const char* target, const char* fstype, unsigned long flags, void* data) {
+int32 do_mount(const char* source, const char* target, const char* fstype, uint64 flags, void* data) {
 	struct path mountpoint;
 	struct fstype* type;
 	struct vfsmount* newmnt;
-	int ret;
+	int32 ret;
 
 	/* 查找文件系统类型 */
 	type = get_fstype(fstype);

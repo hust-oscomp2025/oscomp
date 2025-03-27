@@ -11,6 +11,6 @@ typedef struct syscall_function {
 extern struct syscall_function sys_table[];
 
 
-long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, long a7);
+int64 do_syscall(int64 a0, int64 a1, int64 a2, int64 a3, int64 a4, int64 a5, int64 a6, int64 a7);
 ssize_t sys_user_yield();
 #endif

@@ -13,7 +13,7 @@
  * Returns number of bytes that could not be copied.
  * On success, this will be zero.
  */
-unsigned long copy_to_user(void __user *to, const void *from, unsigned long n)
+uint64 copy_to_user(void __user *to, const void *from, uint64 n)
 {
     struct task_struct *current = current_task();
     if (!current || !current->mm)
@@ -33,9 +33,9 @@ unsigned long copy_to_user(void __user *to, const void *from, unsigned long n)
  * Returns string length including null byte on success,
  * 0 on exception.
  */
-long strlen_user(const char __user *str)
+int64 strlen_user(const char __user *str)
 {
-    long res = 0;
+    int64 res = 0;
     char c;
     
     while (1) {
@@ -64,7 +64,7 @@ long strlen_user(const char __user *str)
  */
 char *user_to_kernel_str(const char *user_ptr) {
     char *kernel_ptr;
-    int len;
+    int32 len;
     
     // 在此获取字符串长度和验证用户指针的有效性
     // 伪代码：验证用户空间指针和获取字符串长度
@@ -98,7 +98,7 @@ char *user_to_kernel_str(const char *user_ptr) {
  * Returns number of bytes that could not be copied.
  * On success, this will be zero.
  */
-unsigned long copy_from_user(void *to, const void __user *from, unsigned long n)
+uint64 copy_from_user(void *to, const void __user *from, uint64 n)
 {
     struct task_struct *current = current_task();
     if (!current || !current->mm)
@@ -119,11 +119,11 @@ unsigned long copy_from_user(void *to, const void __user *from, unsigned long n)
  * @count: Maximum number of bytes to copy, including the trailing NUL
  *
  * Returns the length of the string (not including the trailing NUL) on success,
- * -EFAULT on access exceptions, or -ENAMETOOLONG if the string is too long.
+ * -EFAULT on access exceptions, or -ENAMETOOLONG if the string is too int64.
  */
-long strncpy_from_user(char *dst, const char __user *src, long count)
+int64 strncpy_from_user(char *dst, const char __user *src, int64 count)
 {
-    long res = 0;
+    int64 res = 0;
     
     if (count <= 0)
         return 0;
@@ -160,10 +160,10 @@ long strncpy_from_user(char *dst, const char __user *src, long count)
  * Returns number of bytes that could not be cleared.
  * On success, this will be zero.
  */
-unsigned long clear_user(void __user *to, unsigned long n)
+uint64 clear_user(void __user *to, uint64 n)
 {
     char zeros[64];
-    unsigned long chunk, ret = 0;
+    uint64 chunk, ret = 0;
     
     memset(zeros, 0, sizeof(zeros));
     
@@ -188,7 +188,7 @@ unsigned long clear_user(void __user *to, unsigned long n)
  *
  * 返回非零表示可以访问
  */
-int access_ok(const void __user *addr, unsigned long size)
+int32 access_ok(const void __user *addr, uint64 size)
 {
     struct task_struct *current = current_task();
     if (!current || !current->mm)

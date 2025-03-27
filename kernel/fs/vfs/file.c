@@ -1,28 +1,25 @@
 #include <kernel/fs/vfs/dentry.h>
 #include <kernel/fs/vfs/file.h>
 #include <kernel/fs/vfs/inode.h>
-//#include <kernel/fs/vfs/namespace.h>
+// #include <kernel/fs/vfs/namespace.h>
 #include <kernel/fs/vfs/path.h>
-#include <kernel/fs/vfs/vfs.h>
+#include <kernel/vfs.h>
 #include <kernel/mm/kmalloc.h>
 #include <kernel/sched/process.h>
 #include <kernel/sched/sched.h>
 #include <kernel/types.h>
-#include <util/qstr.h>
-#include <util/string.h>
+#include <kernel/util/qstr.h>
+#include <kernel/util/string.h>
 
-#include <spike_interface/spike_utils.h>
+#include <kernel/sprint.h>
 
 static struct file* __file_alloc(struct dentry* dentry, fmode_t mode);
-static struct file* __file_open(struct dentry* dentry, struct vfsmount* mnt, int flags, fmode_t mode);
-static int __file_free(struct file* filp);
+static struct file* __file_open(struct dentry* dentry, struct vfsmount* mnt, int32 flags, fmode_t mode);
+static int32 __file_free(struct file* filp);
 
 struct file* file_get(struct file* file) {
-	if (!file)
-		return NULL;
-	if (atomic_read(&file->f_refcount) <= 0) {
-		panic("file_get: f_refcount is already 0\n");
-	}
+	if (!file) return NULL;
+	if (atomic_read(&file->f_refcount) <= 0) { panic("file_get: f_refcount is already 0\n"); }
 	/* Increment reference count */
 	atomic_inc(&file->f_refcount);
 	return file;
@@ -34,9 +31,8 @@ struct file* file_get(struct file* file) {
  * @flags: Open flags
  * @mode: Creation mode
  */
-struct file* file_openPath(const struct path* path, int flags, fmode_t mode) {
-	if (!path || !path->dentry)
-		return ERR_PTR(-EINVAL);
+struct file* file_openPath(const struct path* path, int32 flags, fmode_t mode) {
+	if (!path || !path->dentry) return ERR_PTR(-EINVAL);
 
 	return __file_open(path->dentry, path->mnt, flags, mode);
 }
@@ -47,12 +43,11 @@ struct file* file_openPath(const struct path* path, int flags, fmode_t mode) {
  * @flags: Open flags
  * @mode: Creation mode
  */
-struct file* file_open(const char* filename, int flags, fmode_t mode) {
+struct file* file_open(const char* filename, int32 flags, fmode_t mode) {
 	// struct qstr qname;
 	struct file* file;
 
-	if (!filename)
-		return ERR_PTR(-EINVAL);
+	if (!filename) return ERR_PTR(-EINVAL);
 
 	/* Initialize qstr from string */
 	// qstr_init_from_str(&qname, filename);
@@ -61,7 +56,7 @@ struct file* file_open(const char* filename, int flags, fmode_t mode) {
 	// file = file_open_qstr(&qname, flags, mode);
 	/* Convert qstr to path */
 	struct path path;
-	int error = path_create(&filename, 0, &path);
+	int32 error = path_create(filename, 0, &path);
 	/* Handle O_CREAT flag if file doesn't exist */
 	if (error == -ENOENT && (flags & O_CREAT)) {
 		/* Would handle file creation here */
@@ -89,12 +84,11 @@ struct file* file_open(const char* filename, int flags, fmode_t mode) {
  *
  * Returns 0 on success or negative error code on failure.
  */
-int __file_free(struct file* filp) {
-	int error = 0;
-	int fd = -1;
+int32 __file_free(struct file* filp) {
+	int32 error = 0;
+	int32 fd = -1;
 
-	if (!filp)
-		return -EINVAL;
+	if (!filp) return -EINVAL;
 
 	/* Release the file's regular resources */
 	if (filp->f_operations && filp->f_operations->release) {
@@ -113,13 +107,10 @@ int __file_free(struct file* filp) {
 	path_destroy(&filp->f_path);
 
 	/* Release inode reference */
-	if (filp->f_inode)
-		inode_put(filp->f_inode);
+	if (filp->f_inode) inode_unref(filp->f_inode);
 
 	/* Log the file close if debugging enabled */
-	if (fd >= 0) {
-		/* debug_file_close(owner, fd); */
-	}
+	if (fd >= 0) { /* debug_file_close(owner, fd); */ }
 
 	/* Free the file structure itself */
 	kfree(filp);
@@ -136,38 +127,34 @@ int __file_free(struct file* filp) {
  *
  * Internal helper function for all file_open variants.
  */
-static struct file* __file_open(struct dentry* dentry, struct vfsmount* mnt, int flags, fmode_t mode) {
+static struct file* __file_open(struct dentry* dentry, struct vfsmount* mnt, int32 flags, fmode_t mode) {
 	struct file* file;
 	struct inode* inode;
-	int error = 0;
+	int32 error = 0;
 	fmode_t file_mode;
 
 	/* Validate dentry has an inode */
 	inode = dentry->d_inode;
-	if (!inode)
-		return ERR_PTR(-ENOENT);
+	if (!inode) return ERR_PTR(-ENOENT);
 
 	/* Check directory write permissions */
-	if (S_ISDIR(inode->i_mode) && (flags & O_ACCMODE) != O_RDONLY)
-		return ERR_PTR(-EISDIR);
+	if (S_ISDIR(inode->i_mode) && (flags & O_ACCMODE) != O_RDONLY) return ERR_PTR(-EISDIR);
 
 	/* Convert flags to fmode_t */
 	file_mode = FMODE_READ;
-	if ((flags & O_ACCMODE) != O_RDONLY)
-		file_mode |= FMODE_WRITE;
+	if ((flags & O_ACCMODE) != O_RDONLY) file_mode |= FMODE_WRITE;
 
 	/* Allocate and initialize file structure using our new function */
 	file = __file_alloc(dentry, file_mode);
-	if (IS_ERR(file))
-		return file;
+	if (IS_ERR(file)) return file;
 
 	/*initialization */
 	atomic_set(&file->f_refcount, 1);
-	file->f_path.dentry = get_dentry(dentry);
+	file->f_path.dentry = dentry_ref(dentry);
 	file->f_path.mnt = get_mount(mnt);
 	/* Set inode if available */
 	assert(dentry->d_inode); // 我们的设计确保所有文件系统都有inode和对应的操作
-	file->f_inode = inode_get(dentry->d_inode);
+	file->f_inode = inode_ref(dentry->d_inode);
 	file->f_operations = dentry->d_inode->i_fop;
 	file->f_mode = file_mode;
 	file->f_flags = flags;
@@ -183,8 +170,7 @@ static struct file* __file_open(struct dentry* dentry, struct vfsmount* mnt, int
 	file->f_read_ahead.prev_pos = 0;
 
 	/* Set position */
-	if (flags & O_APPEND)
-		file->f_pos = inode->i_size;
+	if (flags & O_APPEND) file->f_pos = inode->i_size;
 
 	/* Call open method if available */
 	if (file->f_operations && file->f_operations->open) {
@@ -192,7 +178,7 @@ static struct file* __file_open(struct dentry* dentry, struct vfsmount* mnt, int
 		if (error) {
 			/* Clean up on error */
 			path_destroy(&file->f_path);
-			inode_put(file->f_inode);
+			inode_unref(file->f_inode);
 			kfree(file);
 			return ERR_PTR(error);
 		}
@@ -212,13 +198,11 @@ static struct file* __file_open(struct dentry* dentry, struct vfsmount* mnt, int
 static struct file* __file_alloc(struct dentry* dentry, fmode_t mode) {
 	struct file* file;
 
-	if (!dentry)
-		return ERR_PTR(-EINVAL);
+	if (!dentry) return ERR_PTR(-EINVAL);
 
 	/* Allocate file structure */
 	file = kmalloc(sizeof(struct file));
-	if (!file)
-		return ERR_PTR(-ENOMEM);
+	if (!file) return ERR_PTR(-ENOMEM);
 
 	/* Initialize to zeros */
 	memset(file, 0, sizeof(struct file));
@@ -231,12 +215,9 @@ static struct file* __file_alloc(struct dentry* dentry, fmode_t mode) {
  * file_denyWrite
  * @file: File pointer
  */
-int file_denyWrite(struct file* file) {
-	if (!file) {
-		return -EINVAL;
-	}
-	if (!file->f_inode || atomic_read(&file->f_refcount) <= 0)
-		return -EBADF;
+int32 file_denyWrite(struct file* file) {
+	if (!file) { return -EINVAL; }
+	if (!file->f_inode || atomic_read(&file->f_refcount) <= 0) return -EBADF;
 
 	/* Deny write access by setting the mode to read-only */
 	spinlock_lock(&file->f_lock);
@@ -252,30 +233,15 @@ int file_denyWrite(struct file* file) {
  * Allows write access to the file by setting the mode to read-write.
  * Returns 0 on success or negative error code on failure.
  */
-int file_allowWrite(struct file* file) {
-	if (!file) {
-		return -EINVAL;
-	}
-	if (!file->f_inode || atomic_read(&file->f_refcount) <= 0)
-		return -EBADF;
+int32 file_allowWrite(struct file* file) {
+	if (!file) { return -EINVAL; }
+	if (!file->f_inode || atomic_read(&file->f_refcount) <= 0) return -EBADF;
 
 	/* Allow write access by setting the mode to read-write */
 	spinlock_lock(&file->f_lock);
 	file->f_mode |= FMODE_WRITE;
 	spinlock_unlock(&file->f_lock);
 	return 0;
-}
-
-inline bool file_readable(struct file* file) {
-	if (!file || !file->f_inode || atomic_read(&file->f_refcount) <= 0)
-		return false;
-	return (file->f_mode & FMODE_READ) != 0;
-}
-
-inline bool file_writable(struct file* file) {
-	if (!file || !file->f_inode || atomic_read(&file->f_refcount) <= 0)
-		return false;
-	return (file->f_mode & FMODE_WRITE) != 0;
 }
 
 /**
@@ -287,78 +253,69 @@ inline bool file_writable(struct file* file) {
  * it if the count reaches zero, passing owner information
  * for proper cleanup.
  */
-void file_put(struct file* file) {
-	if (!file)
-		return;
+int32 file_put(struct file* file) {
+	CHECK_PTR_VALID(file, -EINVAL);
 
 	if (atomic_dec_and_test(&file->f_refcount)) {
 		/* Reference count reached zero, close the file */
 		__file_free(file);
-	} else {
-		panic("file_put: f_refcount is already 0\n");
-		/* This should not happen, as we expect the reference count
-		 * to be managed properly by the caller */
+		return 0;
 	}
+	return -EBADF;
+	/* This should not happen, as we expect the reference count
+	 * to be managed properly by the caller */
 }
-
 
 ssize_t file_read(struct file* file, char* buf, size_t count, loff_t* pos) {
-    struct kiocb kiocb;
-    ssize_t ret;
-    
-    if (!file)
-        return -EINVAL;
-    
-    /* Initialize the kiocb with the file */
-    init_kiocb(&kiocb, file);
-    
-    /* If a specific position was provided, use it */
-    if (pos && *pos != file->f_pos) {
-        kiocb_set_pos(&kiocb, *pos);
-        kiocb.ki_flags |= KIOCB_NOUPDATE_POS; /* Don't update file position */
-    }
-    
-    /* Perform the read operation */
-    ret = kiocb_read(&kiocb, buf, count);
-    
-    /* Update the position pointer if provided */
-    if (pos)
-        *pos = kiocb.ki_pos;
-    
-    return ret;
+	struct kiocb kiocb;
+	ssize_t ret;
+
+	if (!file) return -EINVAL;
+
+	/* Initialize the kiocb with the file */
+	init_kiocb(&kiocb, file);
+
+	/* If a specific position was provided, use it */
+	if (pos && *pos != file->f_pos) {
+		kiocb_set_pos(&kiocb, *pos);
+		kiocb.ki_flags |= KIOCB_NOUPDATE_POS; /* Don't update file position */
+	}
+
+	/* Perform the read operation */
+	ret = kiocb_read(&kiocb, buf, count);
+
+	/* Update the position pointer if provided */
+	if (pos) *pos = kiocb.ki_pos;
+
+	return ret;
 }
-
-
 
 ssize_t file_write(struct file* file, const char* buf, size_t count, loff_t* pos) {
-    struct kiocb kiocb;
-    ssize_t ret;
-    
-    if (!file)
-        return -EINVAL;
-    
-    /* Initialize the kiocb with the file */
-    init_kiocb(&kiocb, file);
-    
-    /* If a specific position was provided, use it */
-    if (pos && *pos != file->f_pos) {
-        kiocb_set_pos(&kiocb, *pos);
-        kiocb.ki_flags |= KIOCB_NOUPDATE_POS; /* Don't update file position */
-    }
-    
-    /* Perform the write operation */
-    ret = kiocb_write(&kiocb, buf, count);
-    
-    /* Update the position pointer if provided */
-    if (pos)
-        *pos = kiocb.ki_pos;
-    
-    return ret;
+	struct kiocb kiocb;
+	ssize_t ret;
+
+	if (!file) return -EINVAL;
+
+	/* Initialize the kiocb with the file */
+	init_kiocb(&kiocb, file);
+
+	/* If a specific position was provided, use it */
+	if (pos && *pos != file->f_pos) {
+		kiocb_set_pos(&kiocb, *pos);
+		kiocb.ki_flags |= KIOCB_NOUPDATE_POS; /* Don't update file position */
+	}
+
+	/* Perform the write operation */
+	ret = kiocb_write(&kiocb, buf, count);
+
+	/* Update the position pointer if provided */
+	if (pos) *pos = kiocb.ki_pos;
+
+	return ret;
 }
 
-
 /**
- * file_llseek - Repositions the file offset 
+ * file_llseek - Repositions the file offset
  * @file: File to seek within
  * @offset: File offset to seek to
  * @whence: Type of seek (SEEK_SET, SEEK_CUR, SEEK_END)
@@ -370,55 +327,52 @@ ssize_t file_write(struct file* file, const char* buf, size_t count, loff_t* pos
  *
  * Returns the new file position on success, or a negative error code on failure.
  */
-loff_t file_llseek(struct file* file, loff_t offset, int whence) {
-    //struct kiocb kiocb;
-    loff_t new_pos;
-    
-    /* Basic validation */
-    if (!file || !file->f_inode)
-        return -EINVAL;
-    
-    /* Check if file is seekable */
-    if (!(file->f_mode & FMODE_LSEEK))
-        return -ESPIPE;
-    
-    /* Initialize kiocb */
-    //init_kiocb(&kiocb, file);
-	// The only potential usage would be if the file system's specific llseek operation needed it
-    
-    /* Call file-specific llseek operation if available */
-    if (file->f_operations && file->f_operations->llseek)
-        return file->f_operations->llseek(file, offset, whence);
-    
-    /* Generic implementation for simple files */
-    spinlock_lock(&file->f_lock);
-    
-    switch (whence) {
-    case SEEK_SET:
-        new_pos = offset;
-        break;
-    case SEEK_CUR:
-        new_pos = file->f_pos + offset;
-        break;
-    case SEEK_END:
-        new_pos = file->f_inode->i_size + offset;
-        break;
-    default:
-        spinlock_unlock(&file->f_lock);
-        return -EINVAL;
-    }
-    
-    /* Validate the resulting position */
-    if (new_pos < 0) {
-        spinlock_unlock(&file->f_lock);
-        return -EINVAL;
-    }
-    
-    /* Update file position */
-    file->f_pos = new_pos;
-    spinlock_unlock(&file->f_lock);
-    
-    return new_pos;
+loff_t file_llseek(struct file* file, loff_t offset, int32 whence) {
+	// struct kiocb kiocb;
+	loff_t new_pos;
+
+	/* Basic validation */
+	if (!file || !file->f_inode) return -EINVAL;
+
+	/* Check if file is seekable */
+	if (!(file->f_mode & FMODE_LSEEK)) return -ESPIPE;
+
+	/* Initialize kiocb */
+	// init_kiocb(&kiocb, file);
+	//  The only potential usage would be if the file system's specific llseek operation needed it
+
+	/* Call file-specific llseek operation if available */
+	if (file->f_operations && file->f_operations->llseek) return file->f_operations->llseek(file, offset, whence);
+
+	/* Generic implementation for simple files */
+	spinlock_lock(&file->f_lock);
+
+	switch (whence) {
+	case SEEK_SET:
+		new_pos = offset;
+		break;
+	case SEEK_CUR:
+		new_pos = file->f_pos + offset;
+		break;
+	case SEEK_END:
+		new_pos = file->f_inode->i_size + offset;
+		break;
+	default:
+		spinlock_unlock(&file->f_lock);
+		return -EINVAL;
+	}
+
+	/* Validate the resulting position */
+	if (new_pos < 0) {
+		spinlock_unlock(&file->f_lock);
+		return -EINVAL;
+	}
+
+	/* Update file position */
+	file->f_pos = new_pos;
+	spinlock_unlock(&file->f_lock);
+
+	return new_pos;
 }
 
 /**
@@ -432,34 +386,32 @@ loff_t file_llseek(struct file* file, loff_t offset, int whence) {
  *
  * Returns 0 on success or a negative error code on failure.
  */
-int file_sync(struct file* file, int datasync) {
-    struct inode* inode;
-    int ret = 0;
+int32 file_sync(struct file* file, int32 datasync) {
+	struct inode* inode;
+	int32 ret = 0;
 
-    /* Basic validation */
-    if (!file)
-        return -EINVAL;
+	/* Basic validation */
+	if (!file) return -EINVAL;
 
-    inode = file->f_inode;
-    if (!inode)
-        return -EINVAL;
+	inode = file->f_inode;
+	if (!inode) return -EINVAL;
 
-    /* Call file-specific fsync operation if available */
-    if (file->f_operations && file->f_operations->fsync) {
-        /* Use the file's fsync operation with full file range */
-        //struct kiocb kiocb;
-        //init_kiocb(&kiocb, file);	
-		// currently unused
-        return file->f_operations->fsync(file, 0, INT64_MAX, datasync);
-    }
+	/* Call file-specific fsync operation if available */
+	if (file->f_operations && file->f_operations->fsync) {
+		/* Use the file's fsync operation with full file range */
+		// struct kiocb kiocb;
+		// init_kiocb(&kiocb, file);
+		//  currently unused
+		return file->f_operations->fsync(file, 0, INT64_MAX, datasync);
+	}
 
-    /* Generic implementation - sync the inode */
-    if (datasync)
-        ret = inode_sync(inode, 1); /* Only sync data blocks */
-    else
-        ret = inode_sync_metadata(inode, 1); /* Sync data and metadata */
+	/* Generic implementation - sync the inode */
+	if (datasync)
+		ret = inode_sync(inode, 1); /* Only sync data blocks */
+	else
+		ret = inode_sync_metadata(inode, 1); /* Sync data and metadata */
 
-    return ret;
+	return ret;
 }
 
 /**
@@ -469,57 +421,49 @@ int file_sync(struct file* file, int datasync) {
  * @vlen: Number of io_vector structures
  * @pos: Position in file to read from (updated on return)
  */
-ssize_t file_readv(struct file* file, const struct io_vector* vec, unsigned long vlen, loff_t* pos) {
-    struct kiocb kiocb;
-    struct io_vector_iterator iter;
-    ssize_t ret;
+ssize_t file_readv(struct file* file, const struct io_vector* vec, uint64 vlen, loff_t* pos) {
+	struct kiocb kiocb;
+	struct io_vector_iterator iter;
+	ssize_t ret;
 
-    if (!file || !vec || !pos)
-        return -EINVAL;
+	if (!file || !vec || !pos) return -EINVAL;
 
-    /* Initialize kiocb */
-    init_kiocb(&kiocb, file);
-    kiocb.ki_pos = *pos;
-    
-    /* If we're using a position different from the file's current position */
-    if (*pos != file->f_pos)
-        kiocb.ki_flags |= KIOCB_NOUPDATE_POS;
+	/* Initialize kiocb */
+	init_kiocb(&kiocb, file);
+	kiocb.ki_pos = *pos;
 
-    /* Setup the io_vector iterator */
-    ret = setup_io_vector_iterator(&iter, vec, vlen);
-    if (ret < 0)
-        return ret;
+	/* If we're using a position different from the file's current position */
+	if (*pos != file->f_pos) kiocb.ki_flags |= KIOCB_NOUPDATE_POS;
 
-    /* Use optimized read_iter if available */
-    if (likely(file->f_operations && file->f_operations->read_iter)) {
-        ret = file->f_operations->read_iter(&kiocb, &iter);
-    } else if (file->f_operations && file->f_operations->read) {
-        /* Fall back to sequential reads */
-        ret = 0;
-        for (unsigned long i = 0; i < vlen; i++) {
-            ssize_t bytes;
-            bytes = file->f_operations->read(file, vec[i].iov_base, vec[i].iov_len, &kiocb.ki_pos);
-            if (bytes < 0) {
-                if (ret == 0)
-                    ret = bytes;
-                break;
-            }
-            ret += bytes;
-            if (bytes < vec[i].iov_len)
-                break; /* Short read */
-        }
-    } else {
-        ret = -EINVAL;
-    }
+	/* Setup the io_vector iterator */
+	ret = setup_io_vector_iterator(&iter, vec, vlen);
+	if (ret < 0) return ret;
 
-    /* Update the position for the caller */
-    if (ret > 0)
-        *pos = kiocb.ki_pos;
+	/* Use optimized read_iter if available */
+	if (likely(file->f_operations && file->f_operations->read_iter)) {
+		ret = file->f_operations->read_iter(&kiocb, &iter);
+	} else if (file->f_operations && file->f_operations->read) {
+		/* Fall back to sequential reads */
+		ret = 0;
+		for (uint64 i = 0; i < vlen; i++) {
+			ssize_t bytes;
+			bytes = file->f_operations->read(file, vec[i].iov_base, vec[i].iov_len, &kiocb.ki_pos);
+			if (bytes < 0) {
+				if (ret == 0) ret = bytes;
+				break;
+			}
+			ret += bytes;
+			if (bytes < vec[i].iov_len) break; /* Short read */
+		}
+	} else {
+		ret = -EINVAL;
+	}
 
-    return ret;
+	/* Update the position for the caller */
+	if (ret > 0) *pos = kiocb.ki_pos;
+
+	return ret;
 }
-
-
 
 /**
  * file_writev - Write data from multiple buffers to a file
@@ -528,62 +472,57 @@ ssize_t file_readv(struct file* file, const struct io_vector* vec, unsigned long
  * @vlen: Number of io_vector structures
  * @pos: Position in file to write to (updated on return)
  */
-ssize_t file_writev(struct file* file, const struct io_vector* vec, unsigned long vlen, loff_t* pos) {
-    struct kiocb kiocb;
-    struct io_vector_iterator iter;
-    ssize_t ret;
+ssize_t file_writev(struct file* file, const struct io_vector* vec, uint64 vlen, loff_t* pos) {
+	struct kiocb kiocb;
+	struct io_vector_iterator iter;
+	ssize_t ret;
 
-    if (!file || !vec || !pos)
-        return -EINVAL;
+	if (!file || !vec || !pos) return -EINVAL;
 
-    /* Initialize kiocb */
-    init_kiocb(&kiocb, file);
-    kiocb.ki_pos = *pos;
-    
-    /* If we're using a position different from the file's current position */
-    if (*pos != file->f_pos)
-        kiocb.ki_flags |= KIOCB_NOUPDATE_POS;
+	/* Initialize kiocb */
+	init_kiocb(&kiocb, file);
+	kiocb.ki_pos = *pos;
 
-    /* Setup the io_vector iterator */
-    ret = setup_io_vector_iterator(&iter, vec, vlen);
-    if (ret < 0)
-        return ret;
+	/* If we're using a position different from the file's current position */
+	if (*pos != file->f_pos) kiocb.ki_flags |= KIOCB_NOUPDATE_POS;
 
-    /* Handle append mode */
-    if (file->f_flags & O_APPEND) {
-        kiocb.ki_flags |= KIOCB_APPEND;
-        kiocb.ki_pos = file->f_inode->i_size;
-    }
+	/* Setup the io_vector iterator */
+	ret = setup_io_vector_iterator(&iter, vec, vlen);
+	if (ret < 0) return ret;
 
-    /* Use optimized write_iter if available */
-    if (file->f_operations && file->f_operations->write_iter) {
-        ret = file->f_operations->write_iter(&kiocb, &iter);
-    } else if (file->f_operations && file->f_operations->write) {
-        /* Fall back to sequential writes */
-        ret = 0;
-        for (unsigned long i = 0; i < vlen; i++) {
-            ssize_t bytes;
-            bytes = file->f_operations->write(file, vec[i].iov_base, vec[i].iov_len, &kiocb.ki_pos);
-            if (bytes < 0) {
-                if (ret == 0)
-                    ret = bytes;
-                break;
-            }
-            ret += bytes;
-            if (bytes < vec[i].iov_len)
-                break; /* Short write */
-        }
-    } else {
-        ret = -EINVAL;
-    }
+	/* Handle append mode */
+	if (file->f_flags & O_APPEND) {
+		kiocb.ki_flags |= KIOCB_APPEND;
+		kiocb.ki_pos = file->f_inode->i_size;
+	}
 
-    /* Update the position for the caller */
-    if (ret > 0) {
-        *pos = kiocb.ki_pos;
-        
-        /* Mark the inode as dirty if write was successful */
-        inode_setDirty(file->f_inode);
-    }
+	/* Use optimized write_iter if available */
+	if (file->f_operations && file->f_operations->write_iter) {
+		ret = file->f_operations->write_iter(&kiocb, &iter);
+	} else if (file->f_operations && file->f_operations->write) {
+		/* Fall back to sequential writes */
+		ret = 0;
+		for (uint64 i = 0; i < vlen; i++) {
+			ssize_t bytes;
+			bytes = file->f_operations->write(file, vec[i].iov_base, vec[i].iov_len, &kiocb.ki_pos);
+			if (bytes < 0) {
+				if (ret == 0) ret = bytes;
+				break;
+			}
+			ret += bytes;
+			if (bytes < vec[i].iov_len) break; /* Short write */
+		}
+	} else {
+		ret = -EINVAL;
+	}
 
-    return ret;
+	/* Update the position for the caller */
+	if (ret > 0) {
+		*pos = kiocb.ki_pos;
+
+		/* Mark the inode as dirty if write was successful */
+		inode_setDirty(file->f_inode);
+	}
+
+	return ret;
 }
