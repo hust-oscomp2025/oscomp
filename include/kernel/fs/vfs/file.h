@@ -2,7 +2,7 @@
 #define _FILE_H
 
 #include <kernel/fs/vfs/path.h>
-#include <kernel/types.h>
+#include "forward_declarations.h"
 #include <kernel/util/atomic.h>
 #include <kernel/util/spinlock.h>
 #include <kernel/vfs.h>
@@ -46,6 +46,59 @@ struct file {
 	const struct file_operations* f_operations; /* File s_operations */
 };
 
+/**
+ * Directory context for readdir operations
+ */
+struct dir_context {
+	int32 (*actor)(struct dir_context*, const char*, int32, loff_t, uint64_t,
+		     unsigned);
+	loff_t pos; /* Current position in directory */
+};
+
+/**
+ * File operation structure - provides methods for file manipulation
+ */
+struct file_operations {
+	/* Position manipulation */
+	loff_t (*llseek)(struct file*, loff_t, int32);
+
+	/* Basic I/O */
+	ssize_t (*read)(struct file*, char*, size_t, loff_t*);
+	ssize_t (*write)(struct file*, const char*, size_t, loff_t*);
+
+	/* Vectored I/O */
+	ssize_t (*read_iter)(struct kiocb*, struct io_vector_iterator*);
+	ssize_t (*write_iter)(struct kiocb*, struct io_vector_iterator*);
+
+	/* Directory s_operations */
+	int32 (*iterate)(struct file*, struct dir_context*);
+	int32 (*iterate_shared)(struct file*, struct dir_context*);
+
+	/* Polling/selection */
+	//__poll_t (*poll)(struct file*, struct poll_table_struct*);
+
+	/* Management s_operations */
+	int32 (*open)(struct inode*, struct file*);
+	int32 (*flush)(struct file*);
+	int32 (*release)(struct inode*, struct file*);
+	int32 (*fsync)(struct file*, loff_t, loff_t, int32 datasync);
+
+	/* Memory mapping */
+	int32 (*mmap)(struct file*, struct vm_area_struct*);
+
+	/* Special s_operations */
+	int64 (*unlocked_ioctl)(struct file*, uint32, uint64);
+	int32 (*fasync)(int32, struct file*, int32);
+
+	/* Splice s_operations */
+	//ssize_t (*splice_read)(struct file*, loff_t*, struct pipe_inode_info*, size_t, uint32);
+	//ssize_t (*splice_write)(struct pipe_inode_info*, struct file*, loff_t*, size_t, uint32);
+
+	/* Space allocation */
+	int64 (*fallocate)(struct file*, int32, loff_t, loff_t);
+};
+
+
 #define f_mapping f_inode->i_mapping
 #define f_dentry f_path.dentry
 
@@ -79,6 +132,9 @@ int32 file_sync(struct file*, int32);
 ssize_t file_readv(struct file* file, const struct io_vector* vec, uint64 vlen, loff_t* pos);
 
 ssize_t file_writev(struct file* file, const struct io_vector* vec, uint64 vlen, loff_t* pos);
+
+int32 iterate_dir(struct file*, struct dir_context*);
+
 
 static inline bool file_isReadable(struct file* file) {
 	if (!file || !file->f_inode || atomic_read(&file->f_refcount) <= 0) return false;

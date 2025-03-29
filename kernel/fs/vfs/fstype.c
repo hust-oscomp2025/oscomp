@@ -8,7 +8,6 @@
 static struct list_head file_systems_list;
 static spinlock_t file_systems_lock;
 
-static int32 __lookup_dev_id(const char* dev_name, dev_t* dev_id);
 static struct superblock* __fstype_allocSuperblock(struct fstype* type);
 
 /**
@@ -180,26 +179,6 @@ struct fstype* fstype_lookup(const char* name) {
 	return NULL;
 }
 
-/**
- * lookup_dev_id - Get device ID from device name
- * @dev_name: Name of the device
- * @dev_id: Output parameter for device ID
- *
- * Returns 0 on success, negative error code on failure
- */
-static int32 __lookup_dev_id(const char* dev_name, dev_t* dev_id) {
-	/* Implementation would look up the device in the device registry */
-	/* For now, we'll just use a simple hash function */
-	if (!dev_name || !dev_id) return -EINVAL;
-
-	*dev_id = 0;
-	while (*dev_name) { *dev_id = (*dev_id * 31) + *dev_name++; }
-
-	/* Ensure non-zero value for real devices */
-	if (*dev_id == 0) *dev_id = 1;
-
-	return 0;
-}
 
 int32 fstype_fill_sb(struct fstype* type, struct superblock* sb, void* data, int32 flags) {
 	// 通用初始化阶段
@@ -256,7 +235,8 @@ static struct superblock* __fstype_allocSuperblock(struct fstype* type) {
 	// 初始化原子计数器
 	atomic_set(&sb->s_refcount, 1);
 	atomic_set(&sb->s_ninodes, 0);
-
+	atomic64_set(&sb->s_next_ino, 1);
+	// ino=0是保留的
 	/* Set filesystem type */
 	sb->s_fstype = type;
 

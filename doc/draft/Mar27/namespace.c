@@ -96,7 +96,7 @@ void put_namespace(struct mnt_namespace* ns) {
 		struct vfsmount *mnt, *next;
 		list_for_each_entry_safe(mnt, next, &ns->mount_list, mnt_node_global) {
 			list_del(&mnt->mnt_node_global);
-			put_mount(mnt);
+			vfsmount_put(mnt);
 		}
 
 		/* Free the namespace structure itself */
@@ -151,10 +151,10 @@ struct vfsmount* get_mount(struct vfsmount* mnt) {
 }
 
 /**
- * put_mount - Decrease reference count on a mount
+ * vfsmount_put - Decrease reference count on a mount
  * @mnt: Mount point to dereference
  */
-void put_mount(struct vfsmount* mnt) {
+void vfsmount_put(struct vfsmount* mnt) {
 	if (!mnt)
 		return;
 
@@ -246,7 +246,7 @@ bool is_mounted(struct dentry* dentry) {
 
 	mnt = lookup_vfsmount(dentry);
 	if (mnt) {
-		put_mount(mnt);
+		vfsmount_put(mnt);
 		return true;
 	}
 
@@ -370,7 +370,7 @@ int32 do_umount(struct vfsmount* mnt, int32 flags) {
 	spinlock_unlock(&mount_lock);
 
 	/* Decrease reference count (may free the mount) */
-	put_mount(mnt);
+	vfsmount_put(mnt);
 
 	return 0;
 }

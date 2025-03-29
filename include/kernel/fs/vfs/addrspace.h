@@ -4,6 +4,7 @@
 
 #include <kernel/util/radix_tree.h>
 #include <kernel/util/spinlock.h>
+#include "forward_declarations.h"
 
 struct inode;
 struct writeback_control;
@@ -14,6 +15,20 @@ struct addrSpace {
 	spinlock_t tree_lock;                         /* Lock for tree manipulation */
 	uint64 nrpages;                        /* Number of total pages */
 	const struct addrSpace_ops* a_ops; /* s_operations */
+};
+
+
+/*
+ * Address space s_operations (page cache)
+ */
+struct addrSpace_ops {
+	int32 (*readpage)(struct file*, struct page*);
+	int32 (*writepage)(struct page*, struct writeback_control*);
+	int32 (*readpages)(struct file*, struct addrSpace*, struct list_head*, unsigned);
+	int32 (*writepages)(struct addrSpace*, struct writeback_control*);
+	void (*invalidatepage)(struct page*, uint32);
+	int32 (*releasepage)(struct page*, int32);
+	int32 (*direct_IO)(int32, struct kiocb*, const struct io_vector*, loff_t, uint64);
 };
 
 struct addrSpace* addrSpace_create(struct inode* inode);

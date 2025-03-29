@@ -1,7 +1,7 @@
 #ifndef _IO_VECTOR_H
 #define _IO_VECTOR_H
 
-#include <kernel/types.h>
+#include "forward_declarations.h"
 
 /**
  * struct io_vector - Describes a memory buffer for vectored I/O

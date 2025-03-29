@@ -1,7 +1,7 @@
 #ifndef _KIOCB_H
 #define _KIOCB_H
 
-#include <kernel/types.h>
+#include "forward_declarations.h"
 #include <kernel/fs/vfs/file.h>
 
 /**

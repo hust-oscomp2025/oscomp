@@ -1,8 +1,8 @@
-#ifndef _TYPES_H_
-#define _TYPES_H_
+#pragma once
 #include <asm-generic/statfs.h>
 #include <sys/mount.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -35,13 +35,6 @@ typedef signed char int8;
 typedef signed short int16;
 typedef signed int int32;
 typedef signed long long int64;
-
-
-#ifndef bool
-typedef int bool;
-#define true 1
-#define false 0
-#endif
 
 // 方便的宏定义
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -101,7 +94,7 @@ struct itimerspec {
 /*ERRNO TYPES*/
 #define MAX_ERRNO 4095L
 #define IS_ERR_VALUE(x) ((unsigned long)(x) >= (unsigned long)-MAX_ERRNO)
-
+#define unlikely_if(x) if(unlikely(x))
 #define ERR_PTR(err) ((void*)((long)(err)))
 #define PTR_ERR(ptr) ((long)(ptr))
 #define IS_ERR(ptr) IS_ERR_VALUE((unsigned long)(ptr))
@@ -167,7 +160,8 @@ struct istat {
 typedef long __fsword_t;
 typedef unsigned long fsblkcnt_t;
 
-
+/* File permission and type bits */
+typedef unsigned short umode_t;
 #define READ    0
 #define WRITE   1
 
@@ -235,4 +229,43 @@ static inline void clear_bit(int nr, volatile uint64 *addr) {
 
 
 
-#endif
+/*device types*/
+/* Major/minor number manipulation macros */
+#define MINORBITS       20
+#define MINORMASK       ((1U << MINORBITS) - 1)
+
+/* Extract major and minor numbers from a device ID */
+#define MAJOR(dev)      ((unsigned int) ((dev) >> MINORBITS))
+#define MINOR(dev)      ((unsigned int) ((dev) & MINORMASK))
+
+/* Create a device ID from major and minor numbers */
+#define MKDEV(major,minor) (((dev_t)(major) << MINORBITS) | (minor))
+
+/* Standard Linux device major numbers */
+#define UNNAMED_MAJOR       0
+#define RAMDISK_MAJOR       1
+#define FLOPPY_MAJOR        2
+#define IDE0_MAJOR          3
+#define IDE1_MAJOR          22
+#define IDE2_MAJOR          33
+#define IDE3_MAJOR          34
+#define SCSI_DISK0_MAJOR    8
+#define SCSI_DISK1_MAJOR    65
+#define SCSI_DISK2_MAJOR    66
+#define SCSI_DISK3_MAJOR    67
+#define SCSI_DISK4_MAJOR    68
+#define SCSI_DISK5_MAJOR    69
+#define SCSI_DISK6_MAJOR    70
+#define SCSI_DISK7_MAJOR    71
+#define LOOP_MAJOR          7
+#define MMC_BLOCK_MAJOR     179
+#define VIRTBLK_MAJOR       254
+
+/* Special purpose device majors */
+#define MEM_MAJOR           1       /* /dev/mem etc */
+#define TTY_MAJOR           4
+#define TTYAUX_MAJOR        5
+#define RANDOM_MAJOR        1       /* /dev/random /dev/urandom */
+
+#define DYNAMIC_MAJOR_MIN 128  /* Reserve first 128 majors for fixed assignments */
+

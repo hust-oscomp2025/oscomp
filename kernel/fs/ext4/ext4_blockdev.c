@@ -116,7 +116,7 @@ static int32 ext4_blockdev_adapter_bread(struct ext4_blockdev* e_blockdevice, vo
 	if (!kernel_bdev) return -EINVAL;
 
 	/* Use kernel's block device read function */
-	if (kernel_bdev->bd_ops && kernel_bdev->bd_ops->read_blocks) { return kernel_bdev->bd_ops->read_blocks(kernel_bdev, blk_id, buf, blk_cnt); }
+	if (kernel_bdev->bd_ops && kernel_bdev->bd_ops->read_blocks) { return kernel_bdev->bd_ops->read_blocks(kernel_bdev,buf, blk_id,  blk_cnt); }
 
 	return -ENOSYS;
 }
@@ -131,7 +131,7 @@ static int32 ext4_blockdev_adapter_bwrite(struct ext4_blockdev* e_blockdevice, c
 	if (!kernel_bdev) return -EINVAL;
 
 	/* Use kernel's block device write function */
-	if (kernel_bdev->bd_ops && kernel_bdev->bd_ops->write_block) { return kernel_bdev->bd_ops->write_block(kernel_bdev, blk_id,(void*)buf, blk_cnt ); }
+	if (kernel_bdev->bd_ops && kernel_bdev->bd_ops->write_blocks) { return kernel_bdev->bd_ops->write_blocks(kernel_bdev,(void*)buf, blk_id, blk_cnt ); }
 
 	return -ENOSYS;
 }

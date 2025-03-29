@@ -1,17 +1,13 @@
-#ifndef INODE_H
-#define INODE_H
+#pragma once
 
 //#include <kernel/vfs.h>
 #include <kernel/mm/vma.h>
-#include <kernel/types.h>
+#include "forward_declarations.h"
 #include <kernel/util/atomic.h>
 #include <kernel/util/list.h>
 #include <kernel/util/spinlock.h>
 
 extern struct hashtable inode_hashtable;
-
-/* File permission and type bits */
-typedef unsigned short umode_t;
 
 
 
@@ -115,17 +111,71 @@ struct inode {
     // } i_quota;
 };
 
+struct inode_operations {
+	/* File operations */
+	struct dentry* (*lookup)(struct inode*, struct dentry*, uint32);
+	struct inode* (*create)(struct inode*, struct dentry*, fmode_t, bool);
+	int32 (*link)(struct dentry*, struct inode*, struct dentry*);
+	int32 (*unlink)(struct inode*, struct dentry*);
+	int32 (*symlink)(struct inode*, struct dentry*, const char*);
+	int32 (*mkdir)(struct inode*, struct dentry*, fmode_t);
+	int32 (*rmdir)(struct inode*, struct dentry*);
+	int32 (*mknod)(struct inode*, struct dentry*, fmode_t, dev_t);
+	int32 (*rename)(struct inode*, struct dentry*, struct inode*, struct dentry*, uint32);
+
+	/* Extended attribute operations */
+	int32 (*setxattr)(struct dentry*, const char*, const void*, size_t, int32);
+	ssize_t (*getxattr)(struct dentry*, const char*, void*, size_t);
+	ssize_t (*listxattr)(struct dentry*, char*, size_t);
+	int32 (*removexattr)(struct dentry*, const char*);
+
+	/* Special file operations */
+	int32 (*readlink)(struct dentry*, char*, int32);
+	int32 (*get_link)(struct dentry*, struct inode*, struct path*);
+	int32 (*permission)(struct inode*, int32);
+	int32 (*get_acl)(struct inode*, int32);
+    //int32 (*set_acl)(struct inode*, struct posix_acl*, int32);
+	int32 (*setattr)(struct dentry*, struct iattr*);
+	int32 (*getattr)(const struct path*, struct kstat*, uint32, uint32);
+	int32 (*fiemap)(struct inode*, struct fiemap_extent_info*, uint64, uint64);
+
+	/* Block operations */
+	int32 (*get_block)(struct inode*, sector_t, struct buffer_head*, int32 create);
+	sector_t (*bmap)(struct inode*, sector_t);
+	void (*truncate_blocks)(struct inode*, loff_t size);
+
+	/* Direct I/O support */
+	int32 (*direct_IO)(struct kiocb*, struct io_vector_iterator*);
+    // ACL operations
+    // Memory mapping operations
+    vm_fault_t (*page_fault)(struct vm_area_struct *, struct vm_fault *);
+    uint64 (*get_unmapped_area)(struct file *, uint64, uint64, uint64, uint64);
+
+    // POSIX specific operations
+    int32 (*atomic_open)(struct inode *, struct dentry *, struct file *, unsigned open_flag, umode_t create_mode);
+    int32 (*tmpfile)(struct inode *, struct dentry *, umode_t);
+    //int32 (*dentry_open)(struct dentry *, struct file *, const struct cred *);
+
+};
+
+
 /*
  * Inode APIs
  */
 int32 inode_cache_init(void);
 
-/* Reference counting */
+struct inode* inode_acquire(struct superblock* sb, uint64 ino);
 struct inode* inode_ref(struct inode* inode);
 void inode_unref(struct inode* inode);
 
+/*dentry called executer functions*/
+int32 inode_mknod(struct inode* dir, struct dentry* dentry, mode_t mode, dev_t dev);
+int32 inode_mkdir(struct inode *dir, struct dentry *dentry, mode_t mode);
+int32 inode_rmdir(struct inode*, struct dentry*);
+
 /* Inode lookup and creation */
-struct inode* inode_acquire(struct superblock* sb, uint64 ino);
+int32 inode_permission(struct inode* inode, int32 mask);
+/* Reference counting */
 
 
 /*供下层文件系统调用，在IO读写后通知进程*/
@@ -148,6 +198,9 @@ int32 inode_sync_metadata(struct inode* inode, int32 wait);
  */
 static inline int32 inode_isBad(struct inode* inode) { return (!inode || inode->i_op == NULL); }
 int32 inode_checkPermission(struct inode* inode, int32 mask);
+
+
+
 
 
 // Add to inode.h or extend existing declarations
@@ -195,9 +248,9 @@ int32 inode_removexattr(struct inode* inode, const char* name);
 #define ACL_TYPE_ACCESS   (0x0000)  /* POSIX access ACL */
 #define ACL_TYPE_DEFAULT  (0x0001)  /* POSIX default ACL */
 
+bool inode_isReadonly(struct inode *inode);
+bool inode_isImmutable(struct inode *inode);
 
-
-#endif /* INODE_H */
 
 //        ┌─────────────┐
 //        │             │

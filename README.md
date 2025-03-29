@@ -24,9 +24,13 @@
 - [x] 实现ext4 inode虚函数表
 - [ ] 在初始化ext4 mount时传入ext4全局锁
 - [ ] 用riscv-linux-gnu编译lwext4
-- [ ] 在lwext4中修改malloc为kmalloc
+- [ ] 在lwext4静态库编译中修改malloc为kmalloc
 - [ ] 提供一个通用的s_device_id获取方法
 - [ ] 在fs-specific动作中设置i_new
+- [ ] 在generic_shutdown_super中做inode_free
+- [ ] 在vfs_mkdir中，考虑current_task->umask
+- [ ] 制作并加载initramfs
+- [ ] 在superblock中处理ino = 0的acquire请求
 
 
 
@@ -49,6 +53,11 @@
 - [ ] 在kernel blockdevice创建和销毁时，创建和销毁ext4_blockdevice
 - [ ] 实现fs_specific_mount fallback
 - [ ] 支持negative dentry
+- [ ] 在superblock中加入配额quota
+- [ ] 在superblock中做active refcount
+- [ ] 优化vfs_path_lookup
+- [ ] 加入dentry_automount特性
+- [ ] A more complex data structure for multiple mount tracking (rather than a simple counter)
 
 ## 小任务
 - [ ] 把readp和writep分离出去

@@ -1,7 +1,7 @@
 #ifndef _FSTYPE_H
 #define _FSTYPE_H
 
-#include <kernel/types.h>
+#include "forward_declarations.h"
 #include <kernel/util/list.h>
 #include <kernel/util/spinlock.h>
 
@@ -37,7 +37,6 @@ int32 fstype_register(struct fstype*);
 int32 fstype_unregister(struct fstype*);
 
 struct superblock* fstype_acquireSuperblock(struct fstype* type, dev_t dev_id, void* fs_data);
-struct superblock* fstype_handleMount(struct fstype* type, int32 flags, const char* dev_name, void* data);
 int32 fstype_fill_sb(struct fstype* type, struct superblock* sb, void* data, int32 flags);
 struct fstype* fstype_lookup(const char* name);
 

@@ -1,13 +1,14 @@
-#include <kernel/mm/kmalloc.h>
-#include <kernel/sched/sched.h>
+#include <kernel/mmu.h>
+#include <kernel/sched.h>
 #include <kernel/sprint.h>
+#include <kernel/time.h>
 #include <kernel/types.h>
 #include <kernel/util.h>
 #include <kernel/vfs.h>
 
 static struct inode* __inode_lookupHash(struct superblock* sb, uint64 ino);
 
-static void __clear_inode(struct inode* inode);
+static void __inode__free(struct inode* inode);
 static void* __inode_get_key(struct list_node* node);
 static uint32 __inode_hash_func(const void* key, uint32 size);
 static int32 __inode_key_equals(const void* k1, const void* k2);
@@ -62,7 +63,7 @@ int32 inode_cache_init(void) {
 // 	if (current_task()->euid == 0) return 0;
 
 // 	/* Nobody gets write access to a read-only filesystem */
-// 	if ((mask & MAY_WRITE) && IS_RDONLY(inode)) return -EROFS;
+// 	if ((mask & MAY_WRITE) && inode_isReadonly(inode)) return -EROFS;
 
 // 	/* Check if file is accessible by the user */
 // 	if (current_task()->euid == inode->i_uid) {
@@ -111,7 +112,7 @@ int32 inode_cache_init(void) {
 /**
  * inode_acquire - Get a fully initialized inode
  * @sb: superblock to get inode from
- * @ino: inode number to look up
+ * @ino: inode number to look up, 为0时表示分配一个新的inode
  *
  * Tries to find the specified inode in the inode cache. If not found,
  * allocates a new inode and calls the filesystem to read it.
@@ -125,7 +126,7 @@ struct inode* inode_acquire(struct superblock* sb, uint64 ino) {
 	CHECK_PTR_ERROR(inode, ERR_PTR(-ENOMEM));
 
 	if (!inode) {
-		inode = superblock_createInode(sb, ino);
+		inode = superblock_createInode(sb);
 		CHECK_PTR_VALID(inode, ERR_PTR(-ENOMEM));
 	}
 
@@ -239,16 +240,16 @@ static void evict_inode(struct inode* inode) {
 	}
 
 	/* Clean out the inode */
-	__clear_inode(inode);
+	__inode__free(inode);
 }
 
 /**
- * __clear_inode - Clean up an inode and prepare it for freeing
+ * __inode__free - Clean up an inode and prepare it for freeing
  * @inode: inode to clear
  *
  * Final cleanup of an inode before it's memory is freed.
  */
-void __clear_inode(struct inode* inode) {
+void __inode__free(struct inode* inode) {
 	if (!inode) return;
 
 	/* Remove any state flags */
@@ -428,7 +429,6 @@ void wake_up_inode(struct inode* inode) {
 	/* For now, we'll assume no waiters or that it's handled elsewhere */
 }
 
-
 /**
  * Get key from an inode hash node
  * This function extracts the key (superblock + inode number) from a list node
@@ -444,4 +444,223 @@ static void* __inode_get_key(struct list_node* node) {
 	key.ino = inode->i_ino;
 
 	return &key;
+}
+
+/**
+ * inode_mkdir - Core VFS directory creation implementation
+ * @dir: Parent directory inode
+ * @dentry: Dentry for the new directory
+ * @mode: Directory permissions
+ *
+ * 这个函数中的dentry，及它在dentry目录树上的关系，都是预先创建好的
+ * 它只负责在目录inode中把dentry加进去
+ * Creates a new directory with VFS defaults, calling filesystem-specific
+ * extension points when available.
+ *
+ * Returns: 0 on success, negative error code on failure
+ */
+int32 inode_mkdir(struct inode* dir, struct dentry* dentry, mode_t mode) {
+
+	int32 error = 0;
+
+	if (!dir || !dentry) return -EINVAL;
+
+	/* Check if directory is writable */
+	error = inode_permission(dir, MAY_WRITE | MAY_EXEC);
+	if (error) return error;
+
+	/* Call filesystem-specific mkdir if available */
+	if (dir->i_op && dir->i_op->mkdir) { return dir->i_op->mkdir(dir, dentry, mode); }
+
+	/* Default implementation if no filesystem handler */
+	struct inode* inode = inode_acquire(dir->i_superblock, 0);
+	if (!inode) return -ENOMEM;
+
+	/* Set up basic directory attributes */
+	inode->i_mode = S_IFDIR | (mode & 0777);
+	inode->i_uid = current_task()->uid;
+	inode->i_gid = current_task()->gid;
+	inode->i_size = 0;
+	inode->i_blocks = 0;
+	inode->i_atime = inode->i_mtime = inode->i_ctime = current_time(dir->i_superblock);
+
+	/* Set up directory operations */
+	// inode->i_op = &simple_dir_inode_operations;
+	// inode->i_fop = &simple_dir_operations;
+
+	/* Link inode to dentry */
+	dentry_instantiate(dentry, inode);
+
+	/* Update parent directory */
+	dir->i_mtime = dir->i_ctime = current_time(dir->i_superblock);
+	dir->i_size++;
+
+	return 0;
+}
+
+/**
+ * inode_mknod - Core VFS special file creation implementation
+ * @dir: Parent directory inode
+ * @dentry: Dentry for the new device node
+ * @mode: File mode including type (S_IFBLK, S_IFCHR, etc.)
+ * @dev: Device number for device nodes
+ *
+ * Creates a new special file (device node, fifo, socket) with VFS defaults.
+ * Filesystem-specific mknod handlers are called if available, otherwise
+ * uses generic implementation suitable for in-memory filesystems like ramfs.
+ *
+ * Returns: 0 on success, negative error code on failure
+ */
+int32 inode_mknod(struct inode* dir, struct dentry* dentry, mode_t mode, dev_t dev) {
+	int32 error = 0;
+
+	if (!dir || !dentry) return -EINVAL;
+
+	/* Check if directory is writable */
+	error = inode_permission(dir, MAY_WRITE | MAY_EXEC);
+	if (error) return error;
+
+	/* Call filesystem-specific mknod if available */
+	if (dir->i_op && dir->i_op->mknod) { return dir->i_op->mknod(dir, dentry, mode, dev); }
+
+	/* Default implementation for simple filesystems like ramfs */
+	struct inode* inode = inode_acquire(dir->i_superblock, 0);
+	if (IS_ERR(inode)) return PTR_ERR(inode);
+
+	/* Set up basic inode attributes */
+	inode->i_mode = mode;
+	inode->i_uid = current_task()->uid;
+	inode->i_gid = current_task()->gid;
+	inode->i_size = 0;
+	inode->i_blocks = 0;
+	inode->i_atime = inode->i_mtime = inode->i_ctime = current_time(dir->i_superblock);
+	extern const struct file_operations bdFile_operations, chFile_operations, fifoFile_operations, socketFile_operations;
+
+	/* Handle different node types */
+	if (S_ISBLK(mode) || S_ISCHR(mode)) {
+		inode->i_rdev = dev; /* Store device ID in inode */
+
+		if (S_ISBLK(mode)) {
+			/* Block device operations */
+			inode->i_fop = &bdFile_operations;
+		} else {
+			/* Character device operations */
+			inode->i_fop = &chFile_operations;
+		}
+	} else if (S_ISFIFO(mode)) {
+		/* FIFO (named pipe) operations */
+		inode->i_fop = &fifoFile_operations;
+	} else if (S_ISSOCK(mode)) {
+		/* Unix socket operations */
+		inode->i_fop = &socketFile_operations;
+	}
+
+	/* Link inode to dentry */
+	dentry_instantiate(dentry, inode);
+
+	/* Update parent directory */
+	dir->i_mtime = dir->i_ctime = current_time(dir->i_superblock);
+	dir->i_size++;
+
+	return 0;
+}
+
+/**
+ * inode_permission - Check for access rights to a given inode
+ * @inode: inode to check permission on
+ * @mask: access mode to check for (MAY_READ, MAY_WRITE, MAY_EXEC, etc.)
+ *
+ * Main entry point for permission checking in the VFS.
+ * Performs standard Unix-style permission checking, with filesystem-specific
+ * extensions possible but not required.
+ *
+ * Returns 0 if access is allowed, negative error code otherwise.
+ */
+int32 inode_permission(struct inode* inode, int32 mask) {
+	int32 mode;
+	int32 retval = 0;
+
+	if (!inode) return -EINVAL;
+
+	/* Root can do (almost) anything */
+	if (current_task()->euid == 0) {
+		/* Even root has some restrictions */
+		if ((mask & MAY_WRITE) && inode_isImmutable(inode)) return -EPERM;
+		return 0;
+	}
+
+	/* Call filesystem-specific permission if available */
+	if (inode->i_op && inode->i_op->permission) {
+		retval = inode->i_op->permission(inode, mask);
+		if (retval != -EAGAIN) /* Filesystem handled it directly */
+			return retval;
+	}
+
+	/* Default permission implementation */
+	mode = inode->i_mode;
+
+	/* Nobody gets write access to a read-only filesystem */
+	if ((mask & MAY_WRITE) && inode_isReadonly(inode)) return -EROFS;
+
+	/* Check standard Unix permissions */
+	if (current_task()->euid == inode->i_uid) {
+		/* Owner permissions */
+		mode >>= 6;
+	} else if (current_group_matches(inode->i_gid)) {
+		/* Group permissions */
+		mode >>= 3;
+	}
+	/* Everyone else gets the "other" bits */
+
+	/* Check if the mask is allowed in the mode */
+	if ((mask & MAY_READ) && !(mode & 4)) /* 4 = read bit */
+		return -EACCES;
+	if ((mask & MAY_WRITE) && !(mode & 2)) /* 2 = write bit */
+		return -EACCES;
+	if ((mask & MAY_EXEC) && !(mode & 1)) /* 1 = execute bit */
+		return -EACCES;
+
+	return 0;
+}
+
+/**
+ * inode_isReadonly - Check if inode is on a read-only filesystem
+ */
+bool inode_isReadonly(struct inode* inode) {
+	/* Check if the superblock is mounted read-only */
+	return (inode->i_superblock && (inode->i_superblock->s_flags & MS_RDONLY));
+}
+
+/**
+ * inode_isImmutable - Check if inode is immutable
+ */
+bool inode_isImmutable(struct inode* inode) {
+	/* Immutable flag would typically be in inode attributes or flags */
+	/* For simplicity, just returning false for now */
+	return 0;
+}
+
+
+/**
+ * inode_rmdir - Remove a directory
+ * @dir: Parent directory's inode
+ * @dentry: Directory to remove
+ *
+ * Returns 0 on success or negative error code
+ */
+int32 inode_rmdir(struct inode* dir, struct dentry* dentry) {
+	int32 error;
+
+	if (!dir || !dentry || !dentry->d_inode) return -EINVAL;
+
+	if (!dir->i_op || !dir->i_op->rmdir) return -EPERM;
+
+	/* Check directory permissions */
+	error = inode_checkPermission(dir, MAY_WRITE | MAY_EXEC);
+	if (error) return error;
+
+	/* Cannot remove non-empty directory */
+	if (!dentry_isEmptyDir(dentry)) return -ENOTEMPTY;
+
+	return dir->i_op->rmdir(dir, dentry);
 }

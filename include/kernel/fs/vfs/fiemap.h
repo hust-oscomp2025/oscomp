@@ -1,6 +1,6 @@
 #ifndef _FIEMAP_H
 #define _FIEMAP_H
-#include <kernel/types.h>
+#include "forward_declarations.h"
 /* Structure for the fiemap extent information */
 struct fiemap_extent_info {
     uint32 fi_flags;         /* Flags for the current operation */

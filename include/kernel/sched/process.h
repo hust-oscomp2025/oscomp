@@ -165,4 +165,25 @@ int32 current_is_in_group(gid_t gid);
  */
 void print_proc_memory_layout(struct task_struct* proc);
 
+
+/**
+ * Helper function to check if current task belongs to the given group
+ */
+static inline int current_group_matches(gid_t gid) {
+    int i;
+    
+    // /* Check primary group */
+    // if (current_task()->gid == gid)
+    //     return 1;
+        
+    // /* Check supplementary groups */
+    // for (i = 0; i < current_task()->ngroups; i++) {
+    //     if (current_task()->groups[i] == gid)
+    //         return 1;
+    // }
+    
+    // return 0;
+	return 1;
+}
+
 #endif

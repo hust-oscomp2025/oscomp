@@ -151,7 +151,7 @@ static struct file* __file_open(struct dentry* dentry, struct vfsmount* mnt, int
 	/*initialization */
 	atomic_set(&file->f_refcount, 1);
 	file->f_path.dentry = dentry_ref(dentry);
-	file->f_path.mnt = get_mount(mnt);
+	file->f_path.mnt = mount_ref(mnt);
 	/* Set inode if available */
 	assert(dentry->d_inode); // 我们的设计确保所有文件系统都有inode和对应的操作
 	file->f_inode = inode_ref(dentry->d_inode);

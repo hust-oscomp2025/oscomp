@@ -55,12 +55,12 @@ struct fs_struct *copy_fs_struct(struct fs_struct *old_fs)
     
     if (old_fs->root.dentry) {
         new_fs->root.dentry = dentry_ref(old_fs->root.dentry);
-        new_fs->root.mnt = get_mount(old_fs->root.mnt);
+        new_fs->root.mnt = mount_ref(old_fs->root.mnt);
     }
     
     if (old_fs->pwd.dentry) {
         new_fs->pwd.dentry = dentry_ref(old_fs->pwd.dentry);
-        new_fs->pwd.mnt = get_mount(old_fs->pwd.mnt);
+        new_fs->pwd.mnt = mount_ref(old_fs->pwd.mnt);
     }
     
     spinlock_unlock(&old_fs->lock);
@@ -111,7 +111,7 @@ void set_fs_root(struct fs_struct *fs, const struct path *path)
     
     /* Set new path with proper reference counts */
     fs->root.dentry = dentry_ref(path->dentry);
-    fs->root.mnt = get_mount(path->mnt);
+    fs->root.mnt = mount_ref(path->mnt);
     
     spinlock_unlock(&fs->lock);
     
@@ -140,7 +140,7 @@ void set_fs_pwd(struct fs_struct *fs, const struct path *path)
     
     /* Set new path with proper reference counts */
     fs->pwd.dentry = dentry_ref(path->dentry);
-    fs->pwd.mnt = get_mount(path->mnt);
+    fs->pwd.mnt = mount_ref(path->mnt);
     
     spinlock_unlock(&fs->lock);
     

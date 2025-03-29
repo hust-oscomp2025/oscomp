@@ -10,6 +10,7 @@
  
  #include <stdint.h>
  #include <stdatomic.h>
+ #include <kernel/types.h>
  
  /* 
 	* Memory barrier definitions 
@@ -54,7 +55,7 @@
 	* Atomic type definitions
 	*/
  typedef struct {
-		 volatile int32 counter;
+		 volatile int counter;
  } atomic_t;
  
  typedef struct {
@@ -70,7 +71,7 @@
 	*
 	* Atomically reads the value of @v.
 	*/
- static inline int32 atomic_read(const atomic_t *v)
+ static inline int atomic_read(const atomic_t *v)
  {
 		 return READ_ONCE(v->counter);
  }
@@ -93,7 +94,7 @@
 	*
 	* Atomically sets the value of @v to @i.
 	*/
- static inline void atomic_set(atomic_t *v, int32 i)
+ static inline void atomic_set(atomic_t *v, int i)
  {
 		 WRITE_ONCE(v->counter, i);
  }
@@ -117,7 +118,7 @@
 	*
 	* Atomically adds @i to @v.
 	*/
- static inline void atomic_add(int32 i, atomic_t *v)
+ static inline void atomic_add(int i, atomic_t *v)
  {
 		 __asm__ __volatile__ (
 				 "amoadd.w zero, %1, %0"
@@ -149,7 +150,7 @@
 	*
 	* Atomically subtracts @i from @v.
 	*/
- static inline void atomic_sub(int32 i, atomic_t *v)
+ static inline void atomic_sub(int i, atomic_t *v)
  {
 		 atomic_add(-i, v);
  }
@@ -217,9 +218,9 @@
 	*
 	* Atomically adds @i to @v and returns @i + @v
 	*/
- static inline int32 atomic_add_return(int32 i, atomic_t *v)
+ static inline int atomic_add_return(int i, atomic_t *v)
  {
-		 int32 val;
+		 int val;
 		 
 		 __asm__ __volatile__ (
 				 "amoadd.w.aqrl %0, %2, %1"
@@ -257,7 +258,7 @@
 	*
 	* Atomically subtracts @i from @v and returns @v - @i
 	*/
- static inline int32 atomic_sub_return(int32 i, atomic_t *v)
+ static inline int atomic_sub_return(int i, atomic_t *v)
  {
 		 return atomic_add_return(-i, v);
  }
@@ -280,7 +281,7 @@
 	*
 	* Atomically increments @v by 1 and returns the result.
 	*/
- static inline int32 atomic_inc_return(atomic_t *v)
+ static inline int atomic_inc_return(atomic_t *v)
  {
 		 return atomic_add_return(1, v);
  }
@@ -302,7 +303,7 @@
 	*
 	* Atomically decrements @v by 1 and returns the result.
 	*/
- static inline int32 atomic_dec_return(atomic_t *v)
+ static inline int atomic_dec_return(atomic_t *v)
  {
 		 return atomic_sub_return(1, v);
  }
@@ -326,7 +327,7 @@
 	* and returns true if the result is zero, or false for all
 	* other cases.
 	*/
- static inline int32 atomic_inc_and_test(atomic_t *v)
+ static inline int atomic_inc_and_test(atomic_t *v)
  {
 		 return atomic_inc_return(v) == 0;
  }
@@ -339,7 +340,7 @@
 	* and returns true if the result is zero, or false for all
 	* other cases.
 	*/
- static inline int32 atomic64_inc_and_test(atomic64_t *v)
+ static inline int atomic64_inc_and_test(atomic64_t *v)
  {
 		 return atomic64_inc_return(v) == 0;
  }
@@ -352,7 +353,7 @@
 	* returns true if the result is 0, or false for all other
 	* cases.
 	*/
- static inline int32 atomic_dec_and_test(atomic_t *v)
+ static inline int atomic_dec_and_test(atomic_t *v)
  {
 		 return atomic_dec_return(v) == 0;
  }
@@ -365,7 +366,7 @@
 	* returns true if the result is 0, or false for all other
 	* cases.
 	*/
- static inline int32 atomic64_dec_and_test(atomic64_t *v)
+ static inline int atomic64_dec_and_test(atomic64_t *v)
  {
 		 return atomic64_dec_return(v) == 0;
  }
@@ -377,9 +378,9 @@
 	*
 	* Atomically exchanges the value of @v with @new and returns the old value.
 	*/
- static inline int32 atomic_xchg(atomic_t *v, int32 new)
+ static inline int atomic_xchg(atomic_t *v, int new)
  {
-		 int32 val;
+		 int val;
 		 
 		 __asm__ __volatile__ (
 				 "amoswap.w.aqrl %0, %2, %1"
@@ -419,9 +420,9 @@
 	* Atomically compares @v with @old and exchanges it with @new if the
 	* comparison is successful. Returns the previous value of @v.
 	*/
- static inline int32 atomic_cmpxchg(atomic_t *v, int32 old, int32 new)
+ static inline int atomic_cmpxchg(atomic_t *v, int old, int new)
  {
-		 int32 val;
+		 int val;
 		 
 		 __asm__ __volatile__ (
 				 "0:  lr.w %0, %1\n"
@@ -471,9 +472,9 @@
 	* Atomically adds @a to @v, so int64 as @v was not already @u.
 	* Returns true if the addition was performed.
 	*/
- static inline int32 atomic_add_unless(atomic_t *v, int32 a, int32 u)
+ static inline int atomic_add_unless(atomic_t *v, int a, int u)
  {
-		 int32 c, old;
+		 int c, old;
 		 c = atomic_read(v);
 		 while (c != u && (old = atomic_cmpxchg(v, c, c + a)) != c)
 				 c = old;
@@ -489,7 +490,7 @@
 	* Atomically adds @a to @v, so int64 as @v was not already @u.
 	* Returns true if the addition was performed.
 	*/
- static inline int32 atomic64_add_unless(atomic64_t *v, int64 a, int64 u)
+ static inline int atomic64_add_unless(atomic64_t *v, int64 a, int64 u)
  {
 		 int64 c, old;
 		 c = atomic64_read(v);

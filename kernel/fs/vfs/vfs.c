@@ -1,115 +1,45 @@
-#include <kernel/vfs.h>
 #include <kernel/mm/kmalloc.h>
-#include <kernel/sched/sched.h>
+#include <kernel/sched.h>
+#include <kernel/sprint.h>
 #include <kernel/types.h>
 #include <kernel/util/string.h>
+#include <kernel/vfs.h>
+#include <kernel/device/device.h>
 
-/* Global mount list */
-static struct list_head mount_list;
-static spinlock_t mount_lock;
-
-/* Mount point hash table */
-static struct hashtable mount_hashtable;
+/* Add global variable */
+struct dentry* global_root_dentry = NULL;
 
 /**
- * vfs_kern_mount - Mount a filesystem without adding to namespace
- * @type: Filesystem type to mount
- * @flags: Mount flags
- * @name: Device name to mount (or other identifier)
- * @data: Filesystem-specific data
+ * vfs_mkdir_path - Create a directory using a path string
+ * @path: Path string for the directory to create
+ * @mode: Directory mode/permissions
  *
- * Creates a mount point for a filesystem of the specified type.
- * This performs the mount operation but doesn't add the mount
- * point to any namespace - it's a kernel-internal mount used
- * primarily for:
- *   - Initial root filesystem mounting during boot
- *   - Mounting filesystems that will later be moved to user namespaces
- *   - Temporary internal mounts for operations like fs snapshots
+ * Creates a directory at the specified path.
+ * Path can be absolute (from root) or relative (from cwd).
  *
- * Returns a vfsmount structure on success, NULL on failure.
+ * Returns 0 on success, negative error code on failure
  */
-struct vfsmount* vfs_kern_mount(struct fsType* type, int32 flags, const char* name, void* data) {
-	struct vfsmount* mnt;
-	struct superblock* sb;
-	static int32 mount_id = 0;
+struct dentry* vfs_mkdir_path(const char* path, fmode_t mode) {
+	struct path parent;
+	int32 name_pos;
+	struct dentry* result;
 
-	if (!type)
-		return NULL;
+	if (!path || !*path) return ERR_PTR(-EINVAL);
 
-	/* Get or create a superblock */
-	sb = fsType_createMount(type, flags, name, data);
-	if (IS_ERR(sb))
-		return NULL;
+	/* Special case for creating root - impossible */
+	if (strcmp(path, "/") == 0) return ERR_PTR(-EEXIST);
 
-	/* Create new mount structure */
-	mnt = kmalloc(sizeof(struct vfsmount));
-	if (!mnt) {
-		deactivate_super_safe(sb);
-		drop_super(sb);
-		return NULL;
-	}
+	/* Resolve the parent directory */
+	name_pos = resolve_path_parent(path, &parent);
+	if (name_pos < 0) return ERR_PTR(name_pos); /* Error code */
 
-	/* Initialize the mount structure */
-	memset(mnt, 0, sizeof(struct vfsmount));
-	atomic_set(&mnt->mnt_refcount, 1);
-	mnt->mnt_superblock = sb;
-	mnt->mnt_root = dget(sb->s_global_root_dentry);
-	mnt->mnt_flags = flags;
-	mnt->mnt_id = mount_id++;
+	/* Create the directory */
+	result = dentry_mkdir(parent.dentry, &path[name_pos], mode);
 
-	/* Store device name if provided */
-	if (name && *name) {
-		mnt->mnt_devname = kstrdup(name,0);
-		/* Non-fatal if allocation fails, it's just for informational purposes */
-	}
-
-	/* Initialize list heads */
-	INIT_LIST_HEAD(&mnt->mnt_list_children);
-
-	/* Initialize list nodes */
-	INIT_LIST_HEAD(&mnt->mnt_node_superblock);
-	INIT_LIST_HEAD(&mnt->mnt_node_parent);
-	INIT_LIST_HEAD(&mnt->mnt_node_global);
-	INIT_LIST_HEAD(&mnt->mnt_node_namespace);
-
-	/* Add to superblock's mount list */
-	spinlock_lock(&sb->s_list_mounts_lock);
-	list_add(&mnt->mnt_node_superblock, &sb->s_list_mounts);
-	spinlock_unlock(&sb->s_list_mounts_lock);
-
-	return mnt;
+	/* Clean up */
+	path_destroy(&parent);
+	return result;
 }
-
-/**
- * vfs_mkdir - Create a directory
- * @dir: Parent directory's inode
- * @dentry: Dentry for the new directory
- * @mode: Permission mode
- *
- * Returns 0 on success or negative error code
- */
-int32 vfs_mkdir(struct inode* dir, struct dentry* dentry, fmode_t mode) {
-	int32 error;
-
-	if (!dir || !dentry)
-		return -EINVAL;
-
-	if (!dir->i_op || !dir->i_op->mkdir)
-		return -EPERM;
-
-	/* Check if entry already exists */
-	if (dentry->d_inode)
-		return -EEXIST;
-
-	/* Check directory permissions */
-	error = inode_checkPermission(dir, MAY_WRITE | MAY_EXEC);
-	if (error)
-		return error;
-
-	return dir->i_op->mkdir(dir, dentry, mode & ~current_task()->umask);
-}
-
-
 
 /**
  * vfs_kern_mount
@@ -124,11 +54,11 @@ int32 vfs_mkdir(struct inode* dir, struct dentry* dentry, fmode_t mode) {
  * Returns the superblock on success, ERR_PTR on failure
  * 正在优化的vfs_kern_mount函数
  */
-struct vfsmount* vfs_kern_mount(struct fstype* fstype, int32 flags, const char* device_path, void* data){
+struct vfsmount* vfs_kern_mount(struct fstype* fstype, int32 flags, const char* device_path, void* data) {
 	CHECK_PTR_VALID(fstype, ERR_PTR(-EINVAL));
 	dev_t dev_id = 0;
 	/***** 对于挂载实体设备的处理 *****/
-	if(device_path && *device_path){
+	if (device_path && *device_path) {
 		int32 ret = lookup_dev_id(device_path, &dev_id);
 		if (ret < 0) {
 			sprint("VFS: Failed to get device ID for %s\n", device_path);
@@ -141,42 +71,9 @@ struct vfsmount* vfs_kern_mount(struct fstype* fstype, int32 flags, const char* 
 	struct vfsmount* mount = superblock_acquireMount(sb, flags, device_path);
 	CHECK_PTR_VALID(mount, ERR_PTR(-ENOMEM));
 
-
-
-
 	return mount;
 }
 
-
-
-
-/**
- * vfs_rmdir - Remove a directory
- * @dir: Parent directory's inode
- * @dentry: Directory to remove
- *
- * Returns 0 on success or negative error code
- */
-int32 vfs_rmdir(struct inode* dir, struct dentry* dentry) {
-	int32 error;
-
-	if (!dir || !dentry || !dentry->d_inode)
-		return -EINVAL;
-
-	if (!dir->i_op || !dir->i_op->rmdir)
-		return -EPERM;
-
-	/* Check directory permissions */
-	error = inode_checkPermission(dir, MAY_WRITE | MAY_EXEC);
-	if (error)
-		return error;
-
-	/* Cannot remove non-empty directory */
-	if (!is_empty_dir(dentry->d_inode))
-		return -ENOTEMPTY;
-
-	return dir->i_op->rmdir(dir, dentry);
-}
 
 /**
  * vfs_link - Create a hard link
@@ -190,31 +87,24 @@ int32 vfs_rmdir(struct inode* dir, struct dentry* dentry) {
 int32 vfs_link(struct dentry* old_dentry, struct inode* dir, struct dentry* new_dentry, struct inode** new_inode) {
 	int32 error;
 
-	if (!old_dentry || !dir || !new_dentry)
-		return -EINVAL;
+	if (!old_dentry || !dir || !new_dentry) return -EINVAL;
 
-	if (!dir->i_op || !dir->i_op->link)
-		return -EPERM;
+	if (!dir->i_op || !dir->i_op->link) return -EPERM;
 
 	/* Check if target exists */
-	if (new_dentry->d_inode)
-		return -EEXIST;
+	if (new_dentry->d_inode) return -EEXIST;
 
 	/* Check permissions */
 	error = inode_checkPermission(dir, MAY_WRITE);
-	if (error)
-		return error;
+	if (error) return error;
 
 	error = dir->i_op->link(old_dentry, dir, new_dentry);
-	if (error)
-		return error;
+	if (error) return error;
 
-	if (new_inode)
-		*new_inode = new_dentry->d_inode;
+	if (new_inode) *new_inode = new_dentry->d_inode;
 
 	return 0;
 }
-
 
 /**
  * vfs_init - Initialize the VFS subsystem
@@ -223,116 +113,328 @@ int32 vfs_link(struct dentry* old_dentry, struct inode* dir, struct dentry* new_
  * Must be called early during kernel initialization before
  * any filesystem operations can be performed.
  */
-int32 vfs_init(void)
-{
-    int32 err;
-    init_mount_hash();
+int32 vfs_init(void) {
+	int32 err;
+	init_mount_hash();
 
-    /* Initialize the dcache subsystem */
-    sprint("VFS: Initializing dentry cache...\n");
-    err = init_dentry_hashtable();
-    if (err < 0) {
-        sprint("VFS: Failed to initialize dentry cache\n");
-        return err;
-    }
-    
-    /* Initialize the inode subsystem */
-    sprint("VFS: Initializing inode cache...\n");
-    err = inode_cache_init();
-		if (err < 0) {
-				sprint("VFS: Failed to initialize inode cache\n");
-				return err;
+	/* Initialize the dcache subsystem */
+	sprint("VFS: Initializing dentry cache...\n");
+	err = init_dentry_hashtable();
+	if (err < 0) {
+		sprint("VFS: Failed to initialize dentry cache\n");
+		return err;
+	}
+
+	/* Initialize the inode subsystem */
+	sprint("VFS: Initializing inode cache...\n");
+	err = inode_cache_init();
+	if (err < 0) {
+		sprint("VFS: Failed to initialize inode cache\n");
+		return err;
+	}
+
+	/* Register built-in filesystems */
+	sprint("VFS: Registering built-in filesystems...\n");
+	err = fstype_register_all();
+	if (err < 0) {
+		sprint("VFS: Failed to register filesystems\n");
+		return err;
+	}
+
+	sprint("VFS: Initialization complete\n");
+	return 0;
+}
+
+/**
+ * vfs_path_lookup - Look up a path relative to a dentry/mount pair
+ * @base_dentry: Starting dentry
+ * @base_mnt: Starting vfsmount
+ * @path_str: Path string to look up
+ * @flags: Lookup flags (LOOKUP_*)
+ * @result: Result path (output)
+ *
+ * This function resolves a path string to a dentry/vfsmount pair.
+ *
+ * Returns 0 on success, negative error code on failure.
+ */
+int32 vfs_path_lookup(struct dentry* base_dentry, struct vfsmount* base_mnt, const char* path_str, uint32 flags, struct path* result) {
+	struct dentry* dentry;
+	struct vfsmount* mnt;
+	char* component;
+	char* path_copy;
+	char* next_slash;
+	int32 len;
+
+	/* Validate parameters */
+	if (!base_dentry || !path_str || !result) return -EINVAL;
+
+	/* Initialize with starting point */
+	dentry = dentry_ref(base_dentry);
+	mnt = base_mnt ? mount_ref(base_mnt) : NULL;
+
+	/* Handle absolute paths - start from root */
+	if (path_str[0] == '/') {
+		/* Use filesystem root */
+		if (mnt) {
+			dentry_unref(dentry);
+			dentry = dentry_ref(mnt->mnt_root);
+		}
+		/* Skip leading slash */
+		path_str++;
+	}
+
+	/* Empty path means current directory */
+	if (!*path_str) {
+		result->dentry = dentry;
+		result->mnt = mnt;
+		return 0;
+	}
+
+	/* Make a copy of the path so we can modify it */
+	path_copy = kmalloc(strlen(path_str) + 1);
+	if (!path_copy) {
+		dentry_unref(dentry);
+		if (mnt) mount_unref(mnt);
+		return -ENOMEM;
+	}
+
+	strcpy(path_copy, path_str);
+	component = path_copy;
+
+	/* Walk the path component by component */
+	while (*component) {
+		/* Find the next slash or end of string */
+		next_slash = strchr(component, '/');
+		if (next_slash) {
+			*next_slash = '\0';
+			next_slash++;
+		} else {
+			next_slash = component + strlen(component);
 		}
 
+		len = strlen(component);
 
+		/* Handle "." - current directory */
+		if (len == 1 && component[0] == '.') {
+			component = next_slash;
+			continue;
+		}
 
-    /* Register built-in filesystems */
-    sprint("VFS: Registering built-in filesystems...\n");
-    err = fstype_register_all();
-    if (err < 0) {
-        sprint("VFS: Failed to register filesystems\n");
-        return err;
-    }
+		/* Handle ".." - parent directory */
+		if (len == 2 && component[0] == '.' && component[1] == '.') {
+			/* Check if we're at a mount point */
+			if (mnt && dentry == mnt->mnt_root) {
+				/* Go to the parent mount */
+				struct vfsmount* parent_mnt = mnt->mnt_path.mnt;
+				struct dentry* mountpoint = mnt->mnt_path.dentry;
 
+				if (parent_mnt && parent_mnt != mnt) {
+					/* Cross mount boundary upward */
+					dentry_unref(dentry);
+					mount_unref(mnt);
+
+					mnt = mount_ref(parent_mnt);
+					dentry = dentry_ref(mountpoint);
+
+					/* Now go to parent of the mountpoint */
+					struct dentry* parent = dentry->d_parent;
+					if (parent) {
+						dentry_unref(dentry);
+						dentry = dentry_ref(parent);
+					}
+				} else {
+					/* We're at the root of the root filesystem */
+					/* Stay at the root */
+				}
+			} else {
+				/* Regular parent dentry */
+				struct dentry* parent = dentry->d_parent;
+				if (parent) {
+					dentry_unref(dentry);
+					dentry = dentry_ref(parent);
+				}
+			}
+
+			component = next_slash;
+			continue;
+		}
+
+		/* Skip empty components */
+		if (len == 0) {
+			component = next_slash;
+			continue;
+		}
+
+		/* Create a dentry (from cache or allocate new) */
+		struct dentry* next = dentry_acquireRaw(dentry, component, -1, true, true);
+		if (IS_ERR(next) || !next) {
+			dentry_unref(dentry);
+			if (mnt) mount_unref(mnt);
+			kfree(path_copy);
+			return next ? PTR_ERR(next) : -ENOMEM;
+		}
+
+		/* If negative dentry, ask filesystem to look it up */
+		if (!next->d_inode && dentry->d_inode && dentry->d_inode->i_op && dentry->d_inode->i_op->lookup) {
+
+			/* Call filesystem lookup method */
+			struct dentry* found = dentry->d_inode->i_op->lookup(dentry->d_inode, next, 0);
+			if (IS_ERR(found)) {
+				dentry_unref(next);
+				dentry_unref(dentry);
+				if (mnt) mount_unref(mnt);
+				kfree(path_copy);
+				return PTR_ERR(found);
+			}
+
+			if (found && found->d_inode) {
+				/* Instantiate the dentry with the found inode */
+				dentry_instantiate(next, inode_ref(found->d_inode));
+				dentry_unref(found);
+			}
+		}
+
+		/* Release the parent dentry */
+		dentry_unref(dentry);
+		dentry = next;
+
+		/* Check if this is a mount point */
+		if (flags & LOOKUP_AUTOMOUNT && dentry_isMountpoint(dentry)) {
+			/* Find the mount for this mountpoint */
+			struct vfsmount* mounted = dentry_lookupMountpoint(dentry);
+			if (mounted) {
+				/* Cross mount point downward */
+				if (mnt) mount_unref(mnt);
+				mnt = mounted; /* already has incremented ref count */
+
+				/* Switch to the root of the mounted filesystem */
+				struct dentry* mnt_root = dentry_ref(mounted->mnt_root);
+				dentry_unref(dentry);
+				dentry = mnt_root;
+			}
+		}
+
+		// /* Handle symbolic links if needed */
+		// if (flags & LOOKUP_FOLLOW && dentry->d_inode && S_ISLNK(dentry->d_inode->i_mode)) {
+		// 	/* Implement symlink resolution */
+		// 	struct dentry* link_target = dentry_follow_link(dentry);
+		// 	if (IS_ERR(link_target)) {
+		// 		dentry_unref(dentry);
+		// 		if (mnt)
+		// 			mount_unref(mnt);
+		// 		kfree(path_copy);
+		// 		return PTR_ERR(link_target);
+		// 	}
+
+		// 	dentry_unref(dentry);
+		// 	dentry = link_target;
+		// }
+
+		/* Move to the next component */
+		component = next_slash;
+	}
+
+	/* Set the result */
+	result->dentry = dentry;
+	result->mnt = mnt;
+
+	kfree(path_copy);
+	return 0;
+}
+
+/**
+ * vfs_mkdir - Create a directory
+ * @parent: Parent directory dentry, or NULL to use absolute/relative paths
+ *          - If NULL and name starts with '/', uses global root (absolute)
+ *          - If NULL and name doesn't start with '/', uses current dir (relative)
+ * @name: Name of the new directory
+ * @mode: Directory permissions
+ *
+ * Returns: New directory dentry on success, ERR_PTR on failure
+ */
+struct dentry* vfs_mkdir(struct dentry* parent, const char* name, fmode_t mode) {
+	if (!name || !*name) return ERR_PTR(-EINVAL);
+	int32 pos = 0;
+	if (!parent) {
+		struct path parent_path;
+		pos = resolve_path_parent(name, &parent_path);
+		if (pos < 0) return ERR_PTR(pos); /* Error code */
+		parent = parent_path.dentry;
+		path_destroy(&parent_path);
+	}
+
+	/* Validate parent after potential NULL handling */
+	if (!parent) return ERR_PTR(-EINVAL);
+
+	/* Create the directory */
+	return dentry_mkdir(parent, &name[pos], mode);
+}
+
+/**
+ * vfs_mknod - Create a special file
+ * @parent: Parent directory dentry, or NULL to use absolute/relative paths
+ * @name: Name of the new node
+ * @mode: File mode including type (S_IFBLK, S_IFCHR, etc.)
+ * @dev: Device number for device nodes
+ *
+ * Creates a special file (device node, FIFO, socket). If parent is NULL,
+ * resolves the path to find the parent directory.
+ *
+ * Returns: New dentry on success, ERR_PTR on failure
+ */
+struct dentry* vfs_mknod(struct dentry* parent, const char* name, mode_t mode, dev_t dev) {
+    const char* filename = name;
+    int32 name_pos = 0;
     
-    sprint("VFS: Initialization complete\n");
-    return 0;
-}
-
-
-/**
- * hash_mountpoint - Hash a mountpoint
- */
-static uint32 hash_mountpoint(const void *key, uint32 size) {
-  const struct path *path = (const struct path *)key;
-  uint64 hash = (uint64)path->dentry;
-
-  hash = hash * 31 + (uint64)path->mnt;
-  return hash % size;
-}
-
-/**
- * mountpoint_equal - Compare two mountpoints
- */
-static int32 mountpoint_equal(const void *k1, const void *k2) {
-  const struct path *path1 = (const struct path *)k1;
-  const struct path *path2 = (const struct path *)k2;
-
-  return (path1->dentry == path2->dentry && path1->mnt == path2->mnt);
-}
-
-/**
- * init_mount_hash - Initialize the mount hash table
- */
-void init_mount_hash(void) {
-  hashtable_setup(&mount_hashtable, 256, 70, hash_mountpoint, mountpoint_equal);
-	INIT_LIST_HEAD(&mount_list);
-  spinlock_init(&mount_lock);
+    if (!name || !*name)
+        return ERR_PTR(-EINVAL);
+    
+    /* Handle NULL parent case by resolving the path */
+    if (!parent) {
+        struct path parent_path;
+        name_pos = resolve_path_parent(name, &parent_path);
+        if (name_pos < 0)
+            return ERR_PTR(name_pos); /* Error code */
+            
+        parent = parent_path.dentry;
+        filename = &name[name_pos];
+        
+        /* Create the special file */
+        struct dentry* result = dentry_mknod(parent, filename, mode, dev);
+        
+        /* Clean up */
+        path_destroy(&parent_path);
+        return result;
+    }
+    
+    /* If parent was provided directly, just create the node */
+    return dentry_mknod(parent, filename, mode, dev);
 }
 
 /**
- * lookup_mnt - Find a mount for a given path
+ * vfs_mknod_block - Create a block device node
+ * @path: Path where to create the node
+ * @mode: Access mode bits (permissions)
+ * @dev: Device ID
+ *
+ * Simplified helper to create block device nodes.
+ *
+ * Returns: 0 on success, negative error on failure
  */
-struct vfsmount *lookup_mnt(struct path *path) {
-  struct vfsmount *mnt = NULL;
+int32 vfs_mknod_block(const char* path, mode_t mode, dev_t dev) {
+	struct dentry* dentry;
+	int32 error = 0;
 
-  /* Look up in the mount hash table */
-  mnt = hashtable_lookup(&mount_hashtable, path);
-  return mnt;
-}
+	dentry = vfs_mknod(NULL, path, S_IFBLK | (mode & 0777), dev);
 
+	if (IS_ERR(dentry)) {
+		error = PTR_ERR(dentry);
+		/* Special case: if the node exists, don't treat as error */
+		if (error == -EEXIST) return 0;
+		return error;
+	}
 
-/**
- * get_mount - Increment mount reference count
- */
-struct vfsmount *get_mount(struct vfsmount *mnt) {
-  if (mnt) {
-    atomic_inc(&mnt->mnt_refcount);
-    return mnt;
-  }
-  return NULL;
-}
-
-/**
- * put_mount - Decrement mount reference count
- */
-void put_mount(struct vfsmount *mnt) {
-  if (!mnt)
-    return;
-
-  if (atomic_dec_and_test(&mnt->mnt_refcount)) {
-    /* Last reference - free the mount */
-    spinlock_lock(&mount_lock);
-    list_del(&mnt->mnt_node_global);
-    spinlock_unlock(&mount_lock);
-
-    spinlock_lock(&mnt->mnt_superblock->s_list_mounts_lock);
-    list_del(&mnt->mnt_node_superblock);
-    spinlock_unlock(&mnt->mnt_superblock->s_list_mounts_lock);
-
-    dentry_unref(mnt->mnt_root);
-    if (mnt->mnt_devname)
-      kfree(mnt->mnt_devname);
-    kfree(mnt);
-  }
+	/* Release dentry reference */
+	dentry_unref(dentry);
+	return 0;
 }

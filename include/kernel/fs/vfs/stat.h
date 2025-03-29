@@ -1,7 +1,7 @@
 #ifndef _STAT_H
 #define _STAT_H
 
-#include <kernel/types.h>
+#include "forward_declarations.h"
 #include <kernel/fs/vfs/path.h>
 
 
