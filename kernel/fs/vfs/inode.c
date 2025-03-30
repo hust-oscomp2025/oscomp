@@ -10,7 +10,7 @@ static struct inode* __inode_lookupHash(struct superblock* sb, uint64 ino);
 
 static void __inode__free(struct inode* inode);
 static void* __inode_get_key(struct list_node* node);
-static uint32 __inode_hash_func(const void* key, uint32 size);
+static uint32 __inode_hash_func(const void* key);
 static int32 __inode_key_equals(const void* k1, const void* k2);
 static void __inode_hash(struct inode* inode);
 static void __inode_unhash(struct inode* inode);
@@ -91,23 +91,23 @@ int32 inode_cache_init(void) {
  *
  * Returns 0 if access is allowed, negative error code otherwise.
  */
-// int32 inode_checkPermission(struct inode* inode, int32 mask) {
-// 	int32 retval;
+int32 inode_checkPermission(struct inode* inode, int32 mask) {
+	int32 retval;
 
-// 	if (!inode) return -EINVAL;
+	if (!inode) return -EINVAL;
 
-// 	/* Always grant access to special inodes like device files */
-// 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode)) return 0;
+	/* Always grant access to special inodes like device files */
+	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode)) return 0;
 
-// 	/* Use the fs-specific permission function if available */
-// 	if (inode->i_op && inode->i_op->permission) {
-// 		retval = inode->i_op->permission(inode, mask);
-// 		if (retval != -EAGAIN) return retval;
-// 	}
+	/* Use the fs-specific permission function if available */
+	if (inode->i_op && inode->i_op->permission) {
+		retval = inode->i_op->permission(inode, mask);
+		if (retval != -EAGAIN) return retval;
+	}
 
-// 	/* Fall back to generic permission checking */
-// 	return generic_permission(inode, mask);
-// }
+	/* Fall back to generic permission checking */
+	return generic_permission(inode, mask);
+}
 
 /**
  * inode_acquire - Get a fully initialized inode
@@ -299,7 +299,7 @@ static struct inode* __inode_lookupHash(struct superblock* sb, uint64 ino) {
  * Hash function for inode keys
  * Uses both superblock pointer and inode number to generate a hash
  */
-static uint32 __inode_hash_func(const void* key, uint32 size) {
+static uint32 __inode_hash_func(const void* key) {
 	const struct inode_key* ikey = key;
 
 	/* Combine superblock pointer and inode number */
@@ -663,4 +663,46 @@ int32 inode_rmdir(struct inode* dir, struct dentry* dentry) {
 	if (!dentry_isEmptyDir(dentry)) return -ENOTEMPTY;
 
 	return dir->i_op->rmdir(dir, dentry);
+}
+
+
+/**
+ * generic_permission - Check for access rights on a Unix-style file system
+ * @inode: inode to check permissions on
+ * @mask: access mode to check for (MAY_READ, MAY_WRITE, MAY_EXEC)
+ *
+ * Standard Unix permission checking implementation that most filesystems
+ * can use directly or as a basis for their permission checking.
+ *
+ * Returns 0 if access is allowed, -EACCES otherwise.
+ */
+static int32 generic_permission(struct inode* inode, int32 mask) {
+    int32 mode = inode->i_mode;
+    int32 res = 0;
+    
+    /* Root can do anything */
+    if (current_task()->euid == 0) 
+        return 0;
+        
+    /* Nobody gets write access to a read-only filesystem */
+    if ((mask & MAY_WRITE) && inode_isReadonly(inode)) 
+        return -EROFS;
+        
+    /* Check if file is accessible by the user */
+    if (current_task()->euid == inode->i_uid) {
+        mode >>= 6; /* Use the user permissions */
+    } else if (current_group_matches(inode->i_gid)) {
+        mode >>= 3; /* Use the group permissions */
+    }
+    /* Otherwise we're already at "other" permissions */
+    
+    /* Check if the mask is allowed in the mode */
+    if ((mask & MAY_READ) && !(mode & 4))  /* 4 = read bit */
+        res = -EACCES;
+    if ((mask & MAY_WRITE) && !(mode & 2)) /* 2 = write bit */
+        res = -EACCES;
+    if ((mask & MAY_EXEC) && !(mode & 1))  /* 1 = execute bit */
+        res = -EACCES;
+        
+    return res;
 }

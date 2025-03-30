@@ -4,13 +4,13 @@
 #include <kernel/mmu.h>
 
 /* Global mount list */
-static struct list_head mount_list;
-static spinlock_t mount_lock;
+struct list_head mount_list;
+spinlock_t mount_lock;
 
 /* Mount point hash table */
 static struct hashtable mount_hashtable;
 /* Forward declarations */
-static uint32 mount_hash_func(const void* key, uint32 size);
+static uint32 mount_hash_func(const void* key);
 static void* mount_get_key(struct list_head* node);
 static int32 mount_key_equals(const void* key1, const void* key2);
 
@@ -91,8 +91,7 @@ out_path:
  *
  * Returns a hash value for the path
  */
-static uint32 mount_hash_func(const void* key, uint32 size) {
-	size;
+static uint32 mount_hash_func(const void* key) {
 	const struct path* path = (const struct path*)key;
 	uint64 hash;
 

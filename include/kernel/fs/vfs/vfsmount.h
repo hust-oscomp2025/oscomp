@@ -54,4 +54,8 @@ struct vfsmount* lookup_vfsmount(struct dentry* dentry);
 /* Mount traversal */
 int32 iterate_mounts(int32 (*f)(struct vfsmount*, void*), void* arg, struct vfsmount* root);
 
+
+extern struct list_head mount_list;
+extern spinlock_t mount_lock;
+
 #endif

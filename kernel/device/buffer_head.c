@@ -22,7 +22,7 @@ struct buffer_key {
 };
 
 // 哈希函数 - 为 buffer_key 生成哈希值
-static uint32 buffer_hash_func(const void* key, uint32 size) {
+static uint32 buffer_hash_func(const void* key) {
 	const struct buffer_key* bkey = (const struct buffer_key*)key;
 	// 组合设备指针、块号和大小以生成哈希值
 	uint32 hash = (uint32)(uintptr_t)bkey->bdev;

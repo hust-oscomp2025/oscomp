@@ -10,7 +10,7 @@
 static struct hashtable dentry_hashtable;
 
 static void* __dentry_get_key(struct list_head* node);
-static uint32 __dentry_hashfunction(const void* key, uint32 size);
+static uint32 __dentry_hashfunction(const void* key);
 static inline int32 __dentry_hash(struct dentry* dentry);
 static int32 __dentry_key_equals(const void* k1, const void* k2);
 static struct dentry* __dentry_alloc(struct dentry* parent, const struct qstr* name);
@@ -324,7 +324,7 @@ static void* __dentry_get_key(struct list_head* node) {
 /**
  * 计算dentry复合键的哈希值
  */
-static uint32 __dentry_hashfunction(const void* key, uint32 size) {
+static uint32 __dentry_hashfunction(const void* key) {
 	const struct dentry_key* dkey = (const struct dentry_key*)key;
 	uint32 hash;
 

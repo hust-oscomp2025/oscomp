@@ -215,30 +215,30 @@ void radix_tree_init(struct radixTreeRoot *root)
     root->node = NULL;
 }
 
-/* Insert an item into the radix tree */
 int32 radix_tree_insert(struct radixTreeRoot *root, uint64 index, void *item)
 {
-    void **slot;
+    void **slot_ptr;
     int32 result;
     
     /* Cannot insert NULL items */
     if (!item)
         return -EINVAL;
     
-    /* Create a path to the insertion point */
-    result = radix_tree_create_path(root, index, &slot);
+    /* Create a path to the insertion point - with proper casting */
+    result = radix_tree_create_path(root, index, (void**)&slot_ptr);
     if (result < 0)
         return result;
     
     /* Check if the slot is already occupied */
-    if (*slot)
+    if (*slot_ptr)
         return -EEXIST;
     
     /* Store the item */
-    *slot = item;
+    *slot_ptr = item;
     
     return 0;
 }
+
 
 /* Look up an item in the radix tree */
 void *radix_tree_lookup(struct radixTreeRoot *root, uint64 index)

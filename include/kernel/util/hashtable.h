@@ -38,7 +38,7 @@ struct hashtable {
  *
  * 返回: 成功返回0，失败返回负错误码
  */
-int32 hashtable_setup(struct hashtable* ht, uint32 initial_size, uint32 max_load, uint32 (*hash_func)(const void* key, uint32 size), void* (*get_key)(struct list_head* node),
+int32 hashtable_setup(struct hashtable* ht, uint32 initial_size, uint32 max_load, uint32 (*hash_func)(const void* key), void* (*get_key)(struct list_head* node),
                    int32 (*key_equals)(const void* key1, const void* key2));
 
 /**

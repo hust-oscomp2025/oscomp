@@ -27,8 +27,8 @@ static void handle_syscall(struct trapframe *tf) {
   tf->epc += 4;
 
 
-  tf->regs.a0 = do_syscall(tf->regs.a0, tf->regs.a1, tf->regs.a2, tf->regs.a3,
-                           tf->regs.a4, tf->regs.a5, tf->regs.a6, tf->regs.a7);
+  tf->regs.a0 = do_syscall(tf->regs.a7, tf->regs.a0, tf->regs.a1, tf->regs.a2, tf->regs.a3,
+                           tf->regs.a4, tf->regs.a5);
 }
 
 //

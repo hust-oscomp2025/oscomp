@@ -1,4 +1,4 @@
-#include <mm/memlayout.h>
+#include <kernel/mm/memlayout.h>
 
 	# qemu -kernel loads the kernel at 0x80000000
         # and causes each hart (i.e. CPU) to jump there.
@@ -21,7 +21,7 @@ _entry:
         mul t0, t0, t1
         add sp, sp, t0
 
-        # jump to start() in start.c
+        # jump to s_start() in start.c
         # pass a0 as hartid
         call s_start
 spin:

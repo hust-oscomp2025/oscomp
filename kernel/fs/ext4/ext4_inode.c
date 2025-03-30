@@ -8,9 +8,7 @@
 
 
 
-/* Forward declarations for file and dir operations */
-extern const struct file_operations ext4_file_operations;
-extern const struct file_operations ext4_dir_operations;
+
 
 int32 __ext4_flush_dirty_inode(struct ext4_inode_ref *inode_ref);
 int32 ext4_sync_inode(struct ext4_inode_ref *inode_ref);

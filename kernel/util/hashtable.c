@@ -6,7 +6,7 @@
 /**
  * 初始化预先静态分配的哈希表
  */
-int32 hashtable_setup(struct hashtable* ht, uint32 initial_size, uint32 max_load, uint32 (*hash_func)(const void* key, uint32 size), void* (*get_key)(struct list_head* node),
+int32 hashtable_setup(struct hashtable* ht, uint32 initial_size, uint32 max_load, uint32 (*hash_func)(const void* key), void* (*get_key)(struct list_head* node),
                    int32 (*key_equals)(const void* key1, const void* key2)) {
 	uint32 i;
 

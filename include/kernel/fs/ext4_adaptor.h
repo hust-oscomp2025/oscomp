@@ -49,6 +49,11 @@ int32 ext4_fs_sync(struct ext4_fs* fs);
 struct ext4_blockdev* ext4_blockdev_create_adapter(struct block_device* kernel_bdev);
 void ext4_blockdev_free_adapter(struct ext4_blockdev* e_blockdevice);
 
+
+/* Forward declarations for file and dir operations */
+extern const struct file_operations ext4_file_operations;
+extern const struct file_operations ext4_dir_operations;
+
 // int32 ext4_fs_flush_journal(struct ext4_fs *fs);
 
 #endif
