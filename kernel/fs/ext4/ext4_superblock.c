@@ -204,8 +204,8 @@ int32 ext4_fill_super(struct superblock* sb, void* data, int32 silent) {
 // 	int32 ret;
 
 // 	/* Create a new superblock */
-// 	sb = fstype_acquireSuperblock(fs_type, NULL, ext4_fill_super, flags, data);
-// 	if (IS_ERR(sb)) return sb;
+// 	sb = fstype_mount(fs_type, NULL, ext4_fill_super, flags, data);
+// 	if (PTR_IS_ERROR(sb)) return sb;
 
 // 	/* Set the device name */
 // 	if (dev_name && *dev_name) sb->s_dev_name = kstrdup(dev_name, 0);

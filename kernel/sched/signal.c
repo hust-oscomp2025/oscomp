@@ -1,8 +1,8 @@
-#include <kernel/sched/signal.h>
-#include <kernel/sched/process.h>
+#include <kernel/sched.h>
 #include <kernel/types.h>
-#include <kernel/util/string.h>
+#include <kernel/util.h>
 #include <kernel/sprint.h>
+#include <kernel/mmu.h>
 
 /* Global variable to track the signal that caused an interrupt */
 int32 g_signal_pending = 0;
@@ -51,7 +51,7 @@ int32 sigaddset(sigset_t *set, int32 signo)
     if (!set || signo <= 0 || signo >= NSIG)
         return -EINVAL;
         
-    set->sig[(signo - 1) / (8 * sizeof(uint64))] |= 
+    set->__val[(signo - 1) / (8 * sizeof(uint64))] |= 
         1UL << ((signo - 1) % (8 * sizeof(uint64)));
     return 0;
 }
@@ -68,7 +68,7 @@ int32 sigdelset(sigset_t *set, int32 signo)
     if (!set || signo <= 0 || signo >= NSIG)
         return -EINVAL;
         
-    set->sig[(signo - 1) / (8 * sizeof(uint64))] &= 
+    set->__val[(signo - 1) / (8 * sizeof(uint64))] &= 
         ~(1UL << ((signo - 1) % (8 * sizeof(uint64))));
     return 0;
 }
@@ -85,7 +85,7 @@ int32 sigismember(const sigset_t *set, int32 signo)
     if (!set || signo <= 0 || signo >= NSIG)
         return -EINVAL;
         
-    return !!(set->sig[(signo - 1) / (8 * sizeof(uint64))] & 
+    return !!(set->__val[(signo - 1) / (8 * sizeof(uint64))] & 
         (1UL << ((signo - 1) % (8 * sizeof(uint64)))));
 }
 
@@ -105,7 +105,7 @@ int32 do_send_signal(pid_t pid, int32 sig)
 
     // Special case: pid 0 means current process
     if (pid == 0) {
-        p = current_process();
+        p = current_task();
         if (!p)
             return -ESRCH;
     } else {
@@ -155,7 +155,7 @@ int32 do_send_signal(pid_t pid, int32 sig)
  */
 int32 do_sigaction(int32 sig, const struct sigaction *act, struct sigaction *oldact)
 {
-    struct task_struct *p = current_process();
+    struct task_struct *p = current_task();
     
     if (!p)
         return -ESRCH;
@@ -188,7 +188,7 @@ int32 do_sigaction(int32 sig, const struct sigaction *act, struct sigaction *old
  */
 int32 do_sigprocmask(int32 how, const sigset_t *set, sigset_t *oldset)
 {
-    struct task_struct *p = current_process();
+    struct task_struct *p = current_task();
     sigset_t new_blocked;
     
     if (!p)
@@ -207,15 +207,15 @@ int32 do_sigprocmask(int32 how, const sigset_t *set, sigset_t *oldset)
         case SIG_BLOCK:
             // Block signals in set
             new_blocked = p->blocked;
-            for (int32 i = 0; i < _NSIG_WORDS; i++)
-                new_blocked.sig[i] |= set->sig[i];
+            for (int32 i = 0; i < _SIGSET_NWORDS; i++)
+                new_blocked.__val[i] |= set->__val[i];
             break;
             
         case SIG_UNBLOCK:
             // Unblock signals in set
             new_blocked = p->blocked;
-            for (int32 i = 0; i < _NSIG_WORDS; i++)
-                new_blocked.sig[i] &= ~set->sig[i];
+            for (int32 i = 0; i < _SIGSET_NWORDS; i++)
+                new_blocked.__val[i] &= ~set->__val[i];
             break;
             
         case SIG_SETMASK:
@@ -275,7 +275,7 @@ int32 do_kill(pid_t pid, int32 sig)
  */
 void do_signal_delivery(void)
 {
-    struct task_struct *p = current_process();
+    struct task_struct *p = current_task();
     int32 sig;
     
     if (!p)
@@ -349,7 +349,7 @@ void do_signal_delivery(void)
  */
 int32 do_sigsuspend(const sigset_t *mask)
 {
-    struct task_struct *p = current_process();
+    struct task_struct *p = current_task();
     sigset_t old_blocked;
     
     if (!p || !mask)

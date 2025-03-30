@@ -40,16 +40,16 @@ struct fdtable {
 	struct file** fd_array; /* Array of file pointers */
 	uint32* fd_flags; /* Array of fd flags */
 
-	uint32 fdt_size;   /* Size of the array */
+	uint32 max_fds;   /* Size of the array */
 	uint32 fdt_nextfd; /* Next free fd number */
 	spinlock_t fdt_lock;     /* Lock for the struct */
 	atomic_t fdt_refcount;   /* Reference count */
 };
 
 /* Process-level file table management */
-struct fdtable* fdtable_get(struct fdtable*);  // thread
+struct fdtable* fdtable_acquire(struct fdtable*);  // thread
 struct fdtable* fdtable_copy(struct fdtable*); // fork
-int32 fdtable_put(struct fdtable* fdt);
+int32 fdtable_unref(struct fdtable* fdt);
 
 int32 fdtable_allocFd(struct fdtable* fdt, uint32 flags);
 void fdtable_closeFd(struct fdtable* fdt, uint64 fd);
@@ -136,5 +136,19 @@ int32 do_epoll_ctl(struct fdtable *fdt, int32 epfd, int32 op, int32 fd,
  */
 int32 do_epoll_wait(struct fdtable *fdt, int32 epfd,
                  struct epoll_event *events, int32 maxevents, int32 timeout);
+
+/* File descriptor flags - using high bits to avoid conflicts with fcntl.h flags */
+
+/* Internal allocation state flags - use high bits (bits 24-31) */
+#define FD_ALLOCATED    (1U << 24)  /* File descriptor number is allocated (even if file ptr is NULL) */
+#define FD_RESERVED     (1U << 25)  /* Reserved for future allocation */
+
+/* Internal state and tracking flags - also using high bits */
+#define FD_INTERNAL_ASYNC     (1U << 26)  /* Internal async notification tracking */
+#define FD_INTERNAL_CACHE     (1U << 27)  /* Internal cache state tracking */
+#define FD_INTERNAL_CLONING   (1U << 28)  /* Being cloned during fork operation */
+
+
+
 
 #endif /* _FDTABLE_H */

@@ -1,7 +1,7 @@
-#include <kernel/mm/mm_struct.h>
-#include <kernel/sched/sched.h>
-#include <kernel/sched/process.h>
+#include <kernel/mmu.h>
+#include <kernel/sched.h>
 #include <kernel/types.h>
+#include <kernel/util.h>
 
 
 /**
@@ -191,8 +191,10 @@ uint64 clear_user(void __user *to, uint64 n)
 int32 access_ok(const void __user *addr, uint64 size)
 {
     struct task_struct *current = current_task();
-    if (!current || !current->mm)
-        return 0;
+    if (!current || !current->mm){
+        return 1;
+	}
+	
 	return 0;
     // // 简单的边界检查，实际实现应该更完善
     // uint64 uaddr = (uint64)addr;

@@ -261,7 +261,7 @@ struct inode* superblock_createInode(struct superblock* sb) {
 
 	/* Initialize the inode */
 	memset(inode, 0, sizeof(struct inode));
-	atomic_set(&inode->i_count, 0);
+	atomic_set(&inode->i_refcount, 0);
 	INIT_LIST_HEAD(&inode->i_dentryList);
 	INIT_LIST_HEAD(&inode->i_s_list_node);
 	INIT_LIST_HEAD(&inode->i_state_list_node);

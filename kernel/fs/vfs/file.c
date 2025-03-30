@@ -17,9 +17,9 @@ static struct file* __file_alloc(struct dentry* dentry, fmode_t mode);
 static struct file* __file_open(struct dentry* dentry, struct vfsmount* mnt, int32 flags, fmode_t mode);
 static int32 __file_free(struct file* filp);
 
-struct file* file_get(struct file* file) {
+struct file* file_ref(struct file* file) {
 	if (!file) return NULL;
-	if (atomic_read(&file->f_refcount) <= 0) { panic("file_get: f_refcount is already 0\n"); }
+	if (atomic_read(&file->f_refcount) <= 0) { panic("file_ref: f_refcount is already 0\n"); }
 	/* Increment reference count */
 	atomic_inc(&file->f_refcount);
 	return file;
@@ -146,7 +146,7 @@ static struct file* __file_open(struct dentry* dentry, struct vfsmount* mnt, int
 
 	/* Allocate and initialize file structure using our new function */
 	file = __file_alloc(dentry, file_mode);
-	if (IS_ERR(file)) return file;
+	if (PTR_IS_ERROR(file)) return file;
 
 	/*initialization */
 	atomic_set(&file->f_refcount, 1);
@@ -245,7 +245,7 @@ int32 file_allowWrite(struct file* file) {
 }
 
 /**
- * file_put - Decrease reference count on a file
+ * file_unref - Decrease reference count on a file
  * @file: File pointer
  * @owner: Task that owns the file descriptor (can be NULL)
  *
@@ -253,7 +253,7 @@ int32 file_allowWrite(struct file* file) {
  * it if the count reaches zero, passing owner information
  * for proper cleanup.
  */
-int32 file_put(struct file* file) {
+int32 file_unref(struct file* file) {
 	CHECK_PTR_VALID(file, -EINVAL);
 
 	if (atomic_dec_and_test(&file->f_refcount)) {
@@ -525,4 +525,27 @@ ssize_t file_writev(struct file* file, const struct io_vector* vec, uint64 vlen,
 	}
 
 	return ret;
+}
+
+
+/**
+ * file_close - Close a file by file pointer
+ * @file: File to close
+ *
+ * Decreases the reference count of the file and frees resources
+ * when the count reaches zero.
+ *
+ * Returns: 0 on success, negative error code on failure
+ */
+int32 file_close(struct file* file) {
+    if (!file)
+        return -EINVAL;
+    
+    // For logging/debugging
+    if (file->f_path.dentry && file->f_path.dentry->d_name->name) {
+        // sprint("Closing file: %s\n", file->f_path.dentry->d_name.name);
+    }
+    
+    // Just delegate to file_unref which handles reference counting
+    return file_unref(file);
 }

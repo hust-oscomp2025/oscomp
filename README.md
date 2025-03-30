@@ -30,7 +30,9 @@
 - [ ] 在generic_shutdown_super中做inode_free
 - [ ] 在vfs_mkdir中，考虑current_task->umask
 - [ ] 制作并加载initramfs
-- [ ] 在superblock中处理ino = 0的acquire请求
+- [x] 在superblock中处理ino = 0的acquire请求
+- [ ] 补充kernel/console
+- [ ] 重写进程信号量和进程信号函数
 
 
 

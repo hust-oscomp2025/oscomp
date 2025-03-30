@@ -65,7 +65,7 @@ struct vfsmount* vfs_kern_mount(struct fstype* fstype, int32 flags, const char* 
 			return ERR_PTR(ret);
 		}
 	}
-	struct superblock* sb = fstype_acquireSuperblock(fstype, dev_id, data);
+	struct superblock* sb = fstype_mount(fstype,flags, dev_id, data);
 	CHECK_PTR_VALID(sb, ERR_PTR(-ENOMEM));
 
 	struct vfsmount* mount = superblock_acquireMount(sb, flags, device_path);
@@ -267,7 +267,7 @@ int32 vfs_path_lookup(struct dentry* base_dentry, struct vfsmount* base_mnt, con
 
 		/* Create a dentry (from cache or allocate new) */
 		struct dentry* next = dentry_acquireRaw(dentry, component, -1, true, true);
-		if (IS_ERR(next) || !next) {
+		if (PTR_IS_ERROR(next) || !next) {
 			dentry_unref(dentry);
 			if (mnt) mount_unref(mnt);
 			kfree(path_copy);
@@ -279,7 +279,7 @@ int32 vfs_path_lookup(struct dentry* base_dentry, struct vfsmount* base_mnt, con
 
 			/* Call filesystem lookup method */
 			struct dentry* found = dentry->d_inode->i_op->lookup(dentry->d_inode, next, 0);
-			if (IS_ERR(found)) {
+			if (PTR_IS_ERROR(found)) {
 				dentry_unref(next);
 				dentry_unref(dentry);
 				if (mnt) mount_unref(mnt);
@@ -318,7 +318,7 @@ int32 vfs_path_lookup(struct dentry* base_dentry, struct vfsmount* base_mnt, con
 		// if (flags & LOOKUP_FOLLOW && dentry->d_inode && S_ISLNK(dentry->d_inode->i_mode)) {
 		// 	/* Implement symlink resolution */
 		// 	struct dentry* link_target = dentry_follow_link(dentry);
-		// 	if (IS_ERR(link_target)) {
+		// 	if (PTR_IS_ERROR(link_target)) {
 		// 		dentry_unref(dentry);
 		// 		if (mnt)
 		// 			mount_unref(mnt);
@@ -427,7 +427,7 @@ int32 vfs_mknod_block(const char* path, mode_t mode, dev_t dev) {
 
 	dentry = vfs_mknod(NULL, path, S_IFBLK | (mode & 0777), dev);
 
-	if (IS_ERR(dentry)) {
+	if (PTR_IS_ERROR(dentry)) {
 		error = PTR_ERR(dentry);
 		/* Special case: if the node exists, don't treat as error */
 		if (error == -EEXIST) return 0;

@@ -1,6 +1,4 @@
 /*copyright: 2023 farmos*/
-#include <kernel/syscall/syscall_ids.h>
-#include <kernel/syscall/syscall_fs.h>
 #include <kernel/syscall/syscall.h>
 
 

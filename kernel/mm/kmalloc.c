@@ -282,7 +282,7 @@ char *kstrndup(const char *s, size_t max, uint32 gfp)
     if (!s)
         return NULL;
     
-    len = strnlen(s, max);
+    len = strlen(s);
     buf = kmalloc(len + 1);
     if (buf) {
         memcpy(buf, s, len);

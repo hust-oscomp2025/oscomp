@@ -38,7 +38,7 @@ int32 create_device_nodes(void) {
 
 	/* Create /dev directory if it doesn't exist */
 	dev_dir = vfs_mkdir(NULL, "/dev", 0755);
-	if (IS_ERR(dev_dir)) {
+	if (PTR_IS_ERROR(dev_dir)) {
 		sprint("Failed to create /dev directory: %d\n", PTR_ERR(dev_dir));
 		return PTR_ERR(dev_dir);
 	}

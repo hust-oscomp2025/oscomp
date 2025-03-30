@@ -4,6 +4,7 @@
 #include <kernel/sched/process.h>
 
 void load_elf_from_file(struct task_struct *p, char* filename);
+int32 load_init_binary(struct task_struct *init_task, const char *path);
 
 // elf header structure
 typedef struct elf_header_t {

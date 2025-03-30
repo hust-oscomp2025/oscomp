@@ -10,17 +10,11 @@
 #include <kernel/config.h>
 #include <kernel/elf.h>
 
-#include <kernel/mm/kmalloc.h>
-#include <kernel/mm/mm_struct.h>
-#include <kernel/mm/mmap.h>
-#include <kernel/mm/vma.h>
-
+#include <kernel/mmu.h>
 #include <kernel/riscv.h>
-#include <kernel/sched/pid.h>
-#include <kernel/sched/process.h>
-#include <kernel/sched/sched.h>
-#include <kernel/semaphore.h>
+#include <kernel/sched.h>
 #include <kernel/strap.h>
+#include <kernel/vfs.h>
 
 #include <kernel/sprint.h>
 #include <kernel/util/string.h>
@@ -44,7 +38,8 @@ struct task_struct* alloc_process() {
 	ps->trapframe = (struct trapframe*)kmalloc(sizeof(struct trapframe));
 	ps->ktrapframe = NULL;
 	ps->mm = user_alloc_mm();
-	ps->fdtable = alloc_pfm();
+	ps->fs = fs_struct_create();
+	ps->fdtable = fdtable_acquire(NULL);
 	// ps->active_mm =ps->mm;
 	// 分配内核栈
 	ps->pid = pid_alloc();
@@ -99,7 +94,7 @@ ssize_t do_wait(int32 pid) {
 				}
 			}
 			// sprint("current->sem_index = %d\n",current->sem_index);
-			sem_P(CURRENT->sem_index);
+			//sem_P(CURRENT->sem_index);
 			// sprint("wait:return from blocking!\n");
 		}
 	}
@@ -113,7 +108,7 @@ ssize_t do_wait(int32 pid) {
 			free_process(p);
 			return pid;
 		} else {
-			sem_P(p->sem_index);
+			//sem_P(p->sem_index);
 			// sprint("return from blocking!\n");
 
 			return pid;

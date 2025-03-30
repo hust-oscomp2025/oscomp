@@ -14,7 +14,9 @@
 #include <kernel/fs/vfs/path.h>
 #include <kernel/fs/vfs/superblock.h>
 #include <kernel/fs/vfs/vfsmount.h>
-#include <kernel/sched/fdtable.h>
+#include <kernel/fs/vfs/fdtable.h>
+#include <kernel/fs/vfs/fs_struct.h>
+
 
 #include <kernel/types.h>
 #include <kernel/util/list.h>
@@ -76,6 +78,9 @@ struct nameidata {
 /* Initialization functions */
 int32 vfs_init(void);
 
+
+#define vfs_open file_open
+#define vfs_close file_close
 #define vfs_read file_read
 #define vfs_write file_write
 #define vfs_llseek file_llseek

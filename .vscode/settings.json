@@ -59,7 +59,8 @@
 		"atomic.h": "c",
 		"spike_file.h": "c",
 		"util.h": "c",
-		"sprint.h": "c"
+		"sprint.h": "c",
+		"mmu.h": "c"
 	},
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyFunction": true,
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyType": true,

@@ -19,5 +19,20 @@ struct task_struct *alloc_empty_process();
 void switch_to(struct task_struct*);
 
 void schedule();
+struct task_struct *find_process_by_pid(pid_t pid);
+
+/**
+ * set_current_task - Explicitly set the current task for the calling CPU
+ * @task: Task to set as current
+ * 
+ * Sets the specified task as the current task for the CPU core
+ * that called this function. This is primarily used during
+ * initialization or special operations like setting up the init task.
+ */
+static inline void set_current_task(struct task_struct* task) {
+    int32 hartid = read_tp();
+    current_percpu[hartid] = task;
+}
+
 
 #endif

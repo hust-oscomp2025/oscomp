@@ -1683,7 +1683,7 @@ static int32 ext4_vfs_atomic_open(struct inode *inode, struct dentry *dentry,
     int32 ret;
     struct inode *found_inode = ext4_vfs_lookup(inode, dentry, 0);
     
-    if (IS_ERR(found_inode))
+    if (PTR_IS_ERROR(found_inode))
         return PTR_ERR(found_inode);
     
     if (!found_inode && (open_flag & O_CREAT)) {

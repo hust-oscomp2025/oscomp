@@ -36,28 +36,28 @@ static struct kmem_cache slab_caches[SLAB_SIZES_COUNT];
 /**
  * @brief Set a bit in bitmap
  */
-static inline void set_bit(unsigned char *bitmap, uint32 idx) {
+static inline void bitmap_setbit(unsigned char *bitmap, uint32 idx) {
   bitmap[idx / 8] |= (1 << (idx % 8));
 }
 
 /**
  * @brief Clear a bit in bitmap
  */
-static inline void clear_bit(unsigned char *bitmap, uint32 idx) {
+static inline void bitmap_clearbit(unsigned char *bitmap, uint32 idx) {
   bitmap[idx / 8] &= ~(1 << (idx % 8));
 }
 
 /**
  * @brief Test a bit in bitmap
  */
-static inline int32 test_bit(unsigned char *bitmap, uint32 idx) {
+static inline int32 bitmap_testbit(unsigned char *bitmap, uint32 idx) {
   return (bitmap[idx / 8] >> (idx % 8)) & 1;
 }
 
 /**
  * @brief Find first zero bit in bitmap
  */
-static int32 find_first_zero(unsigned char *bitmap, uint32 size) {
+static int32 bitmap_firstzero(unsigned char *bitmap, uint32 size) {
   for (uint32 i = 0; i < (size + 7) / 8; i++) {
     for (uint32 j = 0; j < 8; j++) {
       if (!(bitmap[i] & (1 << j)) && (i * 8 + j < size)) {
@@ -148,14 +148,14 @@ static void *slab_alloc_obj(struct kmem_cache *cache) {
       list_entry(cache->slabs_partial.next, struct slab_header, list);
 
   // Find first free object
-  int32 idx = find_first_zero(slab->bitmap, slab->total_count);
+  int32 idx = bitmap_firstzero(slab->bitmap, slab->total_count);
   if (idx < 0) {
     // This shouldn't happen, as partial slabs should have free objects
     panic("slab_alloc_obj: no free object in partial slab\n");
   }
 
   // Mark as used
-  set_bit(slab->bitmap, idx);
+  bitmap_setbit(slab->bitmap, idx);
   slab->free_count--;
   cache->free_objects--;
 
@@ -188,12 +188,12 @@ static void slab_free_obj(struct kmem_cache *cache, struct slab_header *slab,
   }
 
   // Check if object is already free
-  if (!test_bit(slab->bitmap, idx)) {
+  if (!bitmap_testbit(slab->bitmap, idx)) {
     panic("slab_free_obj: double free detected\n");
   }
 
   // Mark as free
-  clear_bit(slab->bitmap, idx);
+  bitmap_clearbit(slab->bitmap, idx);
   slab->free_count++;
   cache->free_objects++;
 

@@ -157,7 +157,7 @@ struct inode* inode_acquire(struct superblock* sb, uint64 ino) {
 struct inode* inode_ref(struct inode* inode) {
 	if (!inode || inode_isBad(inode)) return NULL;
 
-	atomic_inc(&inode->i_count);
+	atomic_inc(&inode->i_refcount);
 	return inode;
 }
 
@@ -174,7 +174,7 @@ void inode_unref(struct inode* inode) {
 	struct superblock* sb = inode->i_superblock;
 	spinlock_lock(&inode->i_lock);
 	/* Decrease reference count */
-	if (atomic_dec_and_test(&inode->i_count)) {
+	if (atomic_dec_and_test(&inode->i_refcount)) {
 		/* Last reference gone - add to superblock's LRU */
 		if (!(inode->i_state & I_DIRTY)) {
 			/* If it's on another state list, remove it first */
@@ -525,7 +525,7 @@ int32 inode_mknod(struct inode* dir, struct dentry* dentry, mode_t mode, dev_t d
 
 	/* Default implementation for simple filesystems like ramfs */
 	struct inode* inode = inode_acquire(dir->i_superblock, 0);
-	if (IS_ERR(inode)) return PTR_ERR(inode);
+	if (PTR_IS_ERROR(inode)) return PTR_ERR(inode);
 
 	/* Set up basic inode attributes */
 	inode->i_mode = mode;

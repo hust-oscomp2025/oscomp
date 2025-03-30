@@ -132,7 +132,7 @@ struct superblock_operations {
 };
 
 /* Function prototypes */
-//struct superblock* fstype_acquireSuperblock(struct fstype* type, dev_t dev_id, void* fs_data);
+//struct superblock* fstype_mount(struct fstype* type, dev_t dev_id, void* fs_data);
 void superblock_put(struct superblock* sb);
 struct vfsmount* superblock_acquireMount(struct superblock* sb, int32 flags, const char* device_path);
 struct inode* superblock_createInode(struct superblock* sb);

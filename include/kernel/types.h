@@ -97,20 +97,20 @@ struct itimerspec {
 #define unlikely_if(x) if(unlikely(x))
 #define ERR_PTR(err) ((void*)((long)(err)))
 #define PTR_ERR(ptr) ((long)(ptr))
-#define IS_ERR(ptr) IS_ERR_VALUE((unsigned long)(ptr))
+#define PTR_IS_ERROR(ptr) IS_ERR_VALUE((unsigned long)(ptr))
 // clang-format off
 #define CHECK_PTR_VALID(ptr, errno_val) \
-    do { if (unlikely(!(ptr) || IS_ERR(ptr))) return (errno_val); } while (0)
+    do { if (unlikely(!(ptr) || PTR_IS_ERROR(ptr))) return (errno_val); } while (0)
 #define CHECK_PTR_ERROR(ptr, errno_val) \
-	do { if (unlikely(IS_ERR(ptr))) return (errno_val); } while (0)
+	do { if (unlikely(PTR_IS_ERROR(ptr))) return (errno_val); } while (0)
 
-#define IS_INVALID(ptr) (!(ptr) || IS_ERR(ptr))
+#define PTR_IS_INVALID(ptr) (!(ptr) || PTR_IS_ERROR(ptr))
 
 #define CHECK_PTRS(errno_val, ...)                         \
 		do {                                                                \
 			void* __ptrs[] = { (void*)__VA_ARGS__ };                        \
 			for (size_t __i = 0; __i < sizeof(__ptrs)/sizeof(void*); ++__i) { \
-				if (IS_INVALID(__ptrs[__i]))                                \
+				if (PTR_IS_INVALID(__ptrs[__i]))                                \
 					return (errno_val);                                     \
 			}                                                               \
 		} while (0)

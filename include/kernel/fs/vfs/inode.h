@@ -1,15 +1,13 @@
 #pragma once
 
-//#include <kernel/vfs.h>
-#include <kernel/mm/vma.h>
+// #include <kernel/vfs.h>
 #include "forward_declarations.h"
+#include <kernel/mm/vma.h>
 #include <kernel/util/atomic.h>
 #include <kernel/util/list.h>
 #include <kernel/util/spinlock.h>
 
 extern struct hashtable inode_hashtable;
-
-
 
 /* Attribute flags for iattr */
 #define ATTR_MODE (1 << 0)
@@ -52,39 +50,39 @@ struct inode_operations;
  */
 struct inode {
 	/* Identity */
-	fmode_t i_mode;      /* File type and permissions */
-	uid_t i_uid;         /* Owner user ID */
-	gid_t i_gid;         /* Owner group ID */
-	uint64 i_ino; /* Inode number */
-	dev_t i_rdev;        /* Device number (for special files) */
+	fmode_t i_mode; /* File type and permissions */
+	uid_t i_uid;    /* Owner user ID */
+	gid_t i_gid;    /* Owner group ID */
+	uint64 i_ino;   /* Inode number */
+	dev_t i_rdev;   /* Device number (for special files) */
 
 	/* File attributes */
-	loff_t i_size;           /* File size in bytes */
-    // Replace existing timestamp fields with nanosecond precision
-    struct timespec i_atime; /* Last access time */
-    struct timespec i_mtime; /* Last modification time */
-    struct timespec i_ctime; /* Last status change time */
-    struct timespec i_btime; /* Creation time (birth time) */
-	uint32 i_nlink;    /* Number of hard links */
+	loff_t i_size; /* File size in bytes */
+	// Replace existing timestamp fields with nanosecond precision
+	struct timespec i_atime; /* Last access time */
+	struct timespec i_mtime; /* Last modification time */
+	struct timespec i_ctime; /* Last status change time */
+	struct timespec i_btime; /* Creation time (birth time) */
+	uint32 i_nlink;          /* Number of hard links */
 	blkcnt_t i_blocks;       /* Number of blocks allocated */
 
 	/* Memory management */
-	struct addrSpace * i_mapping;                                     /* Associated address space */
+	struct addrSpace* i_mapping; /* Associated address space */
 
 	/* Filesystem information */
-	struct superblock* i_superblock;   /* Superblock */
-	struct list_node i_s_list_node;    /* Superblock list of inodes */
+	struct superblock* i_superblock;    /* Superblock */
+	struct list_node i_s_list_node;     /* Superblock list of inodes */
 	struct list_node i_state_list_node; /* For ONE state list (LRU/dirty/IO) */
 
 	/* Add hash table support */
-	struct list_node i_hash_node;  /* For hash table linkage */
+	struct list_node i_hash_node; /* For hash table linkage */
 
 	/* Operations */
 	const struct inode_operations* i_op; /* Inode operations */
 	const struct file_operations* i_fop; /* Default file operations */
 
 	/* Reference counting and locking */
-	atomic_t i_count;  /* Reference count */
+	atomic_t i_refcount;  /* Reference count */
 	spinlock_t i_lock; /* Protects changes to inode */
 
 	/* State tracking */
@@ -97,18 +95,17 @@ struct inode {
 	struct list_head i_dentryList; /* List of dentries for this inode */
 	                               /*只需要服务活跃的dentry，用来同步*/
 	                               /*它们之间的状态，不用写回磁盘*/
-	spinlock_t i_dentryList_lock; 
-	
+	spinlock_t i_dentryList_lock;
 
 	/* Block mapping */
 	sector_t* i_data; /* Block mapping array */
-    // // Quota fields
-    // struct quota_info {
-    //     spinlock_t dq_lock;
-    //     struct dquot *dq_user;     /* User quota */
-    //     struct dquot *dq_group;    /* Group quota */
-    //     struct dquot *dq_project;  /* Project quota */
-    // } i_quota;
+	// // Quota fields
+	// struct quota_info {
+	//     spinlock_t dq_lock;
+	//     struct dquot *dq_user;     /* User quota */
+	//     struct dquot *dq_group;    /* Group quota */
+	//     struct dquot *dq_project;  /* Project quota */
+	// } i_quota;
 };
 
 struct inode_operations {
@@ -134,7 +131,7 @@ struct inode_operations {
 	int32 (*get_link)(struct dentry*, struct inode*, struct path*);
 	int32 (*permission)(struct inode*, int32);
 	int32 (*get_acl)(struct inode*, int32);
-    //int32 (*set_acl)(struct inode*, struct posix_acl*, int32);
+	// int32 (*set_acl)(struct inode*, struct posix_acl*, int32);
 	int32 (*setattr)(struct dentry*, struct iattr*);
 	int32 (*getattr)(const struct path*, struct kstat*, uint32, uint32);
 	int32 (*fiemap)(struct inode*, struct fiemap_extent_info*, uint64, uint64);
@@ -146,18 +143,16 @@ struct inode_operations {
 
 	/* Direct I/O support */
 	int32 (*direct_IO)(struct kiocb*, struct io_vector_iterator*);
-    // ACL operations
-    // Memory mapping operations
-    vm_fault_t (*page_fault)(struct vm_area_struct *, struct vm_fault *);
-    uint64 (*get_unmapped_area)(struct file *, uint64, uint64, uint64, uint64);
+	// ACL operations
+	// Memory mapping operations
+	vm_fault_t (*page_fault)(struct vm_area_struct*, struct vm_fault*);
+	uint64 (*get_unmapped_area)(struct file*, uint64, uint64, uint64, uint64);
 
-    // POSIX specific operations
-    int32 (*atomic_open)(struct inode *, struct dentry *, struct file *, unsigned open_flag, umode_t create_mode);
-    int32 (*tmpfile)(struct inode *, struct dentry *, umode_t);
-    //int32 (*dentry_open)(struct dentry *, struct file *, const struct cred *);
-
+	// POSIX specific operations
+	int32 (*atomic_open)(struct inode*, struct dentry*, struct file*, unsigned open_flag, umode_t create_mode);
+	int32 (*tmpfile)(struct inode*, struct dentry*, umode_t);
+	// int32 (*dentry_open)(struct dentry *, struct file *, const struct cred *);
 };
-
 
 /*
  * Inode APIs
@@ -170,13 +165,12 @@ void inode_unref(struct inode* inode);
 
 /*dentry called executer functions*/
 int32 inode_mknod(struct inode* dir, struct dentry* dentry, mode_t mode, dev_t dev);
-int32 inode_mkdir(struct inode *dir, struct dentry *dentry, mode_t mode);
+int32 inode_mkdir(struct inode* dir, struct dentry* dentry, mode_t mode);
 int32 inode_rmdir(struct inode*, struct dentry*);
 
 /* Inode lookup and creation */
 int32 inode_permission(struct inode* inode, int32 mask);
 /* Reference counting */
-
 
 /*供下层文件系统调用，在IO读写后通知进程*/
 int unlock_new_inode(struct inode* inode);
@@ -199,21 +193,15 @@ int32 inode_sync_metadata(struct inode* inode, int32 wait);
 static inline int32 inode_isBad(struct inode* inode) { return (!inode || inode->i_op == NULL); }
 int32 inode_checkPermission(struct inode* inode, int32 mask);
 
-
-
-
-
 // Add to inode.h or extend existing declarations
-#define XATTR_CREATE 0x1    /* Create attribute if it doesn't exist */
-#define XATTR_REPLACE 0x2   /* Replace attribute if it exists */
+#define XATTR_CREATE 0x1  /* Create attribute if it doesn't exist */
+#define XATTR_REPLACE 0x2 /* Replace attribute if it exists */
 
 // Implementation functions for extended attributes
 int32 inode_setxattr(struct inode* inode, const char* name, const void* value, size_t size, int32 flags);
 ssize_t inode_getxattr(struct inode* inode, const char* name, void* value, size_t size);
 ssize_t inode_listxattr(struct inode* inode, char* list, size_t size);
 int32 inode_removexattr(struct inode* inode, const char* name);
-
-
 
 /* Inode state flags */
 #define I_DIRTY (1 << 0)          /* Inode is dirty - needs writing */
@@ -228,13 +216,13 @@ int32 inode_removexattr(struct inode* inode, const char* name);
 #define I_DIRTY_DATASYNC (1 << 9) /* Data needs fsync */
 
 /* Permission checking masks */
-#define MAY_EXEC 0x0001   /* Execute permission */
-#define MAY_WRITE 0x0002  /* Write permission */
-#define MAY_READ 0x0004   /* Read permission */
-#define MAY_APPEND 0x0008 /* Append-only permission */
-#define MAY_ACCESS 0x0010 /* Check for existence */
-#define MAY_OPEN 0x0020   /* Check permission for open */
-#define MAY_CHDIR 0x0040  /* Check permission to use as working directory */
+#define MAY_EXEC 0x0001      /* Execute permission */
+#define MAY_WRITE 0x0002     /* Write permission */
+#define MAY_READ 0x0004      /* Read permission */
+#define MAY_APPEND 0x0008    /* Append-only permission */
+#define MAY_ACCESS 0x0010    /* Check for existence */
+#define MAY_OPEN 0x0020      /* Check permission for open */
+#define MAY_CHDIR 0x0040     /* Check permission to use as working directory */
 #define MAY_EXEC_MMAP 0x0080 /* Check exec permission for mmap PROT_EXEC */
 
 /* Combined permissions for common operations */
@@ -245,12 +233,11 @@ int32 inode_removexattr(struct inode* inode, const char* name);
 #define MAY_DELETE (MAY_WRITE | MAY_EXEC)     /* For deleting files */
 
 // ACL types
-#define ACL_TYPE_ACCESS   (0x0000)  /* POSIX access ACL */
-#define ACL_TYPE_DEFAULT  (0x0001)  /* POSIX default ACL */
+#define ACL_TYPE_ACCESS (0x0000)  /* POSIX access ACL */
+#define ACL_TYPE_DEFAULT (0x0001) /* POSIX default ACL */
 
-bool inode_isReadonly(struct inode *inode);
-bool inode_isImmutable(struct inode *inode);
-
+bool inode_isReadonly(struct inode* inode);
+bool inode_isImmutable(struct inode* inode);
 
 //        ┌─────────────┐
 //        │             │

@@ -1,8 +1,8 @@
-#include <kernel/types.h>
-#include <kernel/vfs.h>
-#include <kernel/util.h>
-#include <kernel/sprint.h>
 #include <kernel/mmu.h>
+#include <kernel/sprint.h>
+#include <kernel/types.h>
+#include <kernel/util.h>
+#include <kernel/vfs.h>
 
 /* Head of the filesystem types list */
 static struct list_head file_systems_list;
@@ -11,7 +11,7 @@ static spinlock_t file_systems_lock;
 static struct superblock* __fstype_allocSuperblock(struct fstype* type);
 
 /**
- * fstype_acquireSuperblock - Get or create a superblock
+ * fstype_mount - Get or create a superblock
  * @type: Filesystem type
  * @dev_id: Device identifier (0 for virtual filesystems)
  * @fs_data: Filesystem-specific mount data
@@ -21,7 +21,7 @@ static struct superblock* __fstype_allocSuperblock(struct fstype* type);
  *
  * Returns: pointer to superblock or NULL on failure
  */
-struct superblock* fstype_acquireSuperblock(struct fstype* type, dev_t dev_id, void* fs_data) {
+struct superblock* fstype_mount(struct fstype* type, int32 flags, dev_t dev_id, void* fs_data) {
 	struct superblock* sb = NULL;
 
 	if (!type) return NULL;
@@ -42,15 +42,14 @@ struct superblock* fstype_acquireSuperblock(struct fstype* type, dev_t dev_id, v
 	/* No existing superblock found, allocate a new one */
 	spinlock_unlock(&type->fs_list_superblock_lock);
 
-	sb = __fstype_allocSuperblock(type);
-	CHECK_PTR_VALID(sb, ERR_PTR(-ENOMEM));
-
-	if (type->fs_op_fill_superblock) {
-		int32 error = type->fs_op_fill_superblock(type, sb, fs_data, 0);
-		if (error) {
-			superblock_put(sb);
-			return ERR_PTR(error);
-		}
+	/* NEW CODE: Call filesystem-specific mount if available */
+	if (type->fs_mount) {
+		sb = type->fs_mount(type, flags, dev_id, fs_data);
+		CHECK_PTR_VALID(sb, sb);
+	} else {
+		/* Fall back to generic allocation and initialization */
+		sb = __fstype_allocSuperblock(type);
+		CHECK_PTR_VALID(sb, ERR_PTR(-ENOMEM));
 	}
 
 	/* Set device ID */
@@ -179,25 +178,6 @@ struct fstype* fstype_lookup(const char* name) {
 	return NULL;
 }
 
-
-int32 fstype_fill_sb(struct fstype* type, struct superblock* sb, void* data, int32 flags) {
-	// 通用初始化阶段
-	if (!type || !sb) return -EINVAL;
-
-	// 设置基础字段
-	sb->s_fstype = type;
-	sb->s_device_id = sb->s_device_id; // 由上层传入的dev_t
-	// sb->s_flags = flags & ~(MS_NOUSER | MS_NOSEC); // 过滤不支持标志
-	sb->s_flags = flags; // 过滤不支持标志
-	if (!type->fs_op_fill_superblock) {
-		sprint("fstype_fill_sb: filesystem didn't set fs_op_fill_superblock\n");
-		return -EINVAL;
-	}
-	int32 ret = type->fs_op_fill_superblock(type, sb, data, 0);
-	CHECK_RET(ret, ret);
-
-	return 0;
-}
 
 /**
  * __fstype_allocSuperblock - Allocate a new superblock from a fstype

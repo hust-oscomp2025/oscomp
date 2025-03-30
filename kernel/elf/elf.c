@@ -449,3 +449,78 @@ static int32 load_elf_binary(elf_context *ctx) {
   sprint("ELF loaded successfully, entry point: 0x%lx\n", ctx->entry_point);
   return 0;
 }
+
+
+/**
+ * load_init_binary - Load the init process binary
+ * @init_task: The init task structure
+ * @path: Path to the init binary
+ *
+ * Loads the specified executable as the init process.
+ * Unlike load_elf_from_file, this function returns error codes 
+ * instead of panicking on failure.
+ *
+ * Returns: 0 on success, negative error code on failure
+ */
+int32 load_init_binary(struct task_struct *init_task, const char *path) {
+    elf_context ctx;
+    int32 error = 0;
+
+    sprint("Loading init binary: %s\n", path);
+
+    // Open the init binary file
+    int32 fd = do_open(path, O_RDONLY);
+    if (fd < 0) {
+        sprint("Failed to open init binary: %s (error %d)\n", path, fd);
+        return fd;
+    }
+
+    // Ensure the process has a valid memory layout
+    if (!init_task->mm) {
+        init_task->mm = user_alloc_mm();
+        if (!init_task->mm) {
+            sprint("Failed to create memory layout for init process\n");
+            do_close(fd);
+            return -ENOMEM;
+        }
+    }
+
+    // Initialize ELF context
+    memset(&ctx, 0, sizeof(elf_context));
+    ctx.fd = fd;
+    ctx.proc = init_task;
+
+    // Read ELF header
+    if (elf_read_at(&ctx, &ctx.ehdr, sizeof(elf_header), 0) != sizeof(elf_header)) {
+        sprint("Failed to read ELF header\n");
+        error = -EIO;
+        goto out;
+    }
+
+    // Validate ELF header
+    if (validate_elf_header(&ctx.ehdr) != 0) {
+        sprint("Invalid ELF header\n");
+        error = -ENOEXEC;
+        goto out;
+    }
+
+    ctx.entry_point = ctx.ehdr.entry;
+
+    // Load ELF binary
+    error = load_elf_binary(&ctx);
+    if (error != 0) {
+        sprint("Failed to load init binary: %d\n", error);
+        goto out;
+    }
+
+    // Load debug information if needed
+    load_debug_information(&ctx);
+
+    sprint("Init binary loaded successfully, entry point: 0x%lx\n", 
+           init_task->trapframe->epc);
+
+out:
+    // Close the file
+    do_close(fd);
+    return error;
+}

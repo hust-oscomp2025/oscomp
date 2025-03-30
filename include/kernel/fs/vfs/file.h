@@ -108,9 +108,10 @@ struct file_operations {
 /*打开或创建文件*/
 struct file* file_open(const char* filename, int32 flags, fmode_t mode);
 struct file* file_openPath(const struct path* path, int32 flags, fmode_t mode);
+int32 file_close(struct file* file);
 
-struct file* file_get(struct file* file);
-int32 file_put(struct file* file);
+struct file* file_ref(struct file* file);
+int32 file_unref(struct file* file);
 
 /*位置与访问管理*/
 int32 file_denyWrite(struct file* file);

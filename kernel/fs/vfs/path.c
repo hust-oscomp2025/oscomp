@@ -123,7 +123,7 @@ int32 filename_lookup(int32 dfd, const char* name, uint32 flags, struct path* pa
 
 			/* Check if it's a directory */
 			if (!S_ISDIR(file->f_inode->i_mode)) {
-				file_put(file);
+				file_unref(file);
 				return -ENOTDIR;
 			}
 
@@ -134,7 +134,7 @@ int32 filename_lookup(int32 dfd, const char* name, uint32 flags, struct path* pa
 			start_dentry = dentry_ref(start_dentry);
 			if (start_mnt) mount_ref(start_mnt);
 
-			file_put(file);
+			file_unref(file);
 		}
 	}
 

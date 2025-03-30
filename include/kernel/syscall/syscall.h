@@ -1,12 +1,13 @@
 #ifndef _SYSCALL_H_
 #define _SYSCALL_H_
 #include <kernel/syscall/syscall_fs.h>
+#include <kernel/syscall/syscall_ids.h>
 #include <kernel/types.h>
 
-typedef struct syscall_function {
-	uint64 func;
+struct syscall_function {
+	void* func;
 	const char *name;
-} syscall_function;
+};
 
 extern struct syscall_function sys_table[];
 

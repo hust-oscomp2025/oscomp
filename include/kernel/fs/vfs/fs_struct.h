@@ -21,9 +21,9 @@ struct fs_struct {
 };
 
 /* Filesystem info management */
-struct fs_struct *setup_fs_struct(void);
+struct fs_struct *fs_struct_create(void);
 struct fs_struct *copy_fs_struct(struct fs_struct *old_fs);
-void put_fs_struct(struct fs_struct *fs);
+void fs_struct_unref(struct fs_struct *fs);
 void set_fs_root(struct fs_struct *fs, const struct path *path);
 void set_fs_pwd(struct fs_struct *fs, const struct path *path);
 

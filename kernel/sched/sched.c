@@ -39,7 +39,9 @@ struct task_struct *alloc_empty_process() {
       return procs[i];
     }
   }
+  
   panic("cannot find any free process structure.\n");
+  return NULL;
 }
 //
 // insert a process, proc, into the END of ready queue.
@@ -75,31 +77,31 @@ void schedule() {
     // machine.
     int32 should_shutdown = 1;
 
-    for (int32 i = 0; i < NPROC; i++)
-      if ((procs[i]) && (procs[i]->exit_state != EXIT_TRACE)) {
-        should_shutdown = 0;
-        sprint("ready queue empty, but process %d is not in free/zombie "
-               "state:%d\n",
-               i, procs[i]->exit_state);
-      }
+    // for (int32 i = 0; i < NPROC; i++)
+    //   if ((procs[i]) && (procs[i]->exit_state != EXIT_TRACE)) {
+    //     should_shutdown = 0;
+    //     sprint("ready queue empty, but process %d is not in free/zombie "
+    //            "state:%d\n",
+    //            i, procs[i]->exit_state);
+    //   }
 
-    // 如果所有进程都在 FREE 或 ZOMBIE 状态，允许关机
-    if (should_shutdown) {
-      // 确保只有 hartid == 0 的核心执行 shutdown
-      if (hartid == 0) {
-        sprint("no more ready processes, system shutdown now.\n");
-        shutdown(0); // 只有核心 0 执行关机
-      }
-      // 否则，其他核心等待关机标志
-      else {
-        while (1) {
-          // 自旋等待，直到 hartid == 0 核心完成 shutdown
-        }
-      }
-    } else {
-      panic(
-          "Not handled: we should let system wait for unfinished processes.\n");
-    }
+    // // 如果所有进程都在 FREE 或 ZOMBIE 状态，允许关机
+    // if (should_shutdown) {
+    //   // 确保只有 hartid == 0 的核心执行 shutdown
+    //   if (hartid == 0) {
+    //     sprint("no more ready processes, system shutdown now.\n");
+    //     shutdown(0); // 只有核心 0 执行关机
+    //   }
+    //   // 否则，其他核心等待关机标志
+    //   else {
+    //     while (1) {
+    //       // 自旋等待，直到 hartid == 0 核心完成 shutdown
+    //     }
+    //   }
+    // } else {
+    //   panic(
+    //       "Not handled: we should let system wait for unfinished processes.\n");
+    // }
   }
 
   CURRENT = container_of(ready_queue.next, struct task_struct, ready_queue_node);
@@ -145,4 +147,28 @@ void switch_to(struct task_struct *proc) {
 
   extern void return_to_user(struct trapframe *, uint64);
   return_to_user(proc->trapframe, MAKE_SATP(proc->mm->pagetable));
+}
+
+
+
+/**
+ * find_process_by_pid - Find a process by its PID
+ * @pid: Process ID to search for
+ *
+ * Searches the process table for a process with the given PID.
+ * 
+ * Returns: Pointer to the task_struct if found, NULL if not found
+ */
+struct task_struct *find_process_by_pid(pid_t pid) {
+    if (pid <= 0)
+        return NULL;
+    
+    // Search the process table
+    for (int32 i = 0; i < NPROC; i++) {
+        if (procs[i] && procs[i]->pid == pid) {
+            return procs[i];
+        }
+    }
+    
+    return NULL;  // Process not found
 }

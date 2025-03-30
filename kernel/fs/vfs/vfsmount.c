@@ -71,7 +71,7 @@ int32 do_mount(const char* source, const char* target, const char* fstype_name, 
 		newmnt = vfs_kern_mount(type, flags, source, data);
 	}
 
-	if (IS_ERR(newmnt)) {
+	if (PTR_IS_ERROR(newmnt)) {
 		ret = PTR_ERR(newmnt);
 		goto out_path;
 	}
