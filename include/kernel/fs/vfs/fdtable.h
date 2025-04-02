@@ -70,7 +70,7 @@ uint32 fdtable_getFdFlags(struct fdtable* fdt, uint64 fd);
 int32 do_dup2(struct fdtable* fdt, uint64 oldfd, uint64 newfd);
 /*文件描述符控制系统调用，用于修改文件描述符的属性*/
 int32 do_fcntl(struct fdtable* fdt, uint64 fd, uint32 cmd, uint64 arg);
-int32 do_open(const char *pathname, int32 flags, ...);
+
 int32 do_close(int32 fd);
 off_t do_lseek(int32 fd, off_t offset, int32 whence);
 ssize_t do_read(int32 fd, void *buf, size_t count);

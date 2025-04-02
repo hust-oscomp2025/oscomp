@@ -68,8 +68,8 @@ ssize_t kiocb_read(struct kiocb *kiocb, char *buf, size_t len)
         return -EBADF;
     
     /* If we have a file-specific read method, use it */
-    if (file->f_operations && file->f_operations->read) {
-        ret = file->f_operations->read(file, buf, len, &kiocb->ki_pos);
+    if (file->f_op && file->f_op->read) {
+        ret = file->f_op->read(file, buf, len, &kiocb->ki_pos);
     } else {
         ret = -EINVAL;
     }
@@ -115,8 +115,8 @@ ssize_t kiocb_write(struct kiocb *kiocb, const char *buf, size_t len)
     }
     
     /* If we have a file-specific write method, use it */
-    if (file->f_operations && file->f_operations->write) {
-        ret = file->f_operations->write(file, buf, len, &kiocb->ki_pos);
+    if (file->f_op && file->f_op->write) {
+        ret = file->f_op->write(file, buf, len, &kiocb->ki_pos);
     } else {
         ret = -EINVAL;
     }

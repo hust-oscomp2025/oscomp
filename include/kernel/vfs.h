@@ -77,6 +77,7 @@ struct nameidata {
  */
 /* Initialization functions */
 int32 vfs_init(void);
+struct file *vfs_alloc_file(const struct path *path, int32 flags, mode_t mode);
 
 
 #define vfs_open file_open

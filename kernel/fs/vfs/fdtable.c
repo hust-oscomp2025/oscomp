@@ -526,7 +526,7 @@ static int32 _fdtable_do_poll(struct fdtable* fdt, struct pollfd* fds, uint32 nf
 		}
 
 		/* 调用文件的poll方法
-		fds[i].revents = file->f_operations->poll(file, &pt);
+		fds[i].revents = file->f_op->poll(file, &pt);
 		*/
 
 		// 占位符：模拟poll查询
@@ -556,7 +556,7 @@ static int32 _fdtable_do_poll(struct fdtable* fdt, struct pollfd* fds, uint32 nf
 			}
 
 			/* 不再注册等待，只检查状态
-			fds[i].revents = file->f_operations->poll(file, NULL);
+			fds[i].revents = file->f_op->poll(file, NULL);
 			*/
 
 			// 占位符：模拟唤醒后的poll结果
@@ -640,7 +640,7 @@ int32 do_epoll_ctl(struct fdtable* fdt, int32 epfd, int32 op, int32 fd, struct e
 	    return -EBADF;
 
 	// 调用epoll文件的ctl操作
-	return epfile->f_operations->epoll_ctl(epfile, op, target, event);
+	return epfile->f_op->epoll_ctl(epfile, op, target, event);
 	*/
 
 	// 返回伪值表示未实现
@@ -657,41 +657,14 @@ int32 do_epoll_wait(struct fdtable* fdt, int32 epfd, struct epoll_event* events,
 	    return -EBADF;
 
 	// 调用epoll文件的等待操作
-	return epfile->f_operations->epoll_wait(epfile, events, maxevents, timeout);
+	return epfile->f_op->epoll_wait(epfile, events, maxevents, timeout);
 	*/
 
 	// 返回伪值表示未实现
 	return -ENOSYS;
 }
 
-/**
- * Kernel-internal implementation of open syscall
- */
-int32 do_open(const char* pathname, int32 flags, ...) {
-	// Get mode if O_CREAT is set
-	mode_t mode = 0;
-	if (flags & O_CREAT) {
-		va_list args;
-		va_start(args, flags);
-		mode = va_arg(args, mode_t);
-		va_end(args);
-	}
 
-	// Call into VFS to get a file struct
-	struct file* filp = file_open(pathname, flags, mode);
-	if (PTR_IS_ERROR(filp)) return PTR_ERR(filp);
-
-	// Allocate a file descriptor
-	int32 fd = fdtable_allocFd(current_task()->fdtable, 0);
-	if (fd < 0) {
-		file_unref(filp);
-		return fd;
-	}
-
-	// Install the file in the fd table
-	fdtable_installFd(current_task()->fdtable, fd, filp);
-	return fd;
-}
 
 /**
  * Kernel-internal implementation of close syscall

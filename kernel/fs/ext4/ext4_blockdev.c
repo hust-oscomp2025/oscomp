@@ -3,6 +3,7 @@
 #include <kernel/mm/kmalloc.h>
 #include <kernel/types.h>
 #include <kernel/util/string.h>
+#include <kernel/vfs.h>
 
 static inline struct block_device* __ext4_get_kernel_bdev(struct ext4_blockdev* e_blockdevice);
 

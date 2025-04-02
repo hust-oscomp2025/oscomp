@@ -1699,7 +1699,7 @@ static int32 ext4_vfs_atomic_open(struct inode *inode, struct dentry *dentry,
     
     /* Open the file */
     if (file) {
-        ret = file->f_operations->open(dentry->d_inode, file);
+        ret = file->f_op->open(dentry->d_inode, file);
         if (ret != 0)
             return ret;
     }

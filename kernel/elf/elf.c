@@ -5,7 +5,7 @@
  */
 
 #include <kernel/elf.h>
-
+#include <kernel/syscall/syscall.h>
 #include <kernel/vfs.h>
 #include <kernel/mm/kmalloc.h>
 #include <kernel/mm/mm_struct.h>

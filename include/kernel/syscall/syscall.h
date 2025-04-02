@@ -2,9 +2,9 @@
 #define _SYSCALL_H_
 
 #include <kernel/types.h>
-
+#include <asm/unistd.h>
+#include "forward_types.h"
 /* Include syscall numbers */
-#include "syscall_ids.h"
 
 /**
  * System call wrapper type - all syscall wrappers must match this signature
@@ -25,12 +25,13 @@ struct syscall_entry {
 int64 do_syscall(int64 syscall_num, int64 a0, int64 a1, int64 a2, int64 a3, int64 a4, int64 a5);
 
 /* File-related syscalls */
-int64 sys_open(const char* pathname, int32 flags, mode_t mode);
+int64 sys_openat(int32 dirfd, const char* pathname, int32 flags, mode_t mode);
 int64 sys_close(int32 fd);
 int64 sys_read(int32 fd, void* buf, size_t count);
 int64 sys_write(int32 fd, const void* buf, size_t count);
 int64 sys_lseek(int32 fd, off_t offset, int32 whence);
 int64 sys_mount(const char* source, const char* target, const char* fstype, uint64 flags, const void* data);
+int64 sys_getdents64(int32 fd, struct linux_dirent *dirp, size_t count);
 
 /* Process-related syscalls */
 int64 sys_exit(int32 status);
@@ -56,5 +57,9 @@ int64 sys_clock_gettime(clockid_t clk_id, struct timespec* tp);
 /* Misc syscalls */
 int64 sys_getrandom(void* buf, size_t buflen, uint32 flags);
 int64 sys_yield(void);
+
+int32 do_openat(int32 dirfd, const char* pathname, int32 flags, mode_t mode);
+int32 do_open(const char* pathname, int32 flags, ...);
+int32 do_getdents64(struct file* file, struct dir_context* ctx);
 
 #endif /* _SYSCALL_H_ */

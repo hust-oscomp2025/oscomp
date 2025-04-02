@@ -193,39 +193,6 @@ static inline void clear_bit(int nr, volatile uint64 *addr) {
     addr[nr / (8 * sizeof(uint64))] &= ~(1UL << (nr % (8 * sizeof(uint64))));
 }
 
-/*
- * File mode fmode_t flags
- */
-/* Access modes */
-#define FMODE_READ (1U << 0)  /* File is open for reading */
-#define FMODE_WRITE (1U << 1) /* File is open for writing */
-#define FMODE_EXEC (1U << 5)  /* File is executable */
-
-/* Seeking flags */
-#define FMODE_LSEEK (1U << 2)  /* File is seekable */
-#define FMODE_PREAD (1U << 3)  /* File supports pread */
-#define FMODE_PWRITE (1U << 4) /* File supports pwrite */
-
-/* Special access flags */
-#define FMODE_ATOMIC_POS (1U << 12) /* File needs atomic access to position */
-#define FMODE_RANDOM (1U << 13)     /* File will be accessed randomly */
-#define FMODE_PATH (1U << 14)       /* O_PATH flag - minimal file access */
-#define FMODE_STREAM (1U << 16)     /* File is stream-like */
-
-/* Permission indicators */
-#define FMODE_WRITER (1U << 17)    /* Has write access to underlying fs */
-#define FMODE_CAN_READ (1U << 18)  /* Has read methods */
-#define FMODE_CAN_WRITE (1U << 19) /* Has write methods */
-
-/* State flags */
-#define FMODE_OPENED (1U << 20)  /* File has been opened */
-#define FMODE_CREATED (1U << 21) /* File was created */
-
-/* Optimization flags */
-#define FMODE_NOWAIT (1U << 22)      /* Return -EAGAIN if I/O would block */
-#define FMODE_CAN_ODIRECT (1U << 24) /* Supports direct I/O */
-#define FMODE_BUF_RASYNC (1U << 28)  /* Supports async buffered reads */
-#define FMODE_BUF_WASYNC (1U << 29)  /* Supports async buffered writes */
 
 
 

@@ -1,10 +1,10 @@
+#include <kernel/device/device.h>
 #include <kernel/mm/kmalloc.h>
 #include <kernel/sched.h>
 #include <kernel/sprint.h>
 #include <kernel/types.h>
 #include <kernel/util/string.h>
 #include <kernel/vfs.h>
-#include <kernel/device/device.h>
 
 /* Add global variable */
 struct dentry* global_root_dentry = NULL;
@@ -65,7 +65,7 @@ struct vfsmount* vfs_kern_mount(struct fstype* fstype, int32 flags, const char* 
 			return ERR_PTR(ret);
 		}
 	}
-	struct superblock* sb = fstype_mount(fstype,flags, dev_id, data);
+	struct superblock* sb = fstype_mount(fstype, flags, dev_id, data);
 	CHECK_PTR_VALID(sb, ERR_PTR(-ENOMEM));
 
 	struct vfsmount* mount = superblock_acquireMount(sb, flags, device_path);
@@ -73,7 +73,6 @@ struct vfsmount* vfs_kern_mount(struct fstype* fstype, int32 flags, const char* 
 
 	return mount;
 }
-
 
 /**
  * vfs_link - Create a hard link
@@ -383,32 +382,30 @@ struct dentry* vfs_mkdir(struct dentry* parent, const char* name, fmode_t mode) 
  * Returns: New dentry on success, ERR_PTR on failure
  */
 struct dentry* vfs_mknod(struct dentry* parent, const char* name, mode_t mode, dev_t dev) {
-    const char* filename = name;
-    int32 name_pos = 0;
-    
-    if (!name || !*name)
-        return ERR_PTR(-EINVAL);
-    
-    /* Handle NULL parent case by resolving the path */
-    if (!parent) {
-        struct path parent_path;
-        name_pos = resolve_path_parent(name, &parent_path);
-        if (name_pos < 0)
-            return ERR_PTR(name_pos); /* Error code */
-            
-        parent = parent_path.dentry;
-        filename = &name[name_pos];
-        
-        /* Create the special file */
-        struct dentry* result = dentry_mknod(parent, filename, mode, dev);
-        
-        /* Clean up */
-        path_destroy(&parent_path);
-        return result;
-    }
-    
-    /* If parent was provided directly, just create the node */
-    return dentry_mknod(parent, filename, mode, dev);
+	const char* filename = name;
+	int32 name_pos = 0;
+
+	if (!name || !*name) return ERR_PTR(-EINVAL);
+
+	/* Handle NULL parent case by resolving the path */
+	if (!parent) {
+		struct path parent_path;
+		name_pos = resolve_path_parent(name, &parent_path);
+		if (name_pos < 0) return ERR_PTR(name_pos); /* Error code */
+
+		parent = parent_path.dentry;
+		filename = &name[name_pos];
+
+		/* Create the special file */
+		struct dentry* result = dentry_mknod(parent, filename, mode, dev);
+
+		/* Clean up */
+		path_destroy(&parent_path);
+		return result;
+	}
+
+	/* If parent was provided directly, just create the node */
+	return dentry_mknod(parent, filename, mode, dev);
 }
 
 /**
@@ -437,4 +434,110 @@ int32 vfs_mknod_block(const char* path, mode_t mode, dev_t dev) {
 	/* Release dentry reference */
 	dentry_unref(dentry);
 	return 0;
+}
+
+struct file *vfs_alloc_file(const struct path *path, int32 flags, mode_t mode)
+{
+    struct file *file;
+    struct inode *inode;
+    fmode_t fmode;
+    int32 error = 0;
+    
+    /* 检查路径的有效性 */
+    if (!path || !path->dentry || !path->mnt)
+        return ERR_PTR(-EINVAL);
+        
+    inode = path->dentry->d_inode;
+    
+    /* 验证 flags 有效性 */
+    error = vfs_validate_flags(flags);
+    if (error)
+        return ERR_PTR(error);
+    
+    /* 权限检查 */
+    if ((flags & O_ACCMODE) != O_RDONLY) {
+        /* 检查写入权限 */
+        if (inode && inode_isReadonly(inode))
+            return ERR_PTR(-EROFS);  // 只读文件系统
+        
+        if (inode && (flags & O_ACCMODE) == O_WRONLY || (flags & O_ACCMODE) == O_RDWR) {
+            if (S_ISDIR(inode->i_mode))
+                return ERR_PTR(-EISDIR);  // 不能写入目录
+                
+            error = inode_permission(inode, MAY_WRITE);
+            if (error)
+                return ERR_PTR(error);
+        }
+    }
+    
+    /* 转换 open flags 到 fmode */
+    fmode = 0;
+    if ((flags & O_ACCMODE) == O_RDONLY)
+        fmode |= FMODE_READ;
+    if ((flags & O_ACCMODE) == O_WRONLY)
+        fmode |= FMODE_WRITE;
+    if ((flags & O_ACCMODE) == O_RDWR)
+        fmode |= (FMODE_READ | FMODE_WRITE);
+    if (flags & O_APPEND)
+        fmode |= FMODE_APPEND;
+    if (flags & O_EXCL)
+        fmode |= FMODE_EXCL;
+    if (flags & O_NONBLOCK)
+        fmode |= FMODE_NONBLOCK;
+    
+    /* 分配文件结构 */
+    file = kmalloc(sizeof(struct file));
+    if (!file)
+        return ERR_PTR(-ENOMEM);
+    
+    /* 基本初始化 */
+    memset(file, 0, sizeof(struct file));
+    spinlock_init(&file->f_lock);
+    
+    /* 复制路径和引用计数管理 */
+    file->f_path.dentry = dentry_ref(path->dentry);
+    file->f_path.mnt = mount_ref(path->mnt);
+    
+    if (path->dentry->d_inode)
+        file->f_inode = inode_ref(path->dentry->d_inode);
+    else
+        file->f_inode = NULL;  // 可能是一个将要创建的文件
+    
+    /* 设置文件位置 */
+    if (file->f_inode && (flags & O_APPEND))
+        file->f_pos = file->f_inode->i_size;
+    else
+        file->f_pos = 0;
+    
+    /* 设置模式和标志 */
+    file->f_mode = fmode;
+    
+    /* 内部标志设置 */
+    file->f_flags = flags;
+    
+    /* 
+     * 处理创建权限掩码
+     * 注意：mode 只在 O_CREAT 标志被设置时使用
+     */
+    if (flags & O_CREAT) {
+        /* 应用当前进程的 umask */
+        mode &= ~current_task()->fs->umask;
+        /* 确保基本权限位存在 */
+        mode |= S_IFREG;  // 确保这是一个常规文件
+    }
+    
+    /* 设置操作函数指针 */
+    if (file->f_inode)
+        file->f_op = file->f_inode->i_fop;
+    else
+        file->f_op = NULL;  // 将在创建后设置
+    
+    /* 初始化内部数据 */
+    file->f_private = NULL;
+    
+    
+    /* 设置引用计数 */
+    atomic_set(&file->f_refcount, 1);
+    
+    return file;
 }

@@ -3,18 +3,16 @@
 #include <kernel/fs/vfs/inode.h>
 // #include <kernel/fs/vfs/namespace.h>
 #include <kernel/fs/vfs/path.h>
-#include <kernel/vfs.h>
 #include <kernel/mm/kmalloc.h>
 #include <kernel/sched/process.h>
 #include <kernel/sched/sched.h>
 #include <kernel/types.h>
 #include <kernel/util/qstr.h>
 #include <kernel/util/string.h>
+#include <kernel/vfs.h>
 
 #include <kernel/sprint.h>
 
-static struct file* __file_alloc(struct dentry* dentry, fmode_t mode);
-static struct file* __file_open(struct dentry* dentry, struct vfsmount* mnt, int32 flags, fmode_t mode);
 static int32 __file_free(struct file* filp);
 
 struct file* file_ref(struct file* file) {
@@ -26,51 +24,14 @@ struct file* file_ref(struct file* file) {
 }
 
 /**
- * file_openPath - Open a file using a pre-resolved path
+ * file_open - Open a file using a pre-resolved path
  * @path: Path to the file
  * @flags: Open flags
  * @mode: Creation mode
  */
-struct file* file_openPath(const struct path* path, int32 flags, fmode_t mode) {
-	if (!path || !path->dentry) return ERR_PTR(-EINVAL);
-
-	return __file_open(path->dentry, path->mnt, flags, mode);
-}
-
-/**
- * file_open - Traditional file open with char* path
- * @filename: Path to file
- * @flags: Open flags
- * @mode: Creation mode
- */
-struct file* file_open(const char* filename, int32 flags, fmode_t mode) {
-	// struct qstr qname;
-	struct file* file;
-
-	if (!filename) return ERR_PTR(-EINVAL);
-
-	/* Initialize qstr from string */
-	// qstr_init_from_str(&qname, filename);
-
-	/* Use qstr version */
-	// file = file_open_qstr(&qname, flags, mode);
-	/* Convert qstr to path */
-	struct path path;
-	int32 error = path_create(filename, 0, &path);
-	/* Handle O_CREAT flag if file doesn't exist */
-	if (error == -ENOENT && (flags & O_CREAT)) {
-		/* Would handle file creation here */
-		/* For now, just return the error */
-		return ERR_PTR(error);
-	} else if (error) {
-		return ERR_PTR(error);
-	}
-	/* Open the file */
-	file = __file_open(path.dentry, path.mnt, flags, mode);
-	/* Release path reference */
-	path_destroy(&path);
-
-	return file;
+int32 file_open(struct file* file) {
+	if (file->f_op && file->f_op->open) return file->f_op->open(file);
+	return 0;
 }
 
 /**
@@ -91,9 +52,9 @@ int32 __file_free(struct file* filp) {
 	if (!filp) return -EINVAL;
 
 	/* Release the file's regular resources */
-	if (filp->f_operations && filp->f_operations->release) {
+	if (filp->f_op && filp->f_op->release) {
 		/* Call the file-specific release operation */
-		error = filp->f_operations->release(filp->f_inode, filp);
+		error = filp->f_op->release(filp->f_inode, filp);
 	}
 
 	/* Handle file-specific cleanup s_operations */
@@ -110,105 +71,13 @@ int32 __file_free(struct file* filp) {
 	if (filp->f_inode) inode_unref(filp->f_inode);
 
 	/* Log the file close if debugging enabled */
-	if (fd >= 0) { /* debug_file_close(owner, fd); */ }
+	if (fd >= 0) { /* debug_file_close(owner, fd); */
+	}
 
 	/* Free the file structure itself */
 	kfree(filp);
 
 	return error;
-}
-
-/**
- * __file_open - Common file opening logic
- * @dentry: Dentry of file to open
- * @mnt: Mount point
- * @flags: Open flags
- * @mode: Creation mode
- *
- * Internal helper function for all file_open variants.
- */
-static struct file* __file_open(struct dentry* dentry, struct vfsmount* mnt, int32 flags, fmode_t mode) {
-	struct file* file;
-	struct inode* inode;
-	int32 error = 0;
-	fmode_t file_mode;
-
-	/* Validate dentry has an inode */
-	inode = dentry->d_inode;
-	if (!inode) return ERR_PTR(-ENOENT);
-
-	/* Check directory write permissions */
-	if (S_ISDIR(inode->i_mode) && (flags & O_ACCMODE) != O_RDONLY) return ERR_PTR(-EISDIR);
-
-	/* Convert flags to fmode_t */
-	file_mode = FMODE_READ;
-	if ((flags & O_ACCMODE) != O_RDONLY) file_mode |= FMODE_WRITE;
-
-	/* Allocate and initialize file structure using our new function */
-	file = __file_alloc(dentry, file_mode);
-	if (PTR_IS_ERROR(file)) return file;
-
-	/*initialization */
-	atomic_set(&file->f_refcount, 1);
-	file->f_path.dentry = dentry_ref(dentry);
-	file->f_path.mnt = mount_ref(mnt);
-	/* Set inode if available */
-	assert(dentry->d_inode); // 我们的设计确保所有文件系统都有inode和对应的操作
-	file->f_inode = inode_ref(dentry->d_inode);
-	file->f_operations = dentry->d_inode->i_fop;
-	file->f_mode = file_mode;
-	file->f_flags = flags;
-
-	file->f_private = NULL;
-
-	/* 设置预读参数 */
-	file->f_read_ahead.start = 0;
-	file->f_read_ahead.size = READ_AHEAD_DEFAULT;
-	file->f_read_ahead.async_size = 0;
-	file->f_read_ahead.ra_pages = READ_AHEAD_MAX;
-	file->f_read_ahead.mmap_miss = 0;
-	file->f_read_ahead.prev_pos = 0;
-
-	/* Set position */
-	if (flags & O_APPEND) file->f_pos = inode->i_size;
-
-	/* Call open method if available */
-	if (file->f_operations && file->f_operations->open) {
-		error = file->f_operations->open(inode, file);
-		if (error) {
-			/* Clean up on error */
-			path_destroy(&file->f_path);
-			inode_unref(file->f_inode);
-			kfree(file);
-			return ERR_PTR(error);
-		}
-	}
-
-	return file;
-}
-
-/**
- * __file_alloc - Allocatesa new file structure
- *
- * This function allocates a new file structure.
- * The caller is responsible for initializing the file structure.
- *
- * Returns a pointer to the allocated file structure, or an ERR_PTR on error.
- */
-static struct file* __file_alloc(struct dentry* dentry, fmode_t mode) {
-	struct file* file;
-
-	if (!dentry) return ERR_PTR(-EINVAL);
-
-	/* Allocate file structure */
-	file = kmalloc(sizeof(struct file));
-	if (!file) return ERR_PTR(-ENOMEM);
-
-	/* Initialize to zeros */
-	memset(file, 0, sizeof(struct file));
-	spinlock_init(&file->f_lock);
-
-	return file;
 }
 
 /**
@@ -342,7 +211,7 @@ loff_t file_llseek(struct file* file, loff_t offset, int32 whence) {
 	//  The only potential usage would be if the file system's specific llseek operation needed it
 
 	/* Call file-specific llseek operation if available */
-	if (file->f_operations && file->f_operations->llseek) return file->f_operations->llseek(file, offset, whence);
+	if (file->f_op && file->f_op->llseek) return file->f_op->llseek(file, offset, whence);
 
 	/* Generic implementation for simple files */
 	spinlock_lock(&file->f_lock);
@@ -397,12 +266,12 @@ int32 file_sync(struct file* file, int32 datasync) {
 	if (!inode) return -EINVAL;
 
 	/* Call file-specific fsync operation if available */
-	if (file->f_operations && file->f_operations->fsync) {
+	if (file->f_op && file->f_op->fsync) {
 		/* Use the file's fsync operation with full file range */
 		// struct kiocb kiocb;
 		// init_kiocb(&kiocb, file);
 		//  currently unused
-		return file->f_operations->fsync(file, 0, INT64_MAX, datasync);
+		return file->f_op->fsync(file, 0, INT64_MAX, datasync);
 	}
 
 	/* Generic implementation - sync the inode */
@@ -440,14 +309,14 @@ ssize_t file_readv(struct file* file, const struct io_vector* vec, uint64 vlen, 
 	if (ret < 0) return ret;
 
 	/* Use optimized read_iter if available */
-	if (likely(file->f_operations && file->f_operations->read_iter)) {
-		ret = file->f_operations->read_iter(&kiocb, &iter);
-	} else if (file->f_operations && file->f_operations->read) {
+	if (likely(file->f_op && file->f_op->read_iter)) {
+		ret = file->f_op->read_iter(&kiocb, &iter);
+	} else if (file->f_op && file->f_op->read) {
 		/* Fall back to sequential reads */
 		ret = 0;
 		for (uint64 i = 0; i < vlen; i++) {
 			ssize_t bytes;
-			bytes = file->f_operations->read(file, vec[i].iov_base, vec[i].iov_len, &kiocb.ki_pos);
+			bytes = file->f_op->read(file, vec[i].iov_base, vec[i].iov_len, &kiocb.ki_pos);
 			if (bytes < 0) {
 				if (ret == 0) ret = bytes;
 				break;
@@ -497,14 +366,14 @@ ssize_t file_writev(struct file* file, const struct io_vector* vec, uint64 vlen,
 	}
 
 	/* Use optimized write_iter if available */
-	if (file->f_operations && file->f_operations->write_iter) {
-		ret = file->f_operations->write_iter(&kiocb, &iter);
-	} else if (file->f_operations && file->f_operations->write) {
+	if (file->f_op && file->f_op->write_iter) {
+		ret = file->f_op->write_iter(&kiocb, &iter);
+	} else if (file->f_op && file->f_op->write) {
 		/* Fall back to sequential writes */
 		ret = 0;
 		for (uint64 i = 0; i < vlen; i++) {
 			ssize_t bytes;
-			bytes = file->f_operations->write(file, vec[i].iov_base, vec[i].iov_len, &kiocb.ki_pos);
+			bytes = file->f_op->write(file, vec[i].iov_base, vec[i].iov_len, &kiocb.ki_pos);
 			if (bytes < 0) {
 				if (ret == 0) ret = bytes;
 				break;
@@ -527,7 +396,6 @@ ssize_t file_writev(struct file* file, const struct io_vector* vec, uint64 vlen,
 	return ret;
 }
 
-
 /**
  * file_close - Close a file by file pointer
  * @file: File to close
@@ -538,14 +406,115 @@ ssize_t file_writev(struct file* file, const struct io_vector* vec, uint64 vlen,
  * Returns: 0 on success, negative error code on failure
  */
 int32 file_close(struct file* file) {
-    if (!file)
-        return -EINVAL;
+	if (!file) return -EINVAL;
+
+	// For logging/debugging
+	if (file->f_path.dentry && file->f_path.dentry->d_name->name) {
+		// sprint("Closing file: %s\n", file->f_path.dentry->d_name.name);
+	}
+
+	// Just delegate to file_unref which handles reference counting
+	return file_unref(file);
+}
+
+
+
+
+/**
+ * open_flags_to_fmode - 将 open() 标志转换为内部文件模式
+ * @flags: 用户传入的打开标志
+ *
+ * 将用户空间的 open() 标志转换为内核的 fmode_t 表示
+ * 
+ * 返回: 相应的内部文件模式
+ */
+fmode_t open_flags_to_fmode(int32 flags)
+{
+    fmode_t fmode = 0;
     
-    // For logging/debugging
-    if (file->f_path.dentry && file->f_path.dentry->d_name->name) {
-        // sprint("Closing file: %s\n", file->f_path.dentry->d_name.name);
+    /* 访问模式转换 */
+    switch (flags & O_ACCMODE) {
+    case O_RDONLY:
+        fmode = FMODE_READ;
+        break;
+    case O_WRONLY:
+        fmode = FMODE_WRITE;
+        break;
+    case O_RDWR:
+        fmode = FMODE_READ | FMODE_WRITE;
+        break;
     }
     
-    // Just delegate to file_unref which handles reference counting
-    return file_unref(file);
+    /* 特殊模式标志 */
+    if (flags & O_APPEND)
+        fmode |= FMODE_APPEND;
+    
+    if (flags & O_NONBLOCK)
+        fmode |= FMODE_NONBLOCK;
+    
+    if (flags & O_DIRECT)
+        fmode |= FMODE_DIRECT;
+    
+    if (flags & O_SYNC || flags & O_DSYNC)
+        fmode |= FMODE_SYNC;
+    
+    if (flags & O_EXCL)
+        fmode |= FMODE_EXCL;
+    
+    if (flags & O_EXEC)
+        fmode |= FMODE_EXEC;
+    
+    if (flags & O_PATH)
+        fmode |= FMODE_PATH;
+    
+    if (flags & O_DIRECTORY)
+        fmode |= FMODE_DIRECTORY;
+    
+    return fmode;
+}
+
+
+/**
+ * validate_open_flags - 验证打开文件的标志参数
+ * @flags: 用户传入的打开标志
+ *
+ * 检查用户提供的 open() 标志是否有效且不冲突
+ * 
+ * 返回: 成功返回0，失败返回负的错误码
+ */
+int32 validate_open_flags(int32 flags)
+{
+    /* 检查访问模式 */
+    int32 acc_mode = flags & O_ACCMODE;
+    if (acc_mode != O_RDONLY && acc_mode != O_WRONLY && 
+        acc_mode != O_RDWR)
+        return -EINVAL;
+    
+    /* 检查标志组合的有效性 */
+    
+    /* O_CREAT、O_EXCL 和 O_TRUNC 的组合规则 */
+    if ((flags & O_TRUNC) && acc_mode == O_RDONLY)
+        return -EINVAL; // 只读模式下不能截断
+    
+    if ((flags & O_EXCL) && !(flags & O_CREAT))
+        return -EINVAL; // O_EXCL 必须和 O_CREAT 一起使用
+    
+    /* 检查互斥标志 */
+    if ((flags & O_DIRECTORY) && (flags & O_TRUNC))
+        return -EISDIR; // 不能截断目录
+    
+    /* 检查是否使用了未实现的标志 */
+    if (flags & ~VALID_OPEN_FLAGS)
+        return -EINVAL;
+    
+    return 0; // 标志有效
+}
+
+bool file_isReadable(struct file* file) {
+	if (!file || !file->f_inode || atomic_read(&file->f_refcount) <= 0) return false;
+	return (file->f_mode & FMODE_READ) != 0;
+}
+bool file_isWriteable(struct file* file) {
+	if (!file || !file->f_inode || atomic_read(&file->f_refcount) <= 0) return false;
+	return (file->f_mode & FMODE_WRITE) != 0;
 }

@@ -10,92 +10,90 @@
 /* Debug flag to enable syscall tracing */
 #define SYSCALL_DEBUG 0
 
-/* Wrapper functions for each syscall type */
 
-/* File wrappers */
-static int64 open_wrapper(int64 pathname, int64 flags, int64 mode,
-                         int64 a3, int64 a4, int64 a5) {
-    return sys_open((const char*)pathname, (int32)flags, (mode_t)mode);
+
+
+
+int64 sys_close(int32 fd) {
+    /* Implementation here */
+    return do_close(fd);
 }
 
-static int64 close_wrapper(int64 fd, int64 a1, int64 a2,
-                          int64 a3, int64 a4, int64 a5) {
-    return sys_close((int32)fd);
+int64 sys_read(int32 fd, void *buf, size_t count) {
+    /* Implementation here */
+    return do_read(fd, buf, count);
 }
 
-static int64 read_wrapper(int64 fd, int64 buf, int64 count,
-                         int64 a3, int64 a4, int64 a5) {
-    return sys_read((int32)fd, (void*)buf, (size_t)count);
+int64 sys_write(int32 fd, const void *buf, size_t count) {
+    /* Implementation here */
+    return do_write(fd, buf, count);
 }
 
-static int64 write_wrapper(int64 fd, int64 buf, int64 count,
-                          int64 a3, int64 a4, int64 a5) {
-    return sys_write((int32)fd, (const void*)buf, (size_t)count);
+int64 sys_lseek(int32 fd, off_t offset, int32 whence) {
+    /* Implementation here */
+    return do_lseek(fd, offset, whence);
 }
 
-static int64 lseek_wrapper(int64 fd, int64 offset, int64 whence,
-                          int64 a3, int64 a4, int64 a5) {
-    return sys_lseek((int32)fd, (off_t)offset, (int32)whence);
+int64 sys_mount(const char *source, const char *target, 
+                const char *fstype, uint64 flags, const void *data) {
+    /* Implementation here */
+    return do_mount(source, target, fstype, flags, data);
 }
 
-static int64 mount_wrapper(int64 source, int64 target, int64 fstype,
-                          int64 flags, int64 data, int64 a5) {
-    return sys_mount((const char*)source, (const char*)target,
-                    (const char*)fstype, (uint64)flags, (const void*)data);
+
+
+int64 sys_exit(int32 status) {
+    /* Implementation here */
+    return do_exit(status);
 }
 
-/* Process wrappers */
-static int64 exit_wrapper(int64 status, int64 a1, int64 a2,
-                         int64 a3, int64 a4, int64 a5) {
-    return sys_exit((int32)status);
+int64 sys_getpid(void) {
+    /* Implementation here */
+    return current_task()->pid;
 }
 
-static int64 getpid_wrapper(int64 a0, int64 a1, int64 a2,
-                           int64 a3, int64 a4, int64 a5) {
-    return sys_getpid();
+int64 sys_clone(uint64 flags, uint64 stack, uint64 ptid, 
+               uint64 tls, uint64 ctid) {
+    /* Implementation here */
+    return do_clone(flags, stack, ptid, tls, ctid);
 }
 
-static int64 clone_wrapper(int64 flags, int64 stack, int64 ptid,
-                          int64 tls, int64 ctid, int64 a5) {
-    return sys_clone((uint64)flags, (uint64)stack, (uint64)ptid,
-                    (uint64)tls, (uint64)ctid);
+int64 sys_mmap(void *addr, size_t length, int32 prot, 
+              int32 flags, int32 fd, off_t offset) {
+    /* Implementation here */
+    return do_mmap(addr, length, prot, flags, fd, offset);
 }
 
-/* Memory wrappers */
-static int64 mmap_wrapper(int64 addr, int64 length, int64 prot,
-                         int64 flags, int64 fd, int64 offset) {
-    return sys_mmap((void*)addr, (size_t)length, (int32)prot,
-                   (int32)flags, (int32)fd, (off_t)offset);
+int64 sys_time(time_t *tloc) {
+    /* Implementation here */
+    return do_time(tloc);
 }
 
-/* Time wrappers */
-static int64 time_wrapper(int64 tloc, int64 a1, int64 a2,
-                         int64 a3, int64 a4, int64 a5) {
-    return sys_time((time_t*)tloc);
-}
+/* Complete syscall table using function pointers directly */
+typedef int64 (*syscall_fn_t)(int64, int64, int64, int64, int64, int64);
 
-/* Complete syscall table */
 static struct syscall_entry syscall_table[] = {
     /* File operations */
-    [SYS_open] = {open_wrapper, "open", 3},
-    [SYS_close] = {close_wrapper, "close", 1},
-    [SYS_read] = {read_wrapper, "read", 3},
-    [SYS_write] = {write_wrapper, "write", 3},
-    [SYS_lseek] = {lseek_wrapper, "lseek", 3},
-    [SYS_mount] = {mount_wrapper, "mount", 5},
+    [__NR_openat] = {(syscall_fn_t)sys_openat, "open", 3},
+    [__NR_close] = {(syscall_fn_t)sys_close, "close", 1},
+    [__NR_read] = {(syscall_fn_t)sys_read, "read", 3},
+    [__NR_write] = {(syscall_fn_t)sys_write, "write", 3},
+    [__NR_lseek] = {(syscall_fn_t)sys_lseek, "lseek", 3},
+    [__NR_mount] = {(syscall_fn_t)sys_mount, "mount", 5},
+    [__NR_getdents64] = {(syscall_fn_t)sys_getdents, "getdents", 3},
     
     /* Process operations */
-    [SYS_exit] = {exit_wrapper, "exit", 1},
-    [SYS_getpid] = {getpid_wrapper, "getpid", 0},
-    [SYS_getppid] = {NULL, "getppid", 0}, // Not implemented yet
-    [SYS_clone] = {clone_wrapper, "clone", 5},
+    [__NR_exit] = {(syscall_fn_t)sys_exit, "exit", 1},
+    [__NR_getpid] = {(syscall_fn_t)sys_getpid, "getpid", 0},
+    [__NR_getppid] = {NULL, "getppid", 0}, // Not implemented yet
+    [__NR_clone] = {(syscall_fn_t)sys_clone, "clone", 5},
     
     /* Memory operations */
-    [SYS_mmap] = {mmap_wrapper, "mmap", 6},
-    [SYS_brk] = {NULL, "brk", 1}, // Not implemented yet
+    [__NR_mmap] = {(syscall_fn_t)sys_mmap, "mmap", 6},
+    [__NR_brk] = {NULL, "brk", 1}, // Not implemented yet
     
     /* Time operations */
-    [SYS_time] = {time_wrapper, "time", 1},
+    [__NR_time] = {(syscall_fn_t)sys_time, "time", 1},
 
     /* Add more syscalls as needed */
 };
@@ -122,7 +120,7 @@ int64 do_syscall(int64 syscall_num, int64 a0, int64 a1, int64 a2,
     sprint("SYSCALL: %s(%ld, %ld, ...)\n", entry->name, a0, a1);
 #endif
     
-    /* Execute syscall through wrapper */
+    /* Execute syscall through the function pointer with type casting */
     int64 ret = entry->func(a0, a1, a2, a3, a4, a5);
     
 #if SYSCALL_DEBUG
@@ -130,28 +128,6 @@ int64 do_syscall(int64 syscall_num, int64 a0, int64 a1, int64 a2,
     sprint("SYSCALL: %s returned %ld\n", entry->name, ret);
 #endif
     
-    return ret;
-}
-
-/* Implementations of actual syscall handlers follow */
-
-int64 sys_open(const char *pathname, int32 flags, mode_t mode) {
-    if (!pathname) 
-        return -EFAULT;
-    
-    /* Copy pathname from user space */
-    char *kpathname = kmalloc(PATH_MAX);
-    if (!kpathname)
-        return -ENOMEM;
-    
-    if (copy_from_user(kpathname, pathname, PATH_MAX)) {
-        kfree(kpathname);
-        return -EFAULT;
-    }
-    
-    /* Call internal implementation */
-    int32 ret = do_open(kpathname, flags, mode);
-    kfree(kpathname);
     return ret;
 }
 

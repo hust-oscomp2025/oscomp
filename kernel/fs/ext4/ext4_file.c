@@ -54,7 +54,7 @@ static loff_t ext4_file_llseek(struct file* filp, loff_t offset, int32 whence) {
  */
 static ssize_t ext4_file_read(struct file* filp, char* buf, size_t len, loff_t* ppos) {
 	struct ext4_file* ext4_file = (struct ext4_file*)filp->f_private;
-	uint32_t bytes_read;
+	size_t bytes_read;
 	int32 ret;
 
 	if (!ext4_file) return -EBADF;
@@ -83,7 +83,7 @@ static ssize_t ext4_file_read(struct file* filp, char* buf, size_t len, loff_t* 
  */
 static ssize_t ext4_file_write(struct file* filp, const char* buf, size_t len, loff_t* ppos) {
 	struct ext4_file* ext4_file = (struct ext4_file*)filp->f_private;
-	uint32_t bytes_written;
+	size_t bytes_written;
 	int32 ret;
 
 	if (!ext4_file) return -EBADF;
@@ -110,25 +110,50 @@ static ssize_t ext4_file_write(struct file* filp, const char* buf, size_t len, l
  */
 static int32 ext4_dir_iterate(struct file* filp, struct dir_context* ctx) {
 	struct ext4_dir* ext4_dir = (struct ext4_dir*)filp->f_private;
-	struct ext4_dir_entry entry;
-	int32 ret;
+	const ext4_direntry* entry;
 
 	if (!ext4_dir) return -EBADF;
 
-	// Seek to the position stored in context
-	ret = ext4_dir_seek(ext4_dir, ctx->pos);
-	if (ret != EOK) return -EIO;
+	// 简单地迭代目录条目
+	while ((entry = ext4_dir_entry_next(ext4_dir)) != NULL) {
+		// 确定条目类型
+		unsigned char entry_type = DT_UNKNOWN;
 
-	// Read an entry
-	ret = ext4_dir_read(ext4_dir, &entry);
-	if (ret == ENOENT) return 0; // End of directory
-	if (ret != EOK) return -EIO;
+		// 转换ext4的inode类型到dirent类型
+		switch (entry->inode_type) {
+		case EXT4_DE_REG_FILE:
+			entry_type = DT_REG;
+			break;
+		case EXT4_DE_DIR:
+			entry_type = DT_DIR;
+			break;
+		case EXT4_DE_CHRDEV:
+			entry_type = DT_CHR;
+			break;
+		case EXT4_DE_BLKDEV:
+			entry_type = DT_BLK;
+			break;
+		case EXT4_DE_FIFO:
+			entry_type = DT_FIFO;
+			break;
+		case EXT4_DE_SOCK:
+			entry_type = DT_SOCK;
+			break;
+		case EXT4_DE_SYMLINK:
+			entry_type = DT_LNK;
+			break;
+		default:
+			entry_type = DT_UNKNOWN;
+		}
 
-	// Call the actor callback with the entry info
-	if (!ctx->actor(ctx, entry.name, strlen(entry.name), ctx->pos, entry.inode, entry.entry_type)) return 0;
-
-	// Update position for next read
-	ctx->pos = ext4_dir_tell(ext4_dir);
+		// 调用回调函数，使用简单递增的位置索引
+		if (!ctx->actor(ctx, (const char*)entry->name, entry->name_length,
+		                ctx->pos++, // 简单地递增位置
+		                entry->inode, entry_type)) {
+			// 回调返回false，退出循环
+			break;
+		}
+	}
 
 	return 0;
 }
@@ -150,7 +175,7 @@ static int32 ext4_file_open(struct inode* inode, struct file* filp) {
 	if (!ext4_file) return -ENOMEM;
 
 	// Get full path from dentry
-	path = dentry_get_path(filp->f_dentry);
+	path = dentry_allocRawPath(filp->f_dentry);
 	if (!path) {
 		kfree(ext4_file);
 		return -EINVAL;
