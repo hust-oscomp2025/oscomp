@@ -5,6 +5,8 @@
 #include <kernel/util/string.h>
 #include <kernel/vfs.h>
 
+// EXT4表示兼容层方法。
+
 /**
  * EXT4_dir_iterate - Read directory entries
  * @filp: Directory file
