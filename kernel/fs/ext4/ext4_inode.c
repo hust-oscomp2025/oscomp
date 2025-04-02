@@ -1318,7 +1318,7 @@ static int32 ext4_vfs_get_link(struct dentry *dentry, struct inode *inode, struc
     } else {
         /* Read from file blocks */
         size_t rcnt;
-		char* pathname = dentry_allocRawPath(dentry);
+		char* pathname = dentry_allocFullPath(dentry);
         ret = ext4_readlink(pathname, link_target, inode->i_size, &rcnt);
 		kfree(pathname);
 

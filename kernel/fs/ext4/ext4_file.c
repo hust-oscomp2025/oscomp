@@ -6,109 +6,13 @@
 #include <kernel/vfs.h>
 
 /**
- * ext4_file_llseek - Position the file offset
- * @filp: The file to seek on
- * @offset: The offset to seek to
- * @whence: The seek type (SEEK_SET, SEEK_CUR, SEEK_END)
- *
- * Returns: New position on success, negative error code on failure
- */
-static loff_t ext4_file_llseek(struct file* filp, loff_t offset, int32 whence) {
-	struct ext4_file* ext4_file = (struct ext4_file*)filp->f_private;
-	int32 ret;
-	uint64_t pos;
-
-	if (!ext4_file) return -EBADF;
-
-	switch (whence) {
-	case SEEK_SET:
-		pos = offset;
-		break;
-	case SEEK_CUR:
-		pos = filp->f_pos + offset;
-		break;
-	case SEEK_END:
-		pos = ext4_fsize(ext4_file);
-		if (ret != EOK) return -EIO;
-		pos += offset;
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	ret = ext4_fseek(ext4_file, pos, SEEK_SET);
-	if (ret != EOK) return -EIO;
-
-	filp->f_pos = pos;
-	return pos;
-}
-
-/**
- * ext4_file_read - Read data from a file
- * @filp: File to read from
- * @buf: Buffer to read into
- * @len: Number of bytes to read
- * @ppos: File position (updated after read)
- *
- * Returns: Bytes read on success, negative error code on failure
- */
-static ssize_t ext4_file_read(struct file* filp, char* buf, size_t len, loff_t* ppos) {
-	struct ext4_file* ext4_file = (struct ext4_file*)filp->f_private;
-	size_t bytes_read;
-	int32 ret;
-
-	if (!ext4_file) return -EBADF;
-
-	if (*ppos != filp->f_pos) {
-		ret = ext4_fseek(ext4_file, *ppos, SEEK_SET);
-		if (ret != EOK) return -EIO;
-		filp->f_pos = *ppos;
-	}
-
-	ret = ext4_fread(ext4_file, buf, len, &bytes_read);
-	if (ret != EOK && ret != ENOENT) return -EIO;
-
-	*ppos = filp->f_pos += bytes_read;
-	return bytes_read;
-}
-
-/**
- * ext4_file_write - Write data to a file
- * @filp: File to write to
- * @buf: Buffer containing data to write
- * @len: Number of bytes to write
- * @ppos: File position (updated after write)
- *
- * Returns: Bytes written on success, negative error code on failure
- */
-static ssize_t ext4_file_write(struct file* filp, const char* buf, size_t len, loff_t* ppos) {
-	struct ext4_file* ext4_file = (struct ext4_file*)filp->f_private;
-	size_t bytes_written;
-	int32 ret;
-
-	if (!ext4_file) return -EBADF;
-
-	if (*ppos != filp->f_pos) {
-		ret = ext4_fseek(ext4_file, *ppos, SEEK_SET);
-		if (ret != EOK) return -EIO;
-		filp->f_pos = *ppos;
-	}
-
-	ret = ext4_fwrite(ext4_file, buf, len, &bytes_written);
-	if (ret != EOK) return -EIO;
-
-	*ppos = filp->f_pos += bytes_written;
-	return bytes_written;
-}
-
-/**
- * ext4_dir_iterate - Read directory entries
+ * EXT4_dir_iterate - Read directory entries
  * @filp: Directory file
  * @ctx: Directory context including position and callback
  *
  * Returns: 0 on success, negative error code on failure
  */
-static int32 ext4_dir_iterate(struct file* filp, struct dir_context* ctx) {
+static int32 EXT4_dir_iterate(struct file* filp, struct dir_context* ctx) {
 	struct ext4_dir* ext4_dir = (struct ext4_dir*)filp->f_private;
 	const ext4_direntry* entry;
 
@@ -158,124 +62,71 @@ static int32 ext4_dir_iterate(struct file* filp, struct dir_context* ctx) {
 	return 0;
 }
 
-/**
- * ext4_file_open - Open a file
- * @inode: Inode of file to open
- * @filp: File structure to initialize
- *
- * Returns: 0 on success, negative error code on failure
- */
-static int32 ext4_file_open(struct inode* inode, struct file* filp) {
-	struct ext4_file* ext4_file;
-	int32 ret;
-	char* path;
-
-	// Allocate ext4_file structure
-	ext4_file = kmalloc(sizeof(struct ext4_file));
-	if (!ext4_file) return -ENOMEM;
-
-	// Get full path from dentry
-	path = dentry_allocRawPath(filp->f_dentry);
-	if (!path) {
-		kfree(ext4_file);
-		return -EINVAL;
-	}
-
-	// Open the file
-	if (S_ISDIR(inode->i_mode)) {
-		struct ext4_dir* ext4_dir = (struct ext4_dir*)ext4_file;
-		ret = ext4_dir_open(ext4_dir, path);
-	} else {
-		int ext4_flags = 0;
-
-		// Convert VFS flags to lwext4 flags
-		if (filp->f_mode & FMODE_READ) ext4_flags |= O_RDONLY;
-		if (filp->f_mode & FMODE_WRITE) ext4_flags |= O_WRONLY;
-		if ((filp->f_mode & (FMODE_READ | FMODE_WRITE)) == (FMODE_READ | FMODE_WRITE)) ext4_flags = O_RDWR;
-
-		ret = ext4_fopen(ext4_file, path, ext4_flags);
-	}
-
-	kfree(path);
-
+// 修改 EXT4_file_open 接收 flags 和 mode
+static int32 EXT4_file_open(struct file* file, int32 flags, mode_t mode)
+{
+    ext4_file* ext4_f;
+    int32 ret;
+    char* path;
+    
+    /* 验证参数 */
+    if (!file || !file->f_inode)
+        return -EINVAL;
+    
+    /* 分配ext4文件结构 */
+    ext4_f = kmalloc(sizeof(ext4_file));
+    if (!ext4_f)
+        return -ENOMEM;
+    
+    memset(ext4_f, 0, sizeof(ext4_file));
+    
+    /* 从dentry获取相对挂载点的路径 */
+	path = dentry_allocPath2Mount(file->f_dentry);
+    if (!path) {
+        kfree(ext4_f);
+        return -ENOMEM;
+    }
+    
+    /* 使用传递的 flags 而不是从 file->f_mode 解析 */
+    /* 在这里可以使用 mode 参数 */
+    
+    /* 使用lwext4库的fopen2函数打开文件 */
+    ret = ext4_fopen2(ext4_f, path, flags);    
+    if (ret != EOK) {
+		kfree(ext4_f);
+		goto clean;
+    }
+	ret = ext4_mode_set(path, mode);
 	if (ret != EOK) {
-		kfree(ext4_file);
-		return -EIO;
+		kfree(ext4_f);
+		goto clean;
 	}
+    
+    /* 保存文件位置 */
+    file->f_pos = ext4_f->fpos;
+    
+    /* 将ext4_file存储在file的私有数据中 */
+    file->f_private = ext4_f;
 
-	filp->f_private = ext4_file;
-	return 0;
+clean:
+	kfree(path);
+	return ret;
+
 }
 
-/**
- * ext4_file_release - Release a file
- * @inode: Inode of file to release
- * @filp: File structure
- *
- * Returns: 0 on success, negative error code on failure
- */
-static int32 ext4_file_release(struct inode* inode, struct file* filp) {
-	int32 ret = 0;
-
-	if (filp->f_private) {
-		if (S_ISDIR(inode->i_mode)) {
-			struct ext4_dir* ext4_dir = (struct ext4_dir*)filp->f_private;
-			ret = ext4_dir_close(ext4_dir);
-		} else {
-			struct ext4_file* ext4_file = (struct ext4_file*)filp->f_private;
-			ret = ext4_fclose(ext4_file);
-		}
-
-		kfree(filp->f_private);
-		filp->f_private = NULL;
-	}
-
-	return (ret == EOK) ? 0 : -EIO;
-}
-
-/**
- * ext4_file_fsync - Synchronize file
- * @filp: File to sync
- * @start: Start offset (unused)
- * @end: End offset (unused)
- * @datasync: Only sync data, not metadata if true
- *
- * Returns: 0 on success, negative error code on failure
- */
-static int32 ext4_file_fsync(struct file* filp, loff_t start, loff_t end, int32 datasync) {
-	struct ext4_file* ext4_file = (struct ext4_file*)filp->f_private;
-	int32 ret;
-
-	if (!ext4_file) return -EBADF;
-
-	ret = ext4_fsync(ext4_file);
-	return (ret == EOK) ? 0 : -EIO;
-}
-
-/**
- * ext4_file_mmap - Memory map a file
- * @filp: File to map
- * @vma: Virtual memory area descriptor
- *
- * Returns: 0 on success, negative error code on failure
- */
-static int32 ext4_file_mmap(struct file* filp, struct vm_area_struct* vma) {
-	// For simplicity, delegate to generic file mmap handler
-	return generic_file_mmap(filp, vma);
-}
 
 /**
  * Ext4 file operations structure
  */
 const struct file_operations ext4_file_operations = {
+    .open = EXT4_file_open,
+
+
     .llseek = ext4_file_llseek,
     .read = ext4_file_read,
     .write = ext4_file_write,
     .read_iter = NULL,  // Could implement with ext4_file_read
     .write_iter = NULL, // Could implement with ext4_file_write
-    .iterate = ext4_dir_iterate,
-    .iterate_shared = ext4_dir_iterate, // Same as non-shared for now
-    .open = ext4_file_open,
     .flush = NULL, // Optional
     .release = ext4_file_release,
     .fsync = ext4_file_fsync,
@@ -289,12 +140,12 @@ const struct file_operations ext4_file_operations = {
  * Ext4 directory operations structure
  */
 const struct file_operations ext4_dir_operations = {
+    .open = ext4_dir_open,
+
     .llseek = ext4_file_llseek,
     .read = NULL,  // Directories can't be read directly
     .write = NULL, // Directories can't be written directly
-    .iterate = ext4_dir_iterate,
-    .iterate_shared = ext4_dir_iterate,
-    .open = ext4_file_open,
+    .iterate = EXT4_dir_iterate,
     .release = ext4_file_release,
     .fsync = ext4_file_fsync,
 };

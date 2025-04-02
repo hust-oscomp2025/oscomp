@@ -29,8 +29,8 @@ struct file* file_ref(struct file* file) {
  * @flags: Open flags
  * @mode: Creation mode
  */
-int32 file_open(struct file* file) {
-	if (file->f_op && file->f_op->open) return file->f_op->open(file);
+int32 file_open(struct file* file, int32 flags, mode_t mode) {
+	if (file->f_op && file->f_op->open) return file->f_op->open(file, flags, mode);
 	return 0;
 }
 

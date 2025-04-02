@@ -706,3 +706,8 @@ static int32 generic_permission(struct inode* inode, int32 mask) {
         
     return res;
 }
+
+bool inode_isDir(struct inode* inode){
+	if (!inode) return false;
+	return S_ISDIR(inode->i_mode);
+}

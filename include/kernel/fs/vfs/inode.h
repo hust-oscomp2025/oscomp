@@ -238,6 +238,7 @@ int32 inode_removexattr(struct inode* inode, const char* name);
 
 bool inode_isReadonly(struct inode* inode);
 bool inode_isImmutable(struct inode* inode);
+bool inode_isDir(struct inode* inode);
 
 //        ┌─────────────┐
 //        │             │
