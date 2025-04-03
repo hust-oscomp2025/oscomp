@@ -6,10 +6,10 @@
 #include <kernel/mm/page.h>
 #include <kernel/mm/pagetable.h>
 
-#include <spike_interface/spike_utils.h>
+#include <kernel/util/print.h>
 
-#include <util/spinlock.h>
-#include <util/string.h>
+#include <kernel/util/spinlock.h>
+#include <kernel/util/string.h>
 
 // pointer to kernel page director
 pagetable_t g_kernel_pagetable;
@@ -53,14 +53,14 @@ pagetable_t create_pagetable(void) {
  * @param pagetable 要释放的页表
  * @param level 当前页表级别(0=根页表, 1=中间页表, 2=叶子页表)
  */
-static void _pagetable_free_level(pagetable_t pagetable, int level) {
+static void _pagetable_free_level(pagetable_t pagetable, int32 level) {
   // 叶子页表直接返回，不需要递归
   if (level == PAGE_LEVELS - 1) {
     return;
   }
 
   // 遍历当前页表的所有条目
-  for (int i = 0; i < PT_ENTRIES; i++) {
+  for (int32 i = 0; i < PT_ENTRIES; i++) {
     pte_t pte = pagetable[i];
     // 如果页表项有效，则递归释放下一级页表
     if (pte & PTE_V) {
@@ -93,7 +93,7 @@ void free_pagetable(pagetable_t pagetable) {
 /**
  * 在页表中查找页表项
  */
-pte_t *page_walk(pagetable_t pagetable, uint64 va, int alloc) {
+pte_t *page_walk(pagetable_t pagetable, uint64 va, int32 alloc) {
   if (pagetable == NULL) {
     return NULL;
   }
@@ -107,7 +107,7 @@ pte_t *page_walk(pagetable_t pagetable, uint64 va, int alloc) {
   // starting from the page directory
   pagetable_t pt = pagetable;
 
-  for (int level = 2; level > 0; level--) {
+  for (int32 level = 2; level > 0; level--) {
 
     pte_t *pte = pt + PX(level, va);
 
@@ -144,7 +144,7 @@ pte_t *page_walk(pagetable_t pagetable, uint64 va, int alloc) {
  * @param perm 页权限标志
  * @return 成功返回0，失败返回-1
  */
-int pgt_map_page(pagetable_t pagetable, vaddr_t va, paddr_t pa, int perm) {
+int32 pgt_map_page(pagetable_t pagetable, vaddr_t va, paddr_t pa, int32 perm) {
   if (pagetable == NULL) {
     return -1;
   }
@@ -159,7 +159,7 @@ int pgt_map_page(pagetable_t pagetable, vaddr_t va, paddr_t pa, int perm) {
   }
 
   // 锁定页表操作
-  long flags = spinlock_lock_irqsave(&pagetable_lock);
+  int64 flags = spinlock_lock_irqsave(&pagetable_lock);
 
   // 查找页表项，必要时分配页表
   pte_t *pte = page_walk(pagetable, aligned_va, 1);
@@ -189,8 +189,8 @@ int pgt_map_page(pagetable_t pagetable, vaddr_t va, paddr_t pa, int perm) {
   return 0;
 }
 
-int pgt_map_pages(pagetable_t pagetable, uint64 va, uint64 pa, uint64 size,
-                  int perm) {
+int32 pgt_map_pages(pagetable_t pagetable, uint64 va, uint64 pa, uint64 size,
+                  int32 perm) {
   if (size < 0) {
     sprint("pgt_map_pages: wrong size %d\n", size);
     panic();
@@ -217,7 +217,7 @@ int pgt_map_pages(pagetable_t pagetable, uint64 va, uint64 pa, uint64 size,
 /**
  * 解除页表中一块虚拟地址区域的映射
  */
-int pgt_unmap(pagetable_t pagetable, uint64 va, uint64 size, int free_phys) {
+int32 pgt_unmap(pagetable_t pagetable, uint64 va, uint64 size, int32 free_phys) {
   if (pagetable == NULL) {
     return -1;
   }
@@ -232,7 +232,7 @@ int pgt_unmap(pagetable_t pagetable, uint64 va, uint64 size, int free_phys) {
   }
 
   // 锁定页表操作
-  long flags = spinlock_lock_irqsave(&pagetable_lock);
+  int64 flags = spinlock_lock_irqsave(&pagetable_lock);
 
   // 逐页取消映射
   for (uint64 va_page = start_va; va_page < end_va; va_page += PAGE_SIZE) {
@@ -312,7 +312,7 @@ pagetable_t pagetable_current(void) {
  *   这个复制页表的函数有问题，以后再修
  * 
  */
-pagetable_t pagetable_copy(pagetable_t src, uint64 start, uint64 end, int share) {
+pagetable_t pagetable_copy(pagetable_t src, uint64 start, uint64 end, int32 share) {
   if (src == NULL) {
     return NULL;
   }
@@ -328,7 +328,7 @@ pagetable_t pagetable_copy(pagetable_t src, uint64 start, uint64 end, int share)
   }
 
   // 锁定页表操作
-  long flags = spinlock_lock_irqsave(&pagetable_lock);
+  int64 flags = spinlock_lock_irqsave(&pagetable_lock);
 
   // 逐页复制映射
   for (uint64 va = start; va < end; va += PAGE_SIZE) {
@@ -341,7 +341,7 @@ pagetable_t pagetable_copy(pagetable_t src, uint64 start, uint64 end, int share)
 
     // 获取源物理地址和权限
     uint64 pa = PTE2PA(*src_pte);
-    int perm = PTE_FLAGS(*src_pte);
+    int32 perm = PTE_FLAGS(*src_pte);
 
     // 根据共享模式处理
     if (share == 0) {
@@ -415,16 +415,16 @@ pagetable_t pagetable_copy(pagetable_t src, uint64 start, uint64 end, int share)
  * @param level 当前页表级别
  * @param va_prefix 虚拟地址前缀
  */
-static void _pagetable_dump_level(pagetable_t pagetable, int level,
+static void _pagetable_dump_level(pagetable_t pagetable, int32 level,
                                   uint64 va_prefix) {
   // 打印缩进
-  for (int i = 0; i < level; i++) {
+  for (int32 i = 0; i < level; i++) {
     sprint("  ");
   }
   sprint("Page table @0x%lx\n", (uint64)pagetable);
 
   // 遍历当前页表的所有条目
-  for (int i = 0; i < PT_ENTRIES; i++) {
+  for (int32 i = 0; i < PT_ENTRIES; i++) {
     pte_t pte = pagetable[i];
     if (pte & PTE_V) {
       // 计算此项对应的虚拟地址
@@ -433,7 +433,7 @@ static void _pagetable_dump_level(pagetable_t pagetable, int level,
                                     PT_INDEX_BITS * (PAGE_LEVELS - 1 - level)));
 
       // 打印缩进
-      for (int j = 0; j < level + 1; j++) {
+      for (int32 j = 0; j < level + 1; j++) {
         sprint("  ");
       }
 

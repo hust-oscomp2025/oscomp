@@ -12,8 +12,8 @@
 #include <kernel/mm/page.h>
 #include <kernel/riscv.h>
 #include <kernel/types.h>
-#include <util/atomic.h>
-#include <util/spinlock.h>
+#include <kernel/util/atomic.h>
+#include <kernel/util/spinlock.h>
 
 /**
  * @brief 页表管理数据结构
@@ -72,12 +72,12 @@ void pagetable_server_init(void);
 pagetable_t create_pagetable(void);
 void free_pagetable(pagetable_t pagetable);
 
-int pgt_map_page(pagetable_t pagetable, vaddr_t va, paddr_t pa, int perm);
-int pgt_map_pages(pagetable_t pagetable, vaddr_t va, paddr_t pa, uint64 size,  int perm);
+int32 pgt_map_page(pagetable_t pagetable, vaddr_t va, paddr_t pa, int32 perm);
+int32 pgt_map_pages(pagetable_t pagetable, vaddr_t va, paddr_t pa, uint64 size,  int32 perm);
 
-int pgt_unmap(pagetable_t pagetable, vaddr_t va, uint64 size, int free_phys);
+int32 pgt_unmap(pagetable_t pagetable, vaddr_t va, uint64 size, int32 free_phys);
 
-pte_t *page_walk(pagetable_t pagetable, vaddr_t va, int alloc);
+pte_t *page_walk(pagetable_t pagetable, vaddr_t va, int32 alloc);
 paddr_t lookup_pa(pagetable_t pagetable, vaddr_t va);
 
 
@@ -90,7 +90,7 @@ paddr_t lookup_pa(pagetable_t pagetable, vaddr_t va);
  * @param share 映射类型: 0=复制物理页, 1=共享物理页, 2=写时复制
  * @return pagetable_t 复制的页表，失败返回NULL
  */
-pagetable_t pagetable_copy(pagetable_t src, vaddr_t start, vaddr_t end, int share);
+pagetable_t pagetable_copy(pagetable_t src, vaddr_t start, vaddr_t end, int32 share);
 
 /**
  * @brief 打印页表内容(用于调试)

@@ -1,13 +1,14 @@
-#include <errno.h>
+#include <kernel/types.h>
+
 #include <kernel/mm/kmalloc.h>
 #include <kernel/mm/mm_struct.h>
 #include <kernel/mm/mmap.h>
 #include <kernel/mm/page.h>
 #include <kernel/mm/vma.h>
 #include <kernel/sched/process.h>
-#include <spike_interface/spike_utils.h>
-#include <util/atomic.h>
-#include <util/string.h>
+#include <kernel/util/print.h>
+#include <kernel/util/atomic.h>
+#include <kernel/util/string.h>
 
 // user_alloc_mm
 struct mm_struct *user_alloc_mm(void) {
@@ -75,7 +76,7 @@ void free_mm(struct mm_struct *mm) {
       free_vma(vma);
       // 释放VMA关联的所有页
       if (vma->pages) {
-        for (int i = 0; i < vma->page_count; i++) {
+        for (int32 i = 0; i < vma->page_count; i++) {
           if (vma->pages[i]) {
             put_page(vma->pages[i]);
           }
@@ -168,7 +169,7 @@ ssize_t mm_copy_to_user(struct mm_struct *mm, uint64 dst, const void* src,
     uint64 page_va = ROUNDDOWN(dst_addr + bytes_copied, PAGE_SIZE);
 
     // Find page index
-    int page_idx = (page_va - vma->vm_start) / PAGE_SIZE;
+    int32 page_idx = (page_va - vma->vm_start) / PAGE_SIZE;
     if (page_idx < 0 || page_idx >= vma->page_count)
       return bytes_copied > 0 ? bytes_copied : -EFAULT;
 
@@ -218,7 +219,7 @@ ssize_t mm_copy_from_user(struct mm_struct *mm, uint64 dst, const void* src,
     uint64 page_va = ROUNDDOWN(src_addr + bytes_copied, PAGE_SIZE);
 
     // 查找对应的页结构
-    int page_idx = (page_va - vma->vm_start) / PAGE_SIZE;
+    int32 page_idx = (page_va - vma->vm_start) / PAGE_SIZE;
     if (page_idx < 0 || page_idx >= vma->page_count)
       return bytes_copied > 0 ? bytes_copied : -1;
 

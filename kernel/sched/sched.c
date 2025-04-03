@@ -6,10 +6,11 @@
 #include <kernel/mm/mm_struct.h>
 #include <kernel/sched/pid.h>
 #include <kernel/sched/sched.h>
+#include <kernel/sched/process.h>
 #include <kernel/trapframe.h>
-#include <spike_interface/spike_utils.h>
-#include <util/list.h>
-#include <util/string.h>
+#include <kernel/util/print.h>
+#include <kernel/util/list.h>
+#include <kernel/util/string.h>
 
 struct list_head ready_queue;
 struct task_struct *procs[NPROC];
@@ -24,28 +25,30 @@ void init_scheduler() {
   pid_init();
   memset(procs, 0, sizeof(struct task_struct *) * NPROC);
 
-  for (int i = 0; i < NPROC; ++i) {
+  for (int32 i = 0; i < NPROC; ++i) {
     procs[i] = NULL;
   }
   sprint("Scheduler initiated\n");
 }
 
 struct task_struct *alloc_empty_process() {
-  for (int i = 0; i < NPROC; i++) {
+  for (int32 i = 0; i < NPROC; i++) {
     if (procs[i] == NULL) {
       procs[i] = (struct task_struct *)kmalloc(sizeof(struct task_struct));
       memset(procs[i], 0, sizeof(struct task_struct));
       return procs[i];
     }
   }
+  
   panic("cannot find any free process structure.\n");
+  return NULL;
 }
 //
 // insert a process, proc, into the END of ready queue.
 //
 void insert_to_ready_queue(struct task_struct *proc) {
   sprint("going to insert process %d to ready queue.\n", proc->pid);
-  list_add(&proc->queue_node, &ready_queue);
+  list_add(&proc->ready_queue_node, &ready_queue);
 }
 
 //
@@ -57,7 +60,7 @@ void insert_to_ready_queue(struct task_struct *proc) {
 void schedule() {
   sprint("schedule: start\n");
   extern struct task_struct *procs[NPROC];
-  int hartid = read_tp();
+  int32 hartid = read_tp();
   struct task_struct *cur = CURRENT;
   // sprint("debug\n");
   if (cur &&
@@ -72,36 +75,36 @@ void schedule() {
     // by default, if there are no ready process, and all processes are in the
     // state of FREE and ZOMBIE, we should shutdown the emulated RISC-V
     // machine.
-    int should_shutdown = 1;
+    int32 should_shutdown = 1;
 
-    for (int i = 0; i < NPROC; i++)
-      if ((procs[i]) && (procs[i]->exit_state != EXIT_TRACE)) {
-        should_shutdown = 0;
-        sprint("ready queue empty, but process %d is not in free/zombie "
-               "state:%d\n",
-               i, procs[i]->exit_state);
-      }
+    // for (int32 i = 0; i < NPROC; i++)
+    //   if ((procs[i]) && (procs[i]->exit_state != EXIT_TRACE)) {
+    //     should_shutdown = 0;
+    //     sprint("ready queue empty, but process %d is not in free/zombie "
+    //            "state:%d\n",
+    //            i, procs[i]->exit_state);
+    //   }
 
-    // 如果所有进程都在 FREE 或 ZOMBIE 状态，允许关机
-    if (should_shutdown) {
-      // 确保只有 hartid == 0 的核心执行 shutdown
-      if (hartid == 0) {
-        sprint("no more ready processes, system shutdown now.\n");
-        shutdown(0); // 只有核心 0 执行关机
-      }
-      // 否则，其他核心等待关机标志
-      else {
-        while (1) {
-          // 自旋等待，直到 hartid == 0 核心完成 shutdown
-        }
-      }
-    } else {
-      panic(
-          "Not handled: we should let system wait for unfinished processes.\n");
-    }
+    // // 如果所有进程都在 FREE 或 ZOMBIE 状态，允许关机
+    // if (should_shutdown) {
+    //   // 确保只有 hartid == 0 的核心执行 shutdown
+    //   if (hartid == 0) {
+    //     sprint("no more ready processes, system shutdown now.\n");
+    //     shutdown(0); // 只有核心 0 执行关机
+    //   }
+    //   // 否则，其他核心等待关机标志
+    //   else {
+    //     while (1) {
+    //       // 自旋等待，直到 hartid == 0 核心完成 shutdown
+    //     }
+    //   }
+    // } else {
+    //   panic(
+    //       "Not handled: we should let system wait for unfinished processes.\n");
+    // }
   }
 
-  CURRENT = container_of(ready_queue.next, struct task_struct, queue_node);
+  CURRENT = container_of(ready_queue.next, struct task_struct, ready_queue_node);
   list_del_init(ready_queue.next);
   if (cur->ktrapframe != NULL) {
     sprint("going to schedule process %d to run in s-mode.\n", CURRENT->pid);
@@ -144,4 +147,28 @@ void switch_to(struct task_struct *proc) {
 
   extern void return_to_user(struct trapframe *, uint64);
   return_to_user(proc->trapframe, MAKE_SATP(proc->mm->pagetable));
+}
+
+
+
+/**
+ * find_process_by_pid - Find a process by its PID
+ * @pid: Process ID to search for
+ *
+ * Searches the process table for a process with the given PID.
+ * 
+ * Returns: Pointer to the task_struct if found, NULL if not found
+ */
+struct task_struct *find_process_by_pid(pid_t pid) {
+    if (pid <= 0)
+        return NULL;
+    
+    // Search the process table
+    for (int32 i = 0; i < NPROC; i++) {
+        if (procs[i] && procs[i]->pid == pid) {
+            return procs[i];
+        }
+    }
+    
+    return NULL;  // Process not found
 }

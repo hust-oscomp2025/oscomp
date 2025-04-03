@@ -7,14 +7,14 @@
  *   - Idle 进程负责在系统无其他可运行任务时，进入低功耗状态。
  */
 
-#include <spike_interface/spike_utils.h>
+#include <kernel/util/print.h>
 // printk、KERN_INFO 等
 #include <kernel/sched/sched.h> // task_struct 定义，TASK_RUNNING, PF_KTHREAD 等
 //#include <linux/init.h>         // __init 宏
-#include <util/spinlock.h>      // 锁相关函数
+#include <kernel/util/spinlock.h>      // 锁相关函数
 #include <kernel/mm/kmalloc.h>
-#include <util/string.h>
-#include <util/list.h>
+#include <kernel/util/string.h>
+#include <kernel/util/list.h>
 
 /* 外部声明 */
 extern void schedule(void);
@@ -68,7 +68,7 @@ void init_idle_task(void) {
 	idle_task.ktrapframe = kmalloc(sizeof(struct trapframe));
 	sprint("idle_task.ktrapframe: %p\n",idle_task.ktrapframe);
 	memset(idle_task.ktrapframe,0,sizeof(struct trapframe));
-  idle_task.ktrapframe->epc = (unsigned long)idle_loop;
+  idle_task.ktrapframe->epc = (uint64)idle_loop;
 
 	extern struct mm_struct init_mm;
 	idle_task.mm = &init_mm;
@@ -84,7 +84,7 @@ void init_idle_task(void) {
 	idle_task.parent;
 	INIT_LIST_HEAD(&idle_task.children);
 	INIT_LIST_HEAD(&idle_task.sibling);
-	INIT_LIST_HEAD(&idle_task.queue_node);
+	INIT_LIST_HEAD(&idle_task.ready_queue_node);
   idle_task.tick_count = 0;
 
   //ps->sem_index = sem_new(0);	//这个信号量需要重写

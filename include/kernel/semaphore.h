@@ -6,16 +6,16 @@
 #define NSEM 256
 
 typedef struct semaphore_t {
-  int isActive;
-  int value;
+  int32 isActive;
+  int32 value;
   struct task_struct *wait_queue;
-  int pid; // 系统信号量为-1
+  int32 pid; // 系统信号量为-1
 } semaphore;
 
-int sem_new(int initial_value);
-void sem_free(int sem_index);
-int sem_P(int sem_index);
-int sem_V(int sem_index);
+int32 sem_new(int32 initial_value);
+void sem_free(int32 sem_index);
+int32 sem_P(int32 sem_index);
+int32 sem_V(int32 sem_index);
 
 
 #endif

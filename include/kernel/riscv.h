@@ -86,18 +86,18 @@
 
 #define read_const_csr(reg)              \
   ({                                     \
-    unsigned long __tmp;                 \
+    uint64 __tmp;                 \
     asm("csrr %0, " #reg : "=r"(__tmp)); \
     __tmp;                               \
   })
 
-static inline int supports_extension(char ext) {
+static inline int32 supports_extension(char ext) {
   return read_const_csr(misa) & (1 << (ext - 'A'));
 }
 
 #define read_csr(reg)                             \
   ({                                              \
-    unsigned long __tmp;                          \
+    uint64 __tmp;                          \
     asm volatile("csrr %0, " #reg : "=r"(__tmp)); \
     __tmp;                                        \
   })
@@ -107,14 +107,14 @@ static inline int supports_extension(char ext) {
 
 #define swap_csr(reg, val)                                             \
    ({                                                                  \
-    unsigned long __tmp;                                              \
+    uint64 __tmp;                                              \
     asm volatile("csrrw %0, " #reg ", %1" : "=r"(__tmp) : "rK"(val)); \
     __tmp;                                                         \
   })
 
 #define set_csr(reg, bit)                                             \
   ({                                                                  \
-    unsigned long __tmp;                                              \
+    uint64 __tmp;                                              \
     asm volatile("csrrs %0, " #reg ", %1" : "=r"(__tmp) : "rK"(bit)); \
     __tmp;                                                            \
   })
@@ -126,7 +126,7 @@ static inline void intr_on(void) { write_csr(sstatus, read_csr(sstatus) | SSTATU
 static inline void intr_off(void) { write_csr(sstatus, read_csr(sstatus) & ~SSTATUS_SIE); }
 
 // are device interrupts enabled?
-static inline int is_intr_enable(void) {
+static inline int32 is_intr_enable(void) {
   //  uint64 x = r_sstatus();
   uint64 x = read_csr(sstatus);
   return (x & SSTATUS_SIE) != 0;
