@@ -21,7 +21,7 @@ static struct superblock* __fstype_allocSuperblock(struct fstype* type);
  *
  * Returns: pointer to superblock or NULL on failure
  */
-struct superblock* fstype_mount(struct fstype* type, int32 flags, dev_t dev_id, void* fs_data) {
+struct superblock* fstype_mount(struct fstype* type, int32 flags, dev_t dev_id,const void* fs_data) {
 	struct superblock* sb = NULL;
 
 	if (!type) return NULL;

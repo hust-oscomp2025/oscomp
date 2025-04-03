@@ -65,7 +65,7 @@ static int32 EXT4_dir_iterate(struct file* filp, struct dir_context* ctx) {
 }
 
 // 修改 EXT4_file_open 接收 flags 和 mode
-static int32 EXT4_file_open(struct file* file, int32 flags, mode_t mode)
+static int32 EXT4_file_open(struct file* file, int32 flags)
 {
     ext4_file* ext4_f;
     int32 ret;
@@ -98,11 +98,6 @@ static int32 EXT4_file_open(struct file* file, int32 flags, mode_t mode)
 		kfree(ext4_f);
 		goto clean;
     }
-	ret = ext4_mode_set(path, mode);
-	if (ret != EOK) {
-		kfree(ext4_f);
-		goto clean;
-	}
     
     /* 保存文件位置 */
     file->f_pos = ext4_f->fpos;
@@ -117,6 +112,51 @@ clean:
 }
 
 
+static int32 EXT4_dir_open(struct file* file, int32 flags)
+{
+    ext4_dir* ext4_d;
+    int32 ret;
+    char* path;
+    
+    /* Validate parameters */
+    if (!file || !file->f_inode)
+        return -EINVAL;
+    
+    /* Make sure it's a directory */
+    if (!S_ISDIR(file->f_inode->i_mode))
+        return -ENOTDIR;
+    
+    /* Allocate ext4 directory structure */
+    ext4_d = kmalloc(sizeof(ext4_dir));
+    if (!ext4_d)
+        return -ENOMEM;
+    
+    memset(ext4_d, 0, sizeof(ext4_dir));
+    
+    /* Get path relative to mount point */
+    path = dentry_allocPath2Mount(file->f_dentry);
+    if (!path) {
+        kfree(ext4_d);
+        return -ENOMEM;
+    }
+    
+    /* Open directory using lwext4 library */
+    ret = ext4_dir_open(ext4_d, path);
+    if (ret != EOK) {
+        kfree(ext4_d);
+        kfree(path);
+        return ret;
+    }
+    
+    /* Store directory handle in file's private data */
+    file->f_private = ext4_d;
+    
+    /* Clean up path string */
+    kfree(path);
+    return 0;
+}
+
+
 /**
  * Ext4 file operations structure
  */
@@ -124,30 +164,30 @@ const struct file_operations ext4_file_operations = {
     .open = EXT4_file_open,
 
 
-    .llseek = ext4_file_llseek,
-    .read = ext4_file_read,
-    .write = ext4_file_write,
-    .read_iter = NULL,  // Could implement with ext4_file_read
-    .write_iter = NULL, // Could implement with ext4_file_write
-    .flush = NULL, // Optional
-    .release = ext4_file_release,
-    .fsync = ext4_file_fsync,
-    .mmap = ext4_file_mmap,
-    .unlocked_ioctl = NULL, // Optional
-    .fasync = NULL,         // Optional
-    .fallocate = NULL       // Optional
+    // .llseek = ext4_file_llseek,
+    // .read = ext4_file_read,
+    // .write = ext4_file_write,
+    // .read_iter = NULL,  // Could implement with ext4_file_read
+    // .write_iter = NULL, // Could implement with ext4_file_write
+    // .flush = NULL, // Optional
+    // .release = ext4_file_release,
+    // .fsync = ext4_file_fsync,
+    // .mmap = ext4_file_mmap,
+    // .unlocked_ioctl = NULL, // Optional
+    // .fasync = NULL,         // Optional
+    // .fallocate = NULL       // Optional
 };
 
 /**
  * Ext4 directory operations structure
  */
 const struct file_operations ext4_dir_operations = {
-    .open = ext4_dir_open,
+    .open = EXT4_dir_open,
 
-    .llseek = ext4_file_llseek,
-    .read = NULL,  // Directories can't be read directly
-    .write = NULL, // Directories can't be written directly
-    .iterate = EXT4_dir_iterate,
-    .release = ext4_file_release,
-    .fsync = ext4_file_fsync,
+    // .llseek = ext4_file_llseek,
+    // .read = NULL,  // Directories can't be read directly
+    // .write = NULL, // Directories can't be written directly
+    // .iterate = EXT4_dir_iterate,
+    // .release = ext4_file_release,
+    // .fsync = ext4_file_fsync,
 };

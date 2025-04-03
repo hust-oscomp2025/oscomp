@@ -1,5 +1,5 @@
 
-#include <kernel/fs/vfs/file.h>
+#include <kernel/vfs.h>
 #include <kernel/mm/kmalloc.h>
 #include <kernel/sched.h>
 #include <kernel/sprint.h>

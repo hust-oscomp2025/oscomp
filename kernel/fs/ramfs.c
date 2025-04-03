@@ -12,7 +12,7 @@
  *
  * Initializes a superblock for ramfs
  */
-static int32 static_ramfs_fill_super(struct fstype* type, struct superblock* sb, void* data, int32 silent) {
+static int32 static_ramfs_fill_super(struct fstype* type, struct superblock* sb,const void* data, int32 silent) {
 	struct inode* root_inode;
 	struct dentry* root_dentry;
 
@@ -85,7 +85,7 @@ static int32 static_ramfs_fill_super(struct fstype* type, struct superblock* sb,
  *
  * Creates and returns a new superblock for ramfs
  */
-static struct superblock* static_ramfs_mount(struct fstype* type, int32 flags, dev_t dev_id, void* data) {
+static struct superblock* static_ramfs_mount(struct fstype* type, int32 flags, dev_t dev_id, const void* data) {
 	struct superblock* sb;
 	int32 error;
 

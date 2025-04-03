@@ -54,7 +54,7 @@ struct dentry* vfs_mkdir_path(const char* path, fmode_t mode) {
  * Returns the superblock on success, ERR_PTR on failure
  * 正在优化的vfs_kern_mount函数
  */
-struct vfsmount* vfs_kern_mount(struct fstype* fstype, int32 flags, const char* device_path, void* data) {
+struct vfsmount* vfs_kern_mount(struct fstype* fstype, int32 flags, const char* device_path, const void* data) {
 	CHECK_PTR_VALID(fstype, ERR_PTR(-EINVAL));
 	dev_t dev_id = 0;
 	/***** 对于挂载实体设备的处理 *****/
@@ -145,7 +145,7 @@ int32 vfs_init(void) {
 }
 
 /**
- * vfs_path_lookup - Look up a path relative to a dentry/mount pair
+ * vfs_pathwalk - Look up a path relative to a dentry/mount pair
  * @base_dentry: Starting dentry
  * @base_mnt: Starting vfsmount
  * @path_str: Path string to look up
@@ -156,7 +156,7 @@ int32 vfs_init(void) {
  *
  * Returns 0 on success, negative error code on failure.
  */
-int32 vfs_path_lookup(struct dentry* base_dentry, struct vfsmount* base_mnt, const char* path_str, uint32 flags, struct path* result) {
+int32 vfs_pathwalk(struct dentry* base_dentry, struct vfsmount* base_mnt, const char* path_str, uint32 flags, struct path* result) {
 	struct dentry* dentry;
 	struct vfsmount* mnt;
 	char* component;
@@ -277,7 +277,7 @@ int32 vfs_path_lookup(struct dentry* base_dentry, struct vfsmount* base_mnt, con
 		if (!next->d_inode && dentry->d_inode && dentry->d_inode->i_op && dentry->d_inode->i_op->lookup) {
 
 			/* Call filesystem lookup method */
-			struct dentry* found = dentry->d_inode->i_op->lookup(dentry->d_inode, next, 0);
+			struct dentry* found = inode_lookup(dentry->d_inode, next, flags);
 			if (PTR_IS_ERROR(found)) {
 				dentry_unref(next);
 				dentry_unref(dentry);
@@ -460,7 +460,7 @@ struct file *vfs_alloc_file(const struct path *path, int32 flags, mode_t mode)
         if (inode && inode_isReadonly(inode))
             return ERR_PTR(-EROFS);  // 只读文件系统
         
-        if (inode && (flags & O_ACCMODE) == O_WRONLY || (flags & O_ACCMODE) == O_RDWR) {
+        if (inode && ((flags & O_ACCMODE) == O_WRONLY || (flags & O_ACCMODE) == O_RDWR)) {
             if (S_ISDIR(inode->i_mode))
                 return ERR_PTR(-EISDIR);  // 不能写入目录
                 
@@ -540,4 +540,23 @@ struct file *vfs_alloc_file(const struct path *path, int32 flags, mode_t mode)
     atomic_set(&file->f_refcount, 1);
     
     return file;
+}
+
+
+int vfs_validate_flags(int flags) {
+    // 检查访问模式是否合法
+    if ((flags & O_ACCMODE) != O_RDONLY &&
+        (flags & O_ACCMODE) != O_WRONLY &&
+        (flags & O_ACCMODE) != O_RDWR)
+        return -EINVAL;
+
+    // O_TRUNC 必须有写权限
+    if ((flags & O_TRUNC) && (flags & O_ACCMODE) == O_RDONLY)
+        return -EINVAL;
+
+    // 检查非法 flag
+    if (flags & ~VALID_OPEN_FLAGS)
+        return -EINVAL;
+
+    return 0;
 }

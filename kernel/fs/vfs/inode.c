@@ -6,44 +6,15 @@
 #include <kernel/util.h>
 #include <kernel/vfs.h>
 
-static struct inode* __inode_lookupHash(struct superblock* sb, uint64 ino);
-
-static void __inode__free(struct inode* inode);
-static void* __inode_get_key(struct list_node* node);
-static uint32 __inode_hash_func(const void* key);
-static int32 __inode_key_equals(const void* k1, const void* k2);
-static void __inode_hash(struct inode* inode);
-static void __inode_unhash(struct inode* inode);
-static void evict_inode(struct inode* inode);
-static int32 generic_permission(struct inode* inode, int32 mask);
-static void __unlock_new_inode(struct inode* inode);
+void __inode__free(struct inode* inode);
+void evict_inode(struct inode* inode);
+int32 generic_permission(struct inode* inode, int32 mask);
+void __unlock_new_inode(struct inode* inode);
 
 /* Global inode hash table */
 struct hashtable inode_hashtable;
 
-struct inode_key {
-	struct superblock* sb;
-	uint64 ino;
-};
 
-/**
- * Initialize the inode cache and hash table
- */
-int32 inode_cache_init(void) {
-	int32 err;
-
-	sprint("Initializing inode cache\n");
-
-	/* Initialize hash table with our callbacks */
-	err = hashtable_setup(&inode_hashtable, 1024, 75, __inode_hash_func, __inode_get_key, __inode_key_equals);
-	if (err != 0) {
-		sprint("Failed to initialize inode hashtable: %d\n", err);
-		return err;
-	}
-
-	sprint("Inode cache initialized\n");
-	return 0;
-}
 
 /**
  * generic_permission - Check for access rights on a Unix-style file system
@@ -55,7 +26,7 @@ int32 inode_cache_init(void) {
  *
  * Returns 0 if access is allowed, -EACCES otherwise.
  */
-// static int32 generic_permission(struct inode* inode, int32 mask) {
+//  int32 generic_permission(struct inode* inode, int32 mask) {
 // 	int32 mode = inode->i_mode;
 // 	int32 res = 0;
 
@@ -122,7 +93,7 @@ int32 inode_checkPermission(struct inode* inode, int32 mask) {
 struct inode* inode_acquire(struct superblock* sb, uint64 ino) {
 	CHECK_PTR_VALID(sb, ERR_PTR(-EINVAL));
 
-	struct inode* inode = __inode_lookupHash(sb, ino);
+	struct inode* inode = icache_lookup(sb, ino);
 	CHECK_PTR_ERROR(inode, ERR_PTR(-ENOMEM));
 
 	if (!inode) {
@@ -140,7 +111,7 @@ struct inode* inode_acquire(struct superblock* sb, uint64 ino) {
 			return ERR_PTR(-EINVAL);
 		}
 	}
-	__inode_hash(inode);
+	icache_insert(inode);
 
 	// 原则上栈上使用的inode指针必须解引用，但是返回时又需要增加引用，所以在return前不做动作
 	return inode;
@@ -179,7 +150,9 @@ void inode_unref(struct inode* inode) {
 		if (!(inode->i_state & I_DIRTY)) {
 			/* If it's on another state list, remove it first */
 			spinlock_lock(&sb->s_list_inode_states_lock);
-			if (!list_empty(&inode->i_state_list_node)) { list_del_init(&inode->i_state_list_node); }
+			if (!list_empty(&inode->i_state_list_node)) {
+				list_del_init(&inode->i_state_list_node);
+			}
 
 			list_add_tail(&inode->i_state_list_node, &sb->s_list_clean_inodes);
 			spinlock_unlock(&sb->s_list_inode_states_lock);
@@ -205,7 +178,9 @@ void inode_setDirty(struct inode* inode) {
 		spinlock_lock(&sb->s_list_inode_states_lock);
 		spinlock_lock(&inode->i_lock);
 
-		if (likely(!list_empty(&inode->i_state_list_node))) { list_del_init(&inode->i_state_list_node); }
+		if (likely(!list_empty(&inode->i_state_list_node))) {
+			list_del_init(&inode->i_state_list_node);
+		}
 
 		inode->i_state |= I_DIRTY;
 		list_add(&inode->i_state_list_node, &sb->s_list_dirty_inodes);
@@ -224,14 +199,16 @@ void inode_setDirty(struct inode* inode) {
  * cleaning up filesystem-specific resources and then clearing
  * the inode.
  */
-static void evict_inode(struct inode* inode) {
+void evict_inode(struct inode* inode) {
 	if (!inode) return;
 
 	/* Mark inode as being freed */
 	inode->i_state |= I_FREEING;
 
 	/* Call filesystem-specific cleanup through superblock operations */
-	if (inode->i_superblock && inode->i_superblock->s_operations && inode->i_superblock->s_operations->evict_inode) { inode->i_superblock->s_operations->evict_inode(inode); }
+	if (inode->i_superblock && inode->i_superblock->s_operations && inode->i_superblock->s_operations->evict_inode) {
+		inode->i_superblock->s_operations->evict_inode(inode);
+	}
 
 	/* Delete any remaining pages in the page cache */
 	if (inode->i_mapping) {
@@ -279,53 +256,22 @@ void __inode__free(struct inode* inode) {
 	kfree(inode);
 }
 
-static struct inode* __inode_lookupHash(struct superblock* sb, uint64 ino) {
-	struct inode* inode;
-	struct inode_key key = {.sb = sb, .ino = ino};
-
-	/* Look up in the hash table */
-	struct list_node* inode_node = hashtable_lookup(&inode_hashtable, &key);
-	CHECK_PTR_VALID(inode_node, NULL);
-
-	inode = container_of(inode_node, struct inode, i_hash_node);
-	// inode = hashtable_lookup(&inode_hashtable, &key);
-
-	/* Found in cache - grab a reference */
-	inode_ref(inode);
-	return inode;
-}
-
-/**
- * Hash function for inode keys
- * Uses both superblock pointer and inode number to generate a hash
- */
-static uint32 __inode_hash_func(const void* key) {
-	const struct inode_key* ikey = key;
-
-	/* Combine superblock pointer and inode number */
-	uint64 val = (uint64)ikey->sb ^ ikey->ino;
-
-	/* Mix the bits for better distribution */
-	val = (val * 11400714819323198485ULL) >> 32; /* Fast hash multiply */
-	return (uint32)val;
-}
-
 /**
  * Compare two inode keys for equality
  */
-static int32 __inode_key_equals(const void* k1, const void* k2) {
+int32 icache_equal(const void* k1, const void* k2) {
 	const struct inode_key *key1 = k1, *key2 = k2;
 
 	return (key1->sb == key2->sb && key1->ino == key2->ino);
 }
 
 /**
- * __inode_hash - Add an inode to the hash table
+ * icache_insert - Add an inode to the hash table
  * @inode: The inode to add
  *
  * Adds an inode to the inode hash table for fast lookups.
  */
-static void __inode_hash(struct inode* inode) {
+void icache_insert(struct inode* inode) {
 
 	if (!inode || !inode->i_superblock) return;
 	/* Insert into hash table */
@@ -333,10 +279,10 @@ static void __inode_hash(struct inode* inode) {
 }
 
 /**
- * __inode_unhash - Remove an inode from the hash table
+ * icache_delete - Remove an inode from the hash table
  * @inode: The inode to remove
  */
-static void __inode_unhash(struct inode* inode) {
+void icache_delete(struct inode* inode) {
 	if (!inode || !inode->i_superblock) return;
 	/* Remove from hash table */
 	hashtable_remove(&inode_hashtable, &inode->i_hash_node);
@@ -384,7 +330,9 @@ int32 inode_sync(struct inode* inode, int32 wait) {
 	if (!(inode->i_state & I_DIRTY)) return 0;
 
 	/* Call the filesystem's write_inode method if available */
-	if (inode->i_superblock && inode->i_superblock->s_operations && inode->i_superblock->s_operations->write_inode) { ret = inode->i_superblock->s_operations->write_inode(inode, wait); }
+	if (inode->i_superblock && inode->i_superblock->s_operations && inode->i_superblock->s_operations->write_inode) {
+		ret = inode->i_superblock->s_operations->write_inode(inode, wait);
+	}
 
 	/* If successful and waiting requested, clear dirty state */
 	if (ret == 0 && wait) {
@@ -433,17 +381,9 @@ void wake_up_inode(struct inode* inode) {
  * Get key from an inode hash node
  * This function extracts the key (superblock + inode number) from a list node
  */
-static void* __inode_get_key(struct list_node* node) {
+void* icache_getkey(struct list_node* node) {
 	struct inode* inode = container_of(node, struct inode, i_hash_node);
-	static struct {
-		struct superblock* sb;
-		uint64 ino;
-	} key;
-
-	key.sb = inode->i_superblock;
-	key.ino = inode->i_ino;
-
-	return &key;
+	return &inode->i_key;
 }
 
 /**
@@ -470,7 +410,9 @@ int32 inode_mkdir(struct inode* dir, struct dentry* dentry, mode_t mode) {
 	if (error) return error;
 
 	/* Call filesystem-specific mkdir if available */
-	if (dir->i_op && dir->i_op->mkdir) { return dir->i_op->mkdir(dir, dentry, mode); }
+	if (dir->i_op && dir->i_op->mkdir) {
+		return dir->i_op->mkdir(dir, dentry, mode);
+	}
 
 	/* Default implementation if no filesystem handler */
 	struct inode* inode = inode_acquire(dir->i_superblock, 0);
@@ -521,7 +463,9 @@ int32 inode_mknod(struct inode* dir, struct dentry* dentry, mode_t mode, dev_t d
 	if (error) return error;
 
 	/* Call filesystem-specific mknod if available */
-	if (dir->i_op && dir->i_op->mknod) { return dir->i_op->mknod(dir, dentry, mode, dev); }
+	if (dir->i_op && dir->i_op->mknod) {
+		return dir->i_op->mknod(dir, dentry, mode, dev);
+	}
 
 	/* Default implementation for simple filesystems like ramfs */
 	struct inode* inode = inode_acquire(dir->i_superblock, 0);
@@ -640,7 +584,6 @@ bool inode_isImmutable(struct inode* inode) {
 	return 0;
 }
 
-
 /**
  * inode_rmdir - Remove a directory
  * @dir: Parent directory's inode
@@ -665,7 +608,6 @@ int32 inode_rmdir(struct inode* dir, struct dentry* dentry) {
 	return dir->i_op->rmdir(dir, dentry);
 }
 
-
 /**
  * generic_permission - Check for access rights on a Unix-style file system
  * @inode: inode to check permissions on
@@ -676,38 +618,45 @@ int32 inode_rmdir(struct inode* dir, struct dentry* dentry) {
  *
  * Returns 0 if access is allowed, -EACCES otherwise.
  */
-static int32 generic_permission(struct inode* inode, int32 mask) {
-    int32 mode = inode->i_mode;
-    int32 res = 0;
-    
-    /* Root can do anything */
-    if (current_task()->euid == 0) 
-        return 0;
-        
-    /* Nobody gets write access to a read-only filesystem */
-    if ((mask & MAY_WRITE) && inode_isReadonly(inode)) 
-        return -EROFS;
-        
-    /* Check if file is accessible by the user */
-    if (current_task()->euid == inode->i_uid) {
-        mode >>= 6; /* Use the user permissions */
-    } else if (current_group_matches(inode->i_gid)) {
-        mode >>= 3; /* Use the group permissions */
-    }
-    /* Otherwise we're already at "other" permissions */
-    
-    /* Check if the mask is allowed in the mode */
-    if ((mask & MAY_READ) && !(mode & 4))  /* 4 = read bit */
-        res = -EACCES;
-    if ((mask & MAY_WRITE) && !(mode & 2)) /* 2 = write bit */
-        res = -EACCES;
-    if ((mask & MAY_EXEC) && !(mode & 1))  /* 1 = execute bit */
-        res = -EACCES;
-        
-    return res;
+int32 generic_permission(struct inode* inode, int32 mask) {
+	int32 mode = inode->i_mode;
+	int32 res = 0;
+
+	/* Root can do anything */
+	if (current_task()->euid == 0) return 0;
+
+	/* Nobody gets write access to a read-only filesystem */
+	if ((mask & MAY_WRITE) && inode_isReadonly(inode)) return -EROFS;
+
+	/* Check if file is accessible by the user */
+	if (current_task()->euid == inode->i_uid) {
+		mode >>= 6; /* Use the user permissions */
+	} else if (current_group_matches(inode->i_gid)) {
+		mode >>= 3; /* Use the group permissions */
+	}
+	/* Otherwise we're already at "other" permissions */
+
+	/* Check if the mask is allowed in the mode */
+	if ((mask & MAY_READ) && !(mode & 4)) /* 4 = read bit */
+		res = -EACCES;
+	if ((mask & MAY_WRITE) && !(mode & 2)) /* 2 = write bit */
+		res = -EACCES;
+	if ((mask & MAY_EXEC) && !(mode & 1)) /* 1 = execute bit */
+		res = -EACCES;
+
+	return res;
 }
 
-bool inode_isDir(struct inode* inode){
+bool inode_isDir(struct inode* inode) {
 	if (!inode) return false;
 	return S_ISDIR(inode->i_mode);
+}
+
+struct dentry* inode_lookup(struct inode* dir, struct dentry* dentry, uint32 lookup_flags) {
+	if (!dir || !dentry) return ERR_PTR(-EINVAL);
+	if (!inode_isDir(dir)) return ERR_PTR(-ENOTDIR);
+	if (dir->i_op && dir->i_op->lookup) {
+		return dir->i_op->lookup(dir, dentry, lookup_flags);
+	}
+	return ERR_PTR(-ENOSYS);
 }

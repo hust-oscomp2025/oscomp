@@ -39,10 +39,10 @@ struct vfsmount {
 /* Initialize mount system */
 void init_mount_hash(void);
 
-/* Mount management */
-int32 do_mount(const char* dev_name, const char* path, const char* fstype, uint64 flags, void* data);
-/* Unmount operations */
-int32 do_umount(struct vfsmount* mnt, int32 flags);
+
+struct vfsmount* mount_bind(struct path* source_path, uint64 flags);
+int32 remount(struct path* mount_path, uint64 flags,const void* data);
+int32 mount_add(struct vfsmount* newmnt, struct path* mountpoint, int32 flags);
 
 /* Reference counting */
 struct vfsmount* mount_ref(struct vfsmount* mnt);

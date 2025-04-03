@@ -7,6 +7,7 @@
 #define TIME_SLICE_LEN  2
 extern struct task_struct* current_percpu[NCPU];
 #define CURRENT (current_percpu[read_tp()])
+#define current current_task()
 
 static inline struct task_struct* current_task() {
 		return CURRENT;

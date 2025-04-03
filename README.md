@@ -19,7 +19,7 @@
 - [ ] 在路径遍历中处理挂载点
 - [ ] 尚未实现vfs文件系统、设备、虚拟标准输入输出表述符、主要系统调用。
 - [ ] 在file_open中做文件创建
-- [ ] 在`__file_free`中处理f_private字段
+- [ ] 在`file_free`中处理f_private字段
 - [x] 用嵌入式哈希表重写inode hash
 - [x] 实现ext4 inode虚函数表
 - [ ] 在初始化ext4 mount时传入ext4全局锁
@@ -49,7 +49,7 @@
 - [ ] block_device类异步IO
 - [ ] 加入kobject模块
 - [ ] 实现namespace虚拟化
-- [ ] 在copy_to_user中，检查pagefault disabled
+- [ ] 在mm_copy_to_user中，检查pagefault disabled
 - [ ] 在access_ok中验证用户指针
 - [ ] 完善sys_mount中的文件系统特定数据
 - [ ] 在kernel blockdevice创建和销毁时，创建和销毁ext4_blockdevice
@@ -57,7 +57,7 @@
 - [ ] 支持negative dentry
 - [ ] 在superblock中加入配额quota
 - [ ] 在superblock中做active refcount
-- [ ] 优化vfs_path_lookup
+- [ ] 优化vfs_pathwalk
 - [ ] 加入dentry_automount特性
 - [ ] A more complex data structure for multiple mount tracking (rather than a simple counter)
 

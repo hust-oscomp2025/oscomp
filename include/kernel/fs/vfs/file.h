@@ -36,70 +36,78 @@ struct file {
 	const struct file_operations* f_op; /* File s_operations */
 };
 
-#define f_inode f_path.dentry->d_inode /* Inode of the file */
+#define f_inode f_dentry->d_inode /* Inode of the file */
 
 /**
  * Directory context for readdir operations
  */
 struct dir_context {
-	int32 (*actor)(struct dir_context*, const char*, int32, loff_t, uint64_t, unsigned);
+	int32 (*actor)(struct dir_context*, const char*, int32, loff_t, uint64, uint32);
 	loff_t pos; /* Current position in directory */
 };
 
+/*file syscall functions*/
+int32 file_open(struct file* file, int32 flags);
+int32 file_close(struct file* file);
+int32 file_iterate(struct file*, struct dir_context*);
+ssize_t file_read(struct file*, char*, size_t, loff_t*);
+ssize_t file_write(struct file*, const char*, size_t, loff_t*);
+loff_t file_llseek(struct file*, loff_t, int32);
 /**
  * File operation structure - provides methods for file manipulation
  */
 struct file_operations {
-	int32 (*open)(struct file* file, int32 flags, mode_t mode);
-
-	/* Position manipulation */
-	loff_t (*llseek)(struct file*, loff_t, int32);
-
-	/* Basic I/O */
-	ssize_t (*read)(struct file*, char*, size_t, loff_t*);
-	ssize_t (*write)(struct file*, const char*, size_t, loff_t*);
-
-	/* Vectored I/O */
-	ssize_t (*read_iter)(struct kiocb*, struct io_vector_iterator*);
-	ssize_t (*write_iter)(struct kiocb*, struct io_vector_iterator*);
-
-	/* Directory s_operations */
+	int32 (*open)(struct file* file, int32 flags);
 	int32 (*iterate)(struct file*, struct dir_context*);
-	int32 (*iterate_shared)(struct file*, struct dir_context*);
-
-	/* Polling/selection */
-	//__poll_t (*poll)(struct file*, struct poll_table_struct*);
-
-	/* Management s_operations */
-
-	int32 (*flush)(struct file*);
-	int32 (*release)(struct inode*, struct file*);
+	int32 (*release)(struct file*);
+	// /* Position manipulation */
+	loff_t (*llseek)(struct file*, loff_t, int32);
 	int32 (*fsync)(struct file*, loff_t, loff_t, int32 datasync);
 
-	/* Memory mapping */
-	int32 (*mmap)(struct file*, struct vm_area_struct*);
+	// /* Basic I/O */
+	// ssize_t (*read)(struct file*, char*, size_t, loff_t*);
+	// ssize_t (*write)(struct file*, const char*, size_t, loff_t*);
 
-	/* Special s_operations */
-	int64 (*unlocked_ioctl)(struct file*, uint32, uint64);
-	int32 (*fasync)(int32, struct file*, int32);
+	// /* Vectored I/O */
+	// ssize_t (*read_iter)(struct kiocb*, struct io_vector_iterator*);
+	// ssize_t (*write_iter)(struct kiocb*, struct io_vector_iterator*);
+
+	// /* Directory s_operations */
+	// 
+	// int32 (*iterate_shared)(struct file*, struct dir_context*);
+
+	// /* Polling/selection */
+	// //__poll_t (*poll)(struct file*, struct poll_table_struct*);
+
+	// /* Management s_operations */
+
+	// int32 (*flush)(struct file*);
+	// int32 (*release)(struct inode*, struct file*);
+
+	// /* Memory mapping */
+	// int32 (*mmap)(struct file*, struct vm_area_struct*);
+
+	// /* Special s_operations */
+	// int64 (*unlocked_ioctl)(struct file*, uint32, uint64);
+	// int32 (*fasync)(int32, struct file*, int32);
 
 	/* Splice s_operations */
 	// ssize_t (*splice_read)(struct file*, loff_t*, struct pipe_inode_info*, size_t, uint32);
 	// ssize_t (*splice_write)(struct pipe_inode_info*, struct file*, loff_t*, size_t, uint32);
 
 	/* Space allocation */
-	int64 (*fallocate)(struct file*, int32, loff_t, loff_t);
+	//int64 (*fallocate)(struct file*, int32, loff_t, loff_t);
 };
 
 /*
  * File API functions
  */
-/*file syscall functions*/
-int32 file_open(struct file* file, int32 flags, mode_t mode);
 
+
+static int32 file_free(struct file* filp);
 /*file syscall functions*/
 
-int32 file_close(struct file* file);
+
 
 struct file* file_ref(struct file* file);
 int32 file_unref(struct file* file);
@@ -115,9 +123,7 @@ int32 file_setAccessed(struct file* file);
 int32 file_setModified(struct file* file);
 
 /*标准vfs接口*/
-ssize_t file_read(struct file*, char*, size_t, loff_t*);
-ssize_t file_write(struct file*, const char*, size_t, loff_t*);
-loff_t file_llseek(struct file*, loff_t, int32);
+
 // pos的变化与查询统一接口,setpos和getpos都支持
 int32 file_sync(struct file*, int32);
 /* Vectored I/O functions */
@@ -125,16 +131,22 @@ ssize_t file_readv(struct file* file, const struct io_vector* vec, uint64 vlen, 
 
 ssize_t file_writev(struct file* file, const struct io_vector* vec, uint64 vlen, loff_t* pos);
 
-int32 iterate_dir(struct file*, struct dir_context*);
 
 bool file_isReadable(struct file* file);
 bool file_isWriteable(struct file* file);
 
 /*file_open系统调用*/
 /* 有效的打开标志掩码 - 添加到头文件 */
-#define VALID_OPEN_FLAGS (O_ACCMODE | O_CREAT | O_EXCL | O_TRUNC | O_APPEND | O_NONBLOCK | O_SYNC | O_DIRECT | O_DIRECTORY | O_NOFOLLOW | O_NOATIME | O_CLOEXEC | O_PATH | O_DSYNC | O_ASYNC | O_EXEC)
+#define VALID_OPEN_FLAGS (O_ACCMODE | O_CREAT | O_EXCL | O_TRUNC | O_APPEND | O_NONBLOCK | O_SYNC |  O_DIRECTORY | O_NOFOLLOW |  O_CLOEXEC |  O_DSYNC)
+//O_ASYNC
+//O_EXEC
+//O_DIRECT |
+//O_NOATIME |
+//O_PATH |
+
 fmode_t open_flags_to_fmode(int32 flags);
 int32 validate_open_flags(int32 flags);
+int32 open2lookup(int32 open_flags);
 /*
  * 文件模式(FMODE)定义
  * 这些模式定义了内核对文件的访问权限和操作行为

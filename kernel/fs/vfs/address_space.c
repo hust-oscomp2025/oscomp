@@ -315,7 +315,8 @@ struct page* addrSpace_readPage(struct addrSpace* mapping, uint64 index) {
 		/* Page exists but isn't up to date - need to read it */
 		if (mapping->a_ops && mapping->a_ops->readpage) {
 			struct inode dummy_inode = {.i_mapping = mapping};
-			struct file dummy_file = {.f_inode = &dummy_inode};
+			struct dentry dummy_dentry = {.d_inode = &dummy_inode};
+			struct file dummy_file = {.f_dentry = &dummy_dentry};
 
 			lock_page(page);
 			ret = mapping->a_ops->readpage(&dummy_file, page);
@@ -338,7 +339,8 @@ struct page* addrSpace_readPage(struct addrSpace* mapping, uint64 index) {
 	/* Read the page data */
 	if (mapping->a_ops && mapping->a_ops->readpage) {
 		struct inode dummy_inode = {.i_mapping = mapping};
-		struct file dummy_file = {.f_inode = &dummy_inode};
+		struct dentry dummy_dentry = {.d_inode = &dummy_inode};
+		struct file dummy_file = {.f_dentry = &dummy_dentry};
 
 		lock_page(page);
 		ret = mapping->a_ops->readpage(&dummy_file, page);

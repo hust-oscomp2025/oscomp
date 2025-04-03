@@ -22,7 +22,7 @@ int32 access_ok(const void __user *addr, uint64 size);
 
 #define put_user(x, ptr) ({ \
     uint64 __ret; \
-    __ret = copy_to_user((ptr), &(x), sizeof(*(ptr))); \
+    __ret = mm_copy_to_user((ptr), &(x), sizeof(*(ptr))); \
     __ret ? -EFAULT : 0; \
 })
 

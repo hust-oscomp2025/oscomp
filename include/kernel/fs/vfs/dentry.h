@@ -158,89 +158,10 @@ static inline bool dentry_isMountpoint(const struct dentry* dentry) {
 }
 
 bool dentry_isEmptyDir(struct dentry* dentry);
+char* dentry_allocPath2Mount(struct dentry* dentry);
 
 
-/**
- * dentry_allocPath2Mount - 分配并返回dentry相对于其所属挂载点的路径
- * @dentry: 目标dentry
- *
- * 该函数通过向上遍历dentry树，找到挂载点并构建相对路径。
- * 调用者负责使用kfree()释放返回的字符串。
- *
- * 返回值: 成功时返回新分配的相对路径字符串，失败返回NULL
- */
-char* dentry_allocPath2Mount(struct dentry* dentry)
-{
-	#define CONFIG_MAX_PATH_DEPTH 128  /* 定义合理的最大深度 */
-    struct dentry* current = dentry;
-    struct dentry* mount_point = NULL;
-    
-    /* 临时存储路径组件的栈 */
-    struct {
-        const char* name;
-        size_t len;
-    } path_stack[CONFIG_MAX_PATH_DEPTH];  /* 定义合理的最大深度 */
-    
-    int stack_pos = 0;
-    size_t total_len = 1;  /* 包含起始的'/' */
-    char* path, *ptr;
-    
-    if (!dentry)
-        return NULL;
-    
-    /* 向上遍历查找挂载点 */
-    while (current) {
-        /* 判断当前dentry是否为挂载点 */
-        if (current->d_flags & DCACHE_MOUNTED) {
-            mount_point = current;
-            break;
-        }
-        
-        /* 如果已经到达文件系统根目录，则该根目录就是挂载点 */
-        if (current->d_parent == current || !current->d_parent) {
-            mount_point = current;
-            break;
-        }
-        
-        /* 将当前dentry名称存入栈中 */
-        if (stack_pos < CONFIG_MAX_PATH_DEPTH && current != dentry->d_parent) {
-            path_stack[stack_pos].name = current->d_name->name;
-            path_stack[stack_pos].len = current->d_name->len;
-            total_len += current->d_name->len + 1;  /* +1 是路径分隔符 '/' */
-            stack_pos++;
-        }
-        
-        current = current->d_parent;
-    }
-    
-    /* 如果没找到挂载点，返回错误 */
-    if (!mount_point)
-        return NULL;
-    
-    /* 分配路径字符串 */
-    path = kmalloc(total_len + 1);  /* +1 是字符串结束符 '\0' */
-    if (!path)
-        return NULL;
-    
-    /* 构建路径字符串 */
-    ptr = path;
-    *ptr++ = '/';  /* 起始的根目录标识 */
-    
-    /* 从栈中按顺序构建路径（反向遍历栈） */
-    for (int i = stack_pos - 1; i >= 0; i--) {
-        memcpy(ptr, path_stack[i].name, path_stack[i].len);
-        ptr += path_stack[i].len;
-        
-        if (i > 0) {  /* 如果不是最后一个组件，添加分隔符 */
-            *ptr++ = '/';
-        }
-    }
-    
-    /* 添加字符串结束符 */
-    *ptr = '\0';
-    
-    return path;
-}
+
 
 // 可选：缓存一致性方法
 // void d_rehash_subtree(struct dentry *dentry);

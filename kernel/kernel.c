@@ -14,6 +14,7 @@
 #include <kernel/types.h>
 #include <kernel/util.h>
 #include <kernel/vfs.h>
+#include <kernel/syscall/syscall.h>
 
 static void kernel_vm_init(void) {
 	sprint("kernel_vm_init: start\n");
@@ -71,17 +72,14 @@ int32 setup_init_fds(struct task_struct* init_task) {
 
 	// Temporarily set current to init task
 	set_current_task(init_task);
-	struct file* console_file = vfs_open("/dev/console", O_RDWR, 0);
-	CHECK_PTR_VALID(console_file, -ENOENT);
 
 	// Set up stdin, stdout, stderr
 	for (fd = 0; fd < 3; fd++) {
-		if(fd != fdtable_allocFd(init_task->fdtable, 0)) {
+		if(fd != do_open("/dev/console", O_RDWR, 0)) {
+			sprint("Failed to open /dev/console for fd %d\n", fd);
 			set_current_task(saved_task);
-			vfs_close(console_file);
-			return -EMFILE;
+			return -1;
 		}
-		fdtable_installFd(init_task->fdtable, fd, console_file);
 	}
 
 	// Restore original task

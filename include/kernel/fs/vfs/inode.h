@@ -9,6 +9,15 @@
 
 extern struct hashtable inode_hashtable;
 
+
+struct inode* icache_lookup(struct superblock* sb, uint64 ino);
+uint32 icache_hash(const void* key);
+void icache_insert(struct inode* inode);
+void icache_delete(struct inode* inode);
+void* icache_getkey(struct list_node* node);
+int32 icache_equal(const void* k1, const void* k2);
+int32 icache_init(void);
+
 /* Attribute flags for iattr */
 #define ATTR_MODE (1 << 0)
 #define ATTR_UID (1 << 1)
@@ -45,6 +54,11 @@ struct iattr {
 
 /* Forward declarations */
 struct inode_operations;
+
+struct inode_key {
+	struct superblock* sb;
+	uint64 ino;
+};
 /*
  * Inode structure - core of the filesystem
  */
@@ -53,7 +67,6 @@ struct inode {
 	fmode_t i_mode; /* File type and permissions */
 	uid_t i_uid;    /* Owner user ID */
 	gid_t i_gid;    /* Owner group ID */
-	uint64 i_ino;   /* Inode number */
 	dev_t i_rdev;   /* Device number (for special files) */
 
 	/* File attributes */
@@ -70,7 +83,16 @@ struct inode {
 	struct addrSpace* i_mapping; /* Associated address space */
 
 	/* Filesystem information */
-	struct superblock* i_superblock;    /* Superblock */
+	union{
+		struct inode_key i_key; /* Key for hash table */
+		struct{
+			struct superblock* i_superblock;    /* Superblock */
+			uint64 i_ino;   /* Inode number */
+		};
+	};
+
+
+
 	struct list_node i_s_list_node;     /* Superblock list of inodes */
 	struct list_node i_state_list_node; /* For ONE state list (LRU/dirty/IO) */
 
@@ -108,9 +130,21 @@ struct inode {
 	// } i_quota;
 };
 
+
+/*dentry called executer functions*/
+struct dentry* inode_lookup(struct inode* dir, struct dentry* dentry, uint32 lookup_flags);
+int32 inode_mknod(struct inode* dir, struct dentry* dentry, mode_t mode, dev_t dev);
+int32 inode_mkdir(struct inode* dir, struct dentry* dentry, mode_t mode);
+int32 inode_rmdir(struct inode*, struct dentry*);
+// Implementation functions for extended attributes
+int32 inode_setxattr(struct inode* inode, const char* name, const void* value, size_t size, int32 flags);
+ssize_t inode_getxattr(struct inode* inode, const char* name, void* value, size_t size);
+ssize_t inode_listxattr(struct inode* inode, char* list, size_t size);
+int32 inode_removexattr(struct inode* inode, const char* name);
+
 struct inode_operations {
 	/* File operations */
-	struct dentry* (*lookup)(struct inode*, struct dentry*, uint32);
+	struct dentry* (*lookup)(struct inode*, struct dentry*, uint32 lookup_flags);
 	struct inode* (*create)(struct inode*, struct dentry*, fmode_t, bool);
 	int32 (*link)(struct dentry*, struct inode*, struct dentry*);
 	int32 (*unlink)(struct inode*, struct dentry*);
@@ -155,18 +189,14 @@ struct inode_operations {
 };
 
 /*
- * Inode APIs
+ * inode_helpers
  */
 int32 inode_cache_init(void);
-
 struct inode* inode_acquire(struct superblock* sb, uint64 ino);
 struct inode* inode_ref(struct inode* inode);
 void inode_unref(struct inode* inode);
 
-/*dentry called executer functions*/
-int32 inode_mknod(struct inode* dir, struct dentry* dentry, mode_t mode, dev_t dev);
-int32 inode_mkdir(struct inode* dir, struct dentry* dentry, mode_t mode);
-int32 inode_rmdir(struct inode*, struct dentry*);
+
 
 /* Inode lookup and creation */
 int32 inode_permission(struct inode* inode, int32 mask);
@@ -197,11 +227,7 @@ int32 inode_checkPermission(struct inode* inode, int32 mask);
 #define XATTR_CREATE 0x1  /* Create attribute if it doesn't exist */
 #define XATTR_REPLACE 0x2 /* Replace attribute if it exists */
 
-// Implementation functions for extended attributes
-int32 inode_setxattr(struct inode* inode, const char* name, const void* value, size_t size, int32 flags);
-ssize_t inode_getxattr(struct inode* inode, const char* name, void* value, size_t size);
-ssize_t inode_listxattr(struct inode* inode, char* list, size_t size);
-int32 inode_removexattr(struct inode* inode, const char* name);
+
 
 /* Inode state flags */
 #define I_DIRTY (1 << 0)          /* Inode is dirty - needs writing */

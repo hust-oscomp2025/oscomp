@@ -139,7 +139,7 @@ void* memmove(void* dst, const void* src, size_t n) {
 }
 
 // Like strncpy but guaranteed to NUL-terminate.
-char* safestrcpy(char* s, const char* t, int n) {
+char* strncpy(char* s, const char* t, int n) {
 	char* os;
 
 	os = s;

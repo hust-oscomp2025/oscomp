@@ -8,3 +8,4 @@ struct buffer_head;
 struct io_vector_iterator;
 struct kiocb;
 struct io_vector;
+struct superblock;

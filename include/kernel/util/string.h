@@ -17,7 +17,7 @@ char *strtok(char* str, const char* delim);
 char *strcat(char *dst, const char *src);
 long atol(const char* str);
 void *memmove(void* dst, const void* src, size_t n);
-char *safestrcpy(char* s, const char* t, int n);
+char *strncpy(char* s, const char* t, int n);
 
 int vsnprintf(char* out, size_t n, const char* s, va_list vl);
 int snprintf(char* str, size_t size, const char* format, ...);

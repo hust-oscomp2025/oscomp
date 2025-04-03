@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <stddef.h>
+#include <fcntl.h>
 #include <kernel/types/mm_types.h>
 
 /* 关于指针和数据类型的说明

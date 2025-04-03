@@ -57,7 +57,7 @@ void load_elf_from_file(struct task_struct *proc, char *filename) {
   sprint("load_elf_from_file: Loading application: %s\n", filename);
 
   // 使用内核标准文件接口打开ELF文件
-  int32 fd = do_open(filename, O_RDONLY);
+  int32 fd = do_open(filename, O_RDONLY,0);
   if (fd < 0) {
     panic("Failed to open application file: %s (error %d)\n", filename, fd);
   }
@@ -104,7 +104,7 @@ void load_elf_from_file(struct task_struct *proc, char *filename) {
  * @return 0表示成功，非0表示失败
  */
 int32 load_elf_symbols(char *filename) {
-  int32 fd = do_open(filename, O_RDONLY);
+  int32 fd = do_open(filename, O_RDONLY,0);
   if (fd < 0) {
     sprint("Failed to open file for symbols: %s (error %d)\n", filename, fd);
     return -1;
@@ -469,7 +469,7 @@ int32 load_init_binary(struct task_struct *init_task, const char *path) {
     sprint("Loading init binary: %s\n", path);
 
     // Open the init binary file
-    int32 fd = do_open(path, O_RDONLY);
+    int32 fd = do_open(path, O_RDONLY,0);
     if (fd < 0) {
         sprint("Failed to open init binary: %s (error %d)\n", path, fd);
         return fd;

@@ -15,9 +15,6 @@ static void* mount_get_key(struct list_head* node);
 static int32 mount_key_equals(const void* key1, const void* key2);
 
 
-static struct vfsmount* __mount_bind(struct path* source_path, uint64 flags);
-int32 __mount_remount(struct path* mount_path, uint64 flags, void* data);
-static int32 __mount_add(struct vfsmount* newmnt, struct path* mountpoint, int32 flags);
 
 static void __mount_free(struct vfsmount* mnt);
 static int32 __mount_hash(struct vfsmount* mnt);
@@ -25,65 +22,7 @@ static void __mount_unhash(struct vfsmount* mnt);
 
 
 
-/**
- * do_mount - 挂载文件系统到指定挂载点
- * @source: 源设备名称
- * @target: 挂载点路径
- * @fstype_name: 文件系统类型
- * @flags: 挂载标志
- * @data: 文件系统特定数据
- *
- * 此函数是系统调用 sys_mount 的主要实现。它处理不同类型的挂载操作，
- * 包括常规挂载、bind挂载和重新挂载。
- *
- * 返回: 成功时返回0，失败时返回负的错误码
- */
-int32 do_mount(const char* source, const char* target, const char* fstype_name, uint64 flags, void* data) {
-	struct path mount_path;
-	struct fstype* type;
-	struct vfsmount* newmnt;
-	int32 ret;
 
-	/* 查找文件系统类型 */
-	type = fstype_lookup(fstype_name);
-	if (!type) return -ENODEV;
-
-	/* 查找挂载点路径 */
-	ret = path_create(target, 0, &mount_path);
-	if (ret) return ret;
-
-	/* 处理特殊挂载标志 */
-	if (flags & MS_BIND) {
-		/* Bind mount 处理 */
-		struct path source_path;
-		ret = path_create(source, 0, &source_path);
-		if (ret) goto out_path;
-
-		newmnt = __mount_bind(&source_path, flags);
-		path_destroy(&source_path);
-	} else if (flags & MS_REMOUNT) {
-		/* 重新挂载处理 */
-		ret = __mount_remount(&mount_path, flags, data);
-		goto out_path;
-	} else {
-		/* 常规挂载 */
-
-		newmnt = vfs_kern_mount(type, flags, source, data);
-	}
-
-	if (PTR_IS_ERROR(newmnt)) {
-		ret = PTR_ERR(newmnt);
-		goto out_path;
-	}
-
-	/* 添加新挂载点到挂载点层次结构 */
-	ret = __mount_add(newmnt, &mount_path, flags);
-	if (ret) mount_unref(newmnt);
-
-out_path:
-	path_destroy(&mount_path);
-	return ret;
-}
 
 /**
  * mount_hash_func - Hash function for mount points
@@ -213,14 +152,14 @@ static void __mount_free(struct vfsmount* mnt)
 
 
 /**
- * __mount_add - Add a mount to the mount tree
+ * mount_add - Add a mount to the mount tree
  * @newmnt: New mount to add
  * @mountpoint: Where to mount it
  * @flags: Mount flags
  * 
  * Returns 0 on success, error code on failure
  */
-int32 __mount_add(struct vfsmount* newmnt, struct path* mountpoint, int32 flags)
+int32 mount_add(struct vfsmount* newmnt, struct path* mountpoint, int32 flags)
 {
     struct vfsmount* parent;
     int32 error;
@@ -289,7 +228,7 @@ void __mount_unhash(struct vfsmount* mnt)
 
 
 /**
- * __mount_bind - Create a bind mount from a source path to a target path
+ * mount_bind - Create a bind mount from a source path to a target path
  * @source_path: Source path object to bind from
  * @flags: Mount flags
  *
@@ -299,7 +238,7 @@ void __mount_unhash(struct vfsmount* mnt)
  *
  * Returns: The new vfsmount on success, ERR_PTR on failure
  */
-static struct vfsmount* __mount_bind(struct path* source_path, uint64 flags) {
+struct vfsmount* mount_bind(struct path* source_path, uint64 flags) {
     struct vfsmount* newmnt;
     
     if (!source_path || !source_path->dentry || !source_path->mnt)
@@ -358,7 +297,7 @@ static struct vfsmount* __mount_bind(struct path* source_path, uint64 flags) {
 }
 
 /**
- * __mount_remount - Remount a filesystem with new options
+ * remount - Remount a filesystem with new options
  * @mount_path: Path to the existing mount point
  * @flags: New mount flags
  * @data: Filesystem-specific mount data
@@ -368,7 +307,7 @@ static struct vfsmount* __mount_bind(struct path* source_path, uint64 flags) {
  *
  * Returns: 0 on success, negative error code on failure
  */
-int32 __mount_remount(struct path* mount_path, uint64 flags, void* data) {
+int32 remount(struct path* mount_path, uint64 flags,const void* data) {
     struct vfsmount* mnt;
     struct superblock* sb;
     int32 remount_flags;
@@ -383,7 +322,7 @@ int32 __mount_remount(struct path* mount_path, uint64 flags, void* data) {
         return -EINVAL;
     
     sb = mnt->mnt_superblock;
-    if (!sb || !sb->s_operations || !sb->s_operations->remount_fs)
+    if (!sb || !sb->s_operations || !sb->s_operations->remount)
         return -ENOSYS;
     
     /* Combine existing mount flags with requested changes */
@@ -410,7 +349,7 @@ int32 __mount_remount(struct path* mount_path, uint64 flags, void* data) {
         remount_flags |= MS_RELATIME;
     
     /* Notify the filesystem about remounting */
-    ret = sb->s_operations->remount_fs(sb, &remount_flags, data);
+    ret = sb->s_operations->remount(sb,mount_path, &remount_flags, data);
     if (ret)
         return ret;
     

@@ -11,7 +11,7 @@
  * @flags: Lookup flags
  * @result: Result path
  *
- * This is a wrapper around vfs_path_lookup that uses the current
+ * This is a wrapper around vfs_pathwalk that uses the current
  * working directory as the starting point.
  */
 int32 path_create(const char* name, uint32 flags, struct path* path) {
@@ -25,7 +25,7 @@ int32 path_create(const char* name, uint32 flags, struct path* path) {
 	start_mnt = CURRENT->fs->pwd.mnt;
 
 	/* Perform the lookup */
-	error = vfs_path_lookup(start_dentry, start_mnt, name, flags, path);
+	error = vfs_pathwalk(start_dentry, start_mnt, name, flags, path);
 	return error;
 }
 
@@ -127,12 +127,8 @@ int32 filename_lookup(int32 dfd, const char* name, uint32 flags, struct path* pa
 				return -ENOTDIR;
 			}
 
-			start_dentry = file->f_path.dentry;
-			start_mnt = file->f_path.mnt;
-
-			/* Take reference to starting path components */
-			start_dentry = dentry_ref(start_dentry);
-			if (start_mnt) mount_ref(start_mnt);
+			start_dentry = dentry_ref(file->f_path.dentry);
+			start_mnt = mount_ref(file->f_path.mnt);
 
 			file_unref(file);
 		}
@@ -145,7 +141,7 @@ int32 filename_lookup(int32 dfd, const char* name, uint32 flags, struct path* pa
 	}
 
 	/* Do the actual lookup */
-	error = vfs_path_lookup(start_dentry, start_mnt, name, flags, path);
+	error = vfs_pathwalk(start_dentry, start_mnt, name, flags, path);
 
 	/* Release references to starting directory */
 	dentry_unref(start_dentry);
@@ -215,7 +211,7 @@ int32 resolve_path_parent(const char* path_str, struct path* out_parent)
 
         /* If there's a parent path, look it up */
         if (*path_copy) {
-            error = vfs_path_lookup(start_path.dentry, start_path.mnt, 
+            error = vfs_pathwalk(start_path.dentry, start_path.mnt, 
                                    path_copy, LOOKUP_FOLLOW, out_parent);
             path_destroy(&start_path);
             kfree(path_copy);

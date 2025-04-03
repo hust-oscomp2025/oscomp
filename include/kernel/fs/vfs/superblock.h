@@ -68,7 +68,7 @@ struct superblock {
 struct superblock_operations {
 	struct inode* (*alloc_inode)(struct superblock* sb, uint64 ino);
 	/*上面是已维护的*/
-
+	int32 (*remount)(struct superblock* sb,struct path* mount_path,  int32* flags, const void* data);
 
 	int64 (*get_next_ino)(struct superblock* sb);
     // 分配文件系统特定的超级块信息
@@ -91,7 +91,6 @@ struct superblock_operations {
 	int32 (*freeze_fs)(struct superblock* sb);
 	int32 (*unfreeze_fs)(struct superblock* sb);
 	int32 (*statfs)(struct superblock* sb, struct statfs* statfs);
-	int32 (*remount_fs)(struct superblock* sb, int32* flags, char* data);
 	void (*umount_begin)(struct superblock* sb);
 
 	/* Superblock lifecycle */

@@ -52,9 +52,6 @@ static vm_fault_t ext4_vfs_page_fault(struct vm_area_struct *vma, struct vm_faul
 // static uint64 ext4_vfs_get_unmapped_area(struct file *file, uint64 addr,
 //                                              uint64 len, uint64 pgoff,
 //                                              uint64 flags);
-static int32 ext4_vfs_atomic_open(struct inode *inode, struct dentry *dentry,
-                             struct file *file, unsigned open_flag,
-                             umode_t create_mode);
 static int32 ext4_vfs_tmpfile(struct inode *inode, struct dentry *dentry, umode_t mode);
 
 
@@ -102,7 +99,6 @@ const struct inode_operations ext4_dir_inode_operations = {
     .removexattr    = ext4_vfs_removexattr,
     //.get_acl        = ext4_vfs_get_acl,
     //.set_acl        = ext4_vfs_set_acl,
-    .atomic_open    = ext4_vfs_atomic_open,
     .tmpfile        = ext4_vfs_tmpfile,
 };
 
@@ -1664,48 +1660,6 @@ static vm_fault_t ext4_vfs_page_fault(struct vm_area_struct *vma, struct vm_faul
 //     return generic_get_unmapped_area(file, addr, len, pgoff, flags);
 // }
 
-/**
- * @brief Atomic open operation
- * 
- * @param inode Directory inode
- * @param dentry File dentry
- * @param file File structure to fill
- * @param open_flag Open flags
- * @param create_mode Creation mode
- * @return int32 Error code
- */
-static int32 ext4_vfs_atomic_open(struct inode *inode, struct dentry *dentry,
-                         struct file *file, unsigned open_flag,
-                         umode_t create_mode)
-{
-    int32 ret;
-    struct inode *found_inode = ext4_vfs_lookup(inode, dentry, 0);
-    
-    if (PTR_IS_ERROR(found_inode))
-        return PTR_ERR(found_inode);
-    
-    if (!found_inode && (open_flag & O_CREAT)) {
-        /* File doesn't exist, create it */
-        ret = ext4_vfs_create(inode, dentry, create_mode);
-        if (ret != 0)
-            return ret;
-    } else if (!found_inode) {
-        /* File doesn't exist and not creating */
-        return -ENOENT;
-    } else {
-        /* File exists */
-        dentry_instantiate(dentry, found_inode);
-    }
-    
-    /* Open the file */
-    if (file) {
-        ret = file->f_op->open(dentry->d_inode, file);
-        if (ret != 0)
-            return ret;
-    }
-    
-    return 0;
-}
 
 /**
  * @brief Create a temporary file

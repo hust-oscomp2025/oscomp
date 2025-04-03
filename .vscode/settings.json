@@ -64,7 +64,10 @@
 		"radix_tree.h": "c",
 		"ext4_adaptor.h": "c",
 		"string_view": "c",
-		"initializer_list": "c"
+		"initializer_list": "c",
+		"forward_declarations.h": "c",
+		"syscall.h": "c",
+		"forward_types.h": "c"
 	},
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyFunction": true,
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyType": true,
