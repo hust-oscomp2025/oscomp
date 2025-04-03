@@ -6,13 +6,8 @@
  * Used by kmalloc for allocations up to 4KB in size.
  */
 
-#include <kernel/mm/page.h>
-#include <kernel/mm/slab.h>
-#include <kernel/util/print.h>
-#include <kernel/util/atomic.h>
-#include <kernel/util/list.h>
-#include <kernel/util/spinlock.h>
-#include <kernel/util/string.h>
+#include <kernel/mmu.h>
+#include <kernel/util.h>
 
 // Slab sizes including allocation headers (8 bytes)
 // These sizes are the total allocation size
@@ -121,13 +116,13 @@ static struct slab_header *slab_header_init(size_t obj_size) {
  * @brief Allocate object from slab
  */
 static void *slab_alloc_obj(struct kmem_cache *cache) {
-  //sprint("slab_alloc_obj: start\n");
+  //kprintf("slab_alloc_obj: start\n");
   // Check for partial slabs
   if (list_empty(&cache->slabs_partial)) {
     // If no partial slabs, check free slabs
     if (list_empty(&cache->slabs_free)) {
       // Need to create a new slab
-      //sprint("slab_alloc_obj: creating a new slab\n");
+      //kprintf("slab_alloc_obj: creating a new slab\n");
 
       struct slab_header *slab = slab_header_init(cache->obj_size);
       if (!slab)
@@ -227,7 +222,7 @@ static void slab_free_obj(struct kmem_cache *cache, struct slab_header *slab,
 
 // 在kmem_init中调用
 void slab_init(void) {
-	sprint("slab_init: start\n");
+	kprintf("slab_init: start\n");
   // Initialize all slab caches
   for (int32 i = 0; i < SLAB_SIZES_COUNT; i++) {
     struct kmem_cache *cache = &slab_caches[i];
@@ -239,7 +234,7 @@ void slab_init(void) {
     INIT_LIST_HEAD(&cache->slabs_free);
     cache->free_objects = 0;
 
-    sprint("  Initialized slab cache for size %d bytes\n", cache->obj_size);
+    kprintf("  Initialized slab cache for size %d bytes\n", cache->obj_size);
   }
 }
 
@@ -247,13 +242,13 @@ void slab_init(void) {
  * @brief Get cache for a specific size
  */
 struct kmem_cache *slab_cache_for_size(size_t size) {
-  //sprint("slab_cache_for_size: start, size = %d\n", size);
+  //kprintf("slab_cache_for_size: start, size = %d\n", size);
   // Round up size to next multiple of 8 bytes for alignment
   size = (size + 7) & ~7;
 
   for (int32 i = 0; i < SLAB_SIZES_COUNT; i++) {
     if (size <= slab_sizes[i]) {
-      //sprint("slab_cache_for_size: i = %d, &slab_caches[i]=%lx\n", i,&slab_caches[i]);
+      //kprintf("slab_cache_for_size: i = %d, &slab_caches[i]=%lx\n", i,&slab_caches[i]);
 
       return &slab_caches[i];
     }
@@ -268,7 +263,7 @@ struct kmem_cache *slab_cache_for_size(size_t size) {
  * @brief Allocate object from slab allocator
  */
 void *slab_alloc(size_t size) {
-  //sprint("slab_alloc: start, size = %d\n", size);
+  //kprintf("slab_alloc: start, size = %d\n", size);
   // Verify size is within our slab allocator range
   if (size > 2048) {
     return NULL; // Too large for slab allocator
@@ -276,17 +271,17 @@ void *slab_alloc(size_t size) {
 
   struct kmem_cache *cache = slab_cache_for_size(size);
   if (!cache) {
-    //sprint("slab_alloc: failed to find cache for size %d\n", size);
+    //kprintf("slab_alloc: failed to find cache for size %d\n", size);
     // Should not happen if size <= 2048
     panic();
   }
 
   spinlock_lock(&cache->lock);
-  //sprint("slab_alloc: get cache\n");
+  //kprintf("slab_alloc: get cache\n");
 
   void *ptr = slab_alloc_obj(cache);
   spinlock_unlock(&cache->lock);
-  //sprint("slab_alloc: complete\n");
+  //kprintf("slab_alloc: complete\n");
 
   return ptr;
 }
@@ -335,7 +330,7 @@ int32 slab_free(void *ptr) {
  * @brief Print slab allocator statistics
  */
 void slab_stats(void) {
-  sprint("Slab caches:\n");
+  kprintf("Slab caches:\n");
   for (int32 i = 0; i < SLAB_SIZES_COUNT; i++) {
     struct kmem_cache *cache = &slab_caches[i];
 
@@ -350,7 +345,7 @@ void slab_stats(void) {
 
     list_for_each(pos, &cache->slabs_free) { free_count++; }
 
-    sprint(
+    kprintf(
         "  Size %4d bytes: %2d full, %2d partial, %2d free, %4d free objects\n",
         cache->obj_size, full_count, partial_count, free_count,
         cache->free_objects);

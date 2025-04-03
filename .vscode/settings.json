@@ -59,7 +59,7 @@
 		"atomic.h": "c",
 		"spike_file.h": "c",
 		"util.h": "c",
-		"sprint.h": "c",
+		"kprintf.h": "c",
 		"mmu.h": "c",
 		"radix_tree.h": "c",
 		"ext4_adaptor.h": "c",
@@ -68,7 +68,9 @@
 		"forward_declarations.h": "c",
 		"syscall.h": "c",
 		"forward_types.h": "c",
-		"stdlib.h": "c"
+		"stdlib.h": "c",
+		"vprint.h": "c",
+		"pagetable.h": "c"
 	},
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyFunction": true,
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyType": true,

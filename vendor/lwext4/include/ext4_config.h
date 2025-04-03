@@ -99,12 +99,12 @@ extern "C" {
 #define CONFIG_HAVE_OWN_ERRNO 0
 #endif
 
-/**@brief   Debug printf enable (stdout)*/
+/**@brief   Debug kprintf enable (stdout)*/
 #ifndef CONFIG_DEBUG_PRINTF
 #define CONFIG_DEBUG_PRINTF 1
 #endif
 
-/**@brief   Assert printf enable (stdout)*/
+/**@brief   Assert kprintf enable (stdout)*/
 #ifndef CONFIG_DEBUG_ASSERT
 #define CONFIG_DEBUG_ASSERT 1
 #endif

@@ -3,13 +3,8 @@
  * @brief RISC-V SV39 页表管理模块的实现
  */
 
-#include <kernel/mm/page.h>
-#include <kernel/mm/pagetable.h>
-
-#include <kernel/util/print.h>
-
-#include <kernel/util/spinlock.h>
-#include <kernel/util/string.h>
+#include <kernel/mmu.h>
+#include <kernel/util.h>
 
 // pointer to kernel page director
 pagetable_t g_kernel_pagetable;
@@ -124,7 +119,7 @@ pte_t *page_walk(pagetable_t pagetable, uint64 va, int32 alloc) {
 
         *pte = PA2PPN(pt) | PTE_V;
       } else {
-        sprint("pgt_walk: invalid pte! va = %lx\n", va);
+        kprintf("pgt_walk: invalid pte! va = %lx\n", va);
 
         return 0;
 
@@ -148,7 +143,7 @@ int32 pgt_map_page(pagetable_t pagetable, vaddr_t va, paddr_t pa, int32 perm) {
   if (pagetable == NULL) {
     return -1;
   }
-  // sprint("debug\n");
+  // kprintf("debug\n");
   // 将地址对齐到页边界
   uint64 aligned_va = ROUNDDOWN(va, PAGE_SIZE);
   uint64 aligned_pa = ROUNDDOWN(pa, PAGE_SIZE);
@@ -192,24 +187,24 @@ int32 pgt_map_page(pagetable_t pagetable, vaddr_t va, paddr_t pa, int32 perm) {
 int32 pgt_map_pages(pagetable_t pagetable, uint64 va, uint64 pa, uint64 size,
                   int32 perm) {
   if (size < 0) {
-    sprint("pgt_map_pages: wrong size %d\n", size);
+    kprintf("pgt_map_pages: wrong size %d\n", size);
     panic();
   }
   if (unlikely((uint64)va & (PAGE_SIZE - 1))) {
-    sprint("va is not aligned\n");
+    kprintf("va is not aligned\n");
     panic();
   }
   if (unlikely((uint64)pa & (PAGE_SIZE - 1))) {
-    sprint("pa is not aligned\n");
+    kprintf("pa is not aligned\n");
     panic();
   }
 	// size可以不对齐
   size = ROUNDUP(size, PAGE_SIZE);
-  //sprint("pgt_map_pages: start\n");
+  //kprintf("pgt_map_pages: start\n");
   for (uint64 off = 0; off < size; off += PAGE_SIZE) {
     pgt_map_page(pagetable, va + off, pa + off, perm);
   }
-  //sprint("pgt_map_pages: complete\n");
+  //kprintf("pgt_map_pages: complete\n");
 
   return 0;
 }
@@ -283,12 +278,12 @@ paddr_t lookup_pa(pagetable_t pagetable, vaddr_t va) {
 }
 
 void pagetable_activate(pagetable_t pagetable) {
-  // sprint("pagetable_activate: start.\n");
+  // kprintf("pagetable_activate: start.\n");
   // pagetable_dump(pagetable);
   //  确保所有映射都已完成
   write_csr(satp, MAKE_SATP(pagetable));
   flush_tlb(); // 刷新TLB
-  sprint("pagetable_activate: complete.\n");
+  kprintf("pagetable_activate: complete.\n");
 }
 
 pagetable_t pagetable_current(void) {
@@ -419,9 +414,9 @@ static void _pagetable_dump_level(pagetable_t pagetable, int32 level,
                                   uint64 va_prefix) {
   // 打印缩进
   for (int32 i = 0; i < level; i++) {
-    sprint("  ");
+    kprintf("  ");
   }
-  sprint("Page table @0x%lx\n", (uint64)pagetable);
+  kprintf("Page table @0x%lx\n", (uint64)pagetable);
 
   // 遍历当前页表的所有条目
   for (int32 i = 0; i < PT_ENTRIES; i++) {
@@ -434,28 +429,28 @@ static void _pagetable_dump_level(pagetable_t pagetable, int32 level,
 
       // 打印缩进
       for (int32 j = 0; j < level + 1; j++) {
-        sprint("  ");
+        kprintf("  ");
       }
 
       // 打印索引和虚拟地址
-      sprint("[%d] VA 0x%lx -> PA 0x%lx, flags: ", i, va, PTE2PA(pte));
+      kprintf("[%d] VA 0x%lx -> PA 0x%lx, flags: ", i, va, PTE2PA(pte));
 
       // 打印权限标志
       if (pte & PTE_R)
-        sprint("R");
+        kprintf("R");
       if (pte & PTE_W)
-        sprint("W");
+        kprintf("W");
       if (pte & PTE_X)
-        sprint("X");
+        kprintf("X");
       if (pte & PTE_U)
-        sprint("U");
+        kprintf("U");
       if (pte & PTE_G)
-        sprint("G");
+        kprintf("G");
       if (pte & PTE_A)
-        sprint("A");
+        kprintf("A");
       if (pte & PTE_D)
-        sprint("D");
-      sprint("\n");
+        kprintf("D");
+      kprintf("\n");
 
       // 如果不是叶子级别，则递归打印下一级
       if (level < PAGE_LEVELS - 1 && !(pte & (PTE_R | PTE_W | PTE_X))) {
@@ -470,18 +465,18 @@ static void _pagetable_dump_level(pagetable_t pagetable, int32 level,
  */
 void pagetable_dump(pagetable_t pagetable) {
   if (pagetable == NULL) {
-    sprint("NULL page table\n");
+    kprintf("NULL page table\n");
     return;
   }
 
-  sprint("=== Page Table Dump ===\n");
+  kprintf("=== Page Table Dump ===\n");
   _pagetable_dump_level(pagetable, 0, 0);
 
   // 打印统计信息
-  sprint("Stats: %d page tables, %d mapped pages\n",
+  kprintf("Stats: %d page tables, %d mapped pages\n",
          atomic_read(&pt_stats.page_tables),
          atomic_read(&pt_stats.mapped_pages));
-  sprint("=======================\n");
+  kprintf("=======================\n");
 }
 
 // 检查特定地址的映射
@@ -491,14 +486,14 @@ void check_address_mapping(pagetable_t pagetable, uint64 va) {
   vpn[1] = (va >> 21) & 0x1FF;
   vpn[0] = (va >> 12) & 0x1FF;
 
-  sprint("Checking mapping for address 0x%lx (vpn: %d,%d,%d)\n", va, vpn[2],
+  kprintf("Checking mapping for address 0x%lx (vpn: %d,%d,%d)\n", va, vpn[2],
          vpn[1], vpn[0]);
 
   // 检查第一级
   pte_t *pte1 = &pagetable[vpn[2]];
-  sprint("L1 PTE at 0x%lx: 0x%lx\n", (uint64)pte1, *pte1);
+  kprintf("L1 PTE at 0x%lx: 0x%lx\n", (uint64)pte1, *pte1);
   if (!(*pte1 & PTE_V)) {
-    sprint("  Invalid L1 entry!\n");
+    kprintf("  Invalid L1 entry!\n");
     return;
   }
 
@@ -507,9 +502,9 @@ void check_address_mapping(pagetable_t pagetable, uint64 va) {
   // 转换为虚拟地址以便访问
   pt2 = (pagetable_t)PHYSICAL_TO_VIRTUAL((uint64)pt2);
   pte_t *pte2 = &pt2[vpn[1]];
-  sprint("L2 PTE at 0x%lx: 0x%lx\n", (uint64)pte2, *pte2);
+  kprintf("L2 PTE at 0x%lx: 0x%lx\n", (uint64)pte2, *pte2);
   if (!(*pte2 & PTE_V)) {
-    sprint("  Invalid L2 entry!\n");
+    kprintf("  Invalid L2 entry!\n");
     return;
   }
 
@@ -517,15 +512,15 @@ void check_address_mapping(pagetable_t pagetable, uint64 va) {
   pagetable_t pt3 = (pagetable_t)PTE2PA(*pte2);
   pt3 = (pagetable_t)PHYSICAL_TO_VIRTUAL((uint64)pt3);
   pte_t *pte3 = &pt3[vpn[0]];
-  sprint("L3 PTE at 0x%lx: 0x%lx\n", (uint64)pte3, *pte3);
+  kprintf("L3 PTE at 0x%lx: 0x%lx\n", (uint64)pte3, *pte3);
   if (!(*pte3 & PTE_V)) {
-    sprint("  Invalid L3 entry!\n");
+    kprintf("  Invalid L3 entry!\n");
     return;
   }
 
   // 分析最终PTE的权限
-  sprint("  Physical addr: 0x%lx\n", PTE2PA(*pte3));
-  sprint("  Permissions: %s%s%s%s%s%s%s\n", (*pte3 & PTE_R) ? "R" : "-",
+  kprintf("  Physical addr: 0x%lx\n", PTE2PA(*pte3));
+  kprintf("  Permissions: %s%s%s%s%s%s%s\n", (*pte3 & PTE_R) ? "R" : "-",
          (*pte3 & PTE_W) ? "W" : "-", (*pte3 & PTE_X) ? "X" : "-",
          (*pte3 & PTE_U) ? "U" : "-", (*pte3 & PTE_G) ? "G" : "-",
          (*pte3 & PTE_A) ? "A" : "-", (*pte3 & PTE_D) ? "D" : "-");

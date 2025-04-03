@@ -8,7 +8,7 @@
 #include <kernel/sched/sched.h>
 #include <kernel/sched/process.h>
 #include <kernel/trapframe.h>
-#include <kernel/util/print.h>
+#include <kernel/util.h>
 #include <kernel/util/list.h>
 #include <kernel/util/string.h>
 
@@ -20,7 +20,7 @@ struct task_struct *current_percpu[NCPU];
 // initialize process pool (the procs[] array). added @lab3_1
 //
 void init_scheduler() {
-  // sprint("init_scheduler: start\n");
+  // kprintf("init_scheduler: start\n");
   INIT_LIST_HEAD(&ready_queue);
   pid_init();
   memset(procs, 0, sizeof(struct task_struct *) * NPROC);
@@ -28,7 +28,7 @@ void init_scheduler() {
   for (int32 i = 0; i < NPROC; ++i) {
     procs[i] = NULL;
   }
-  sprint("Scheduler initiated\n");
+  kprintf("Scheduler initiated\n");
 }
 
 struct task_struct *alloc_empty_process() {
@@ -47,7 +47,7 @@ struct task_struct *alloc_empty_process() {
 // insert a process, proc, into the END of ready queue.
 //
 void insert_to_ready_queue(struct task_struct *proc) {
-  sprint("going to insert process %d to ready queue.\n", proc->pid);
+  kprintf("going to insert process %d to ready queue.\n", proc->pid);
   list_add(&proc->ready_queue_node, &ready_queue);
 }
 
@@ -58,18 +58,18 @@ void insert_to_ready_queue(struct task_struct *proc) {
 // (by calling ready_queue_insert), and then call schedule().
 //
 void schedule() {
-  sprint("schedule: start\n");
+  kprintf("schedule: start\n");
   extern struct task_struct *procs[NPROC];
   int32 hartid = read_tp();
   struct task_struct *cur = CURRENT;
-  // sprint("debug\n");
+  // kprintf("debug\n");
   if (cur &&
       ((cur->state == TASK_INTERRUPTIBLE) |
        (cur->state == TASK_UNINTERRUPTIBLE)) &&
       cur->ktrapframe == NULL) {
     cur->ktrapframe = (struct trapframe *)kmalloc(sizeof(struct trapframe));
     store_all_registers(cur->ktrapframe);
-    // sprint("cur->ktrapframe->regs.ra=0x%x\n",cur->ktrapframe->regs.ra);
+    // kprintf("cur->ktrapframe->regs.ra=0x%x\n",cur->ktrapframe->regs.ra);
   }
   if (list_empty(&ready_queue)) {
     // by default, if there are no ready process, and all processes are in the
@@ -80,7 +80,7 @@ void schedule() {
     // for (int32 i = 0; i < NPROC; i++)
     //   if ((procs[i]) && (procs[i]->exit_state != EXIT_TRACE)) {
     //     should_shutdown = 0;
-    //     sprint("ready queue empty, but process %d is not in free/zombie "
+    //     kprintf("ready queue empty, but process %d is not in free/zombie "
     //            "state:%d\n",
     //            i, procs[i]->exit_state);
     //   }
@@ -89,7 +89,7 @@ void schedule() {
     // if (should_shutdown) {
     //   // 确保只有 hartid == 0 的核心执行 shutdown
     //   if (hartid == 0) {
-    //     sprint("no more ready processes, system shutdown now.\n");
+    //     kprintf("no more ready processes, system shutdown now.\n");
     //     shutdown(0); // 只有核心 0 执行关机
     //   }
     //   // 否则，其他核心等待关机标志
@@ -107,14 +107,14 @@ void schedule() {
   CURRENT = container_of(ready_queue.next, struct task_struct, ready_queue_node);
   list_del_init(ready_queue.next);
   if (cur->ktrapframe != NULL) {
-    sprint("going to schedule process %d to run in s-mode.\n", CURRENT->pid);
+    kprintf("going to schedule process %d to run in s-mode.\n", CURRENT->pid);
 
     restore_all_registers(cur->ktrapframe);
     kfree(cur->ktrapframe);
     cur->ktrapframe = NULL;
     return;
   } else {
-    sprint("going to schedule process %d to run in u-mode.\n", CURRENT->pid);
+    kprintf("going to schedule process %d to run in u-mode.\n", CURRENT->pid);
     switch_to(cur);
   }
 }
@@ -143,7 +143,7 @@ void switch_to(struct task_struct *proc) {
 
   // set S Exception Program Counter (sepc register) to the elf entry pc.
   write_csr(sepc, proc->trapframe->epc);
-  sprint("return to user\n");
+  kprintf("return to user\n");
 
   extern void return_to_user(struct trapframe *, uint64);
   return_to_user(proc->trapframe, MAKE_SATP(proc->mm->pagetable));

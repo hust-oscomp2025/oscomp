@@ -54,14 +54,14 @@ static int32 load_elf_binary(elf_context *ctx);
 void load_elf_from_file(struct task_struct *proc, char *filename) {
   elf_context ctx;
 
-  sprint("load_elf_from_file: Loading application: %s\n", filename);
+  kprintf("load_elf_from_file: Loading application: %s\n", filename);
 
   // 使用内核标准文件接口打开ELF文件
   int32 fd = do_open(filename, O_RDONLY,0);
   if (fd < 0) {
     panic("Failed to open application file: %s (error %d)\n", filename, fd);
   }
-  sprint("load_elf_from_file: do_open ended.\n");
+  kprintf("load_elf_from_file: do_open ended.\n");
 
   // 确保进程有有效的内存布局
   if (unlikely(!proc->mm)) {
@@ -71,7 +71,7 @@ void load_elf_from_file(struct task_struct *proc, char *filename) {
       panic("Failed to create memory layout for process\n");
     }
   }
-  sprint("load_elf_from_file: process has mm_struct.\n");
+  kprintf("load_elf_from_file: process has mm_struct.\n");
 
   // 初始化ELF上下文
   if (init_elf_context(&ctx, fd, proc) != 0) {
@@ -87,11 +87,11 @@ void load_elf_from_file(struct task_struct *proc, char *filename) {
 
   // 如果需要，加载调试信息
   load_debug_information(&ctx);
-  sprint("load_elf_from_file: load debug information\n");
+  kprintf("load_elf_from_file: load debug information\n");
   // 关闭文件
   do_close(fd);
 
-  sprint(
+  kprintf(
       "Application loaded successfully, entry point (virtual address): 0x%lx\n",
       proc->trapframe->epc);
 }
@@ -106,7 +106,7 @@ void load_elf_from_file(struct task_struct *proc, char *filename) {
 int32 load_elf_symbols(char *filename) {
   int32 fd = do_open(filename, O_RDONLY,0);
   if (fd < 0) {
-    sprint("Failed to open file for symbols: %s (error %d)\n", filename, fd);
+    kprintf("Failed to open file for symbols: %s (error %d)\n", filename, fd);
     return -1;
   }
 
@@ -117,7 +117,7 @@ int32 load_elf_symbols(char *filename) {
   // 读取ELF头
   if (elf_read_at(&ctx, &ctx.ehdr, sizeof(elf_header), 0) !=
       sizeof(elf_header)) {
-    sprint("Failed to read ELF header for symbols\n");
+    kprintf("Failed to read ELF header for symbols\n");
     do_close(fd);
     return -1;
   }
@@ -175,12 +175,12 @@ static int32 elf_setup_vma(struct mm_struct *mm, uint64 ph_vaddr, uint64 ph_mems
   struct vm_area_struct *vma =
       vm_area_setup(mm, ph_vaddr, ph_memsz, vma_type, prot, vma_flags);
   if (unlikely(!vma)) {
-    sprint("Failed to create VMA for segment\n");
+    kprintf("Failed to create VMA for segment\n");
     return -1;
   }
   int32 ret = populate_vma(vma, ph_vaddr, ph_memsz, prot);
   if (ret != 0) {
-    sprint("Failed to populate VMA: errno = %d\n", ret);
+    kprintf("Failed to populate VMA: errno = %d\n", ret);
     return ret;
   }
   return 0;
@@ -200,13 +200,13 @@ static ssize_t elf_read_at(elf_context *ctx, void *dest, size_t size,
   // 保存当前文件位置
   int32 current_pos = do_lseek(ctx->fd, 0, SEEK_CUR);
   if (current_pos < 0) {
-    sprint("Failed to get current file position\n");
+    kprintf("Failed to get current file position\n");
     return -1;
   }
 
   // 设置新的文件位置
   if (do_lseek(ctx->fd, offset, SEEK_SET) < 0) {
-    sprint("Failed to seek to offset %ld\n", offset);
+    kprintf("Failed to seek to offset %ld\n", offset);
     return -1;
   }
 
@@ -228,19 +228,19 @@ static ssize_t elf_read_at(elf_context *ctx, void *dest, size_t size,
 static int32 validate_elf_header(elf_header *ehdr) {
   // 验证魔数
   if (ehdr->magic != ELF_MAGIC) {
-    sprint("Invalid ELF magic number: 0x%x\n", ehdr->magic);
+    kprintf("Invalid ELF magic number: 0x%x\n", ehdr->magic);
     return -1;
   }
 
   // 验证架构（RISC-V 64位）
   if (ehdr->machine != 0xf3) { // EM_RISCV
-    sprint("Unsupported architecture: 0x%x\n", ehdr->machine);
+    kprintf("Unsupported architecture: 0x%x\n", ehdr->machine);
     return -1;
   }
 
   // 验证类型（可执行文件）
   if (ehdr->type != 2) { // ET_EXEC
-    sprint("Not an executable file: %d\n", ehdr->type);
+    kprintf("Not an executable file: %d\n", ehdr->type);
     return -1;
   }
 
@@ -265,19 +265,19 @@ static int32 load_segment(elf_context *ctx, elf_prog_header *ph) {
   }
   // 验证段信息
   if (ph->memsz < ph->filesz) {
-    sprint("Invalid segment: memory size < file size\n");
+    kprintf("Invalid segment: memory size < file size\n");
     return -1;
   }
   // 检查地址溢出
   if (ph->vaddr + ph->memsz < ph->vaddr) {
-    sprint("Segment address overflow\n");
+    kprintf("Segment address overflow\n");
     return -1;
   }
-  sprint("Loading segment: vaddr=0x%lx, size=0x%lx, flags=0x%x\n", ph->vaddr,
+  kprintf("Loading segment: vaddr=0x%lx, size=0x%lx, flags=0x%x\n", ph->vaddr,
          ph->memsz, ph->flags);
   ret = elf_setup_vma(mm, ph->vaddr, ph->memsz, ph->flags);
   if (ret != 0) {
-    sprint("Failed to setup VMA for segment\n");
+    kprintf("Failed to setup VMA for segment\n");
     return ret;
   }
 
@@ -298,7 +298,7 @@ static int32 load_segment(elf_context *ctx, elf_prog_header *ph) {
 
       // 从文件读取数据到分配的物理页
       if (elf_read_at(ctx, (void*)pa, bytes_to_copy, file_offset) != bytes_to_copy) {
-        sprint("Failed to read segment data\n");
+        kprintf("Failed to read segment data\n");
         return -1;
       }
 
@@ -329,21 +329,21 @@ static void setup_global_pointer(elf_context *ctx) {
   if (elf_read_at(ctx, &shstr_section, sizeof(shstr_section),
                   ehdr->shoff + ehdr->shstrndx * sizeof(elf_sect_header)) !=
       sizeof(shstr_section)) {
-    sprint("Failed to read section header string table\n");
+    kprintf("Failed to read section header string table\n");
     return;
   }
 
   // 分配缓冲区存储节名字符串
   char *shstr_buffer = (char *)kmalloc(shstr_section.size);
   if (!shstr_buffer) {
-    sprint("Failed to allocate section name buffer\n");
+    kprintf("Failed to allocate section name buffer\n");
     return;
   }
 
   // 读取节名字符串表
   if (elf_read_at(ctx, shstr_buffer, shstr_section.size,
                   shstr_section.offset) != shstr_section.size) {
-    sprint("Failed to read section names\n");
+    kprintf("Failed to read section names\n");
     kfree(shstr_buffer);
     return;
   }
@@ -354,7 +354,7 @@ static void setup_global_pointer(elf_context *ctx) {
     uint64 sh_offset = ehdr->shoff + i * sizeof(elf_sect_header);
 
     if (elf_read_at(ctx, &sh, sizeof(sh), sh_offset) != sizeof(sh)) {
-      sprint("Failed to read section header %d\n", i);
+      kprintf("Failed to read section header %d\n", i);
       continue;
     }
 
@@ -363,7 +363,7 @@ static void setup_global_pointer(elf_context *ctx) {
         strcmp(shstr_buffer + sh.name, ".sdata") == 0) {
       // 找到.sdata节，设置gp寄存器
       ctx->proc->trapframe->regs.gp = sh.addr + 0x800;
-      sprint("Found .sdata section at 0x%lx, setting gp to 0x%lx\n", sh.addr,
+      kprintf("Found .sdata section at 0x%lx, setting gp to 0x%lx\n", sh.addr,
              ctx->proc->trapframe->regs.gp);
       break;
     }
@@ -388,7 +388,7 @@ static int32 init_elf_context(elf_context *ctx, int32 fd,
 
   // 读取ELF头
   if (elf_read_at(ctx, &ctx->ehdr, sizeof(ctx->ehdr), 0) != sizeof(ctx->ehdr)) {
-    sprint("Failed to read ELF header\n");
+    kprintf("Failed to read ELF header\n");
     return -1;
   }
 
@@ -429,13 +429,13 @@ static int32 load_elf_binary(elf_context *ctx) {
 
     // 读取程序头
     if (elf_read_at(ctx, &ph, sizeof(ph), ph_offset) != sizeof(ph)) {
-      sprint("Failed to read program header %d\n", i);
+      kprintf("Failed to read program header %d\n", i);
       return -1;
     }
 
     // 加载段
     if (load_segment(ctx, &ph) != 0) {
-      sprint("Failed to load segment %d\n", i);
+      kprintf("Failed to load segment %d\n", i);
       return -1;
     }
   }
@@ -446,7 +446,7 @@ static int32 load_elf_binary(elf_context *ctx) {
   // 设置进程入口点
   ctx->proc->trapframe->epc = ctx->entry_point;
 
-  sprint("ELF loaded successfully, entry point: 0x%lx\n", ctx->entry_point);
+  kprintf("ELF loaded successfully, entry point: 0x%lx\n", ctx->entry_point);
   return 0;
 }
 
@@ -466,12 +466,12 @@ int32 load_init_binary(struct task_struct *init_task, const char *path) {
     elf_context ctx;
     int32 error = 0;
 
-    sprint("Loading init binary: %s\n", path);
+    kprintf("Loading init binary: %s\n", path);
 
     // Open the init binary file
     int32 fd = do_open(path, O_RDONLY,0);
     if (fd < 0) {
-        sprint("Failed to open init binary: %s (error %d)\n", path, fd);
+        kprintf("Failed to open init binary: %s (error %d)\n", path, fd);
         return fd;
     }
 
@@ -479,7 +479,7 @@ int32 load_init_binary(struct task_struct *init_task, const char *path) {
     if (!init_task->mm) {
         init_task->mm = user_alloc_mm();
         if (!init_task->mm) {
-            sprint("Failed to create memory layout for init process\n");
+            kprintf("Failed to create memory layout for init process\n");
             do_close(fd);
             return -ENOMEM;
         }
@@ -492,14 +492,14 @@ int32 load_init_binary(struct task_struct *init_task, const char *path) {
 
     // Read ELF header
     if (elf_read_at(&ctx, &ctx.ehdr, sizeof(elf_header), 0) != sizeof(elf_header)) {
-        sprint("Failed to read ELF header\n");
+        kprintf("Failed to read ELF header\n");
         error = -EIO;
         goto out;
     }
 
     // Validate ELF header
     if (validate_elf_header(&ctx.ehdr) != 0) {
-        sprint("Invalid ELF header\n");
+        kprintf("Invalid ELF header\n");
         error = -ENOEXEC;
         goto out;
     }
@@ -509,14 +509,14 @@ int32 load_init_binary(struct task_struct *init_task, const char *path) {
     // Load ELF binary
     error = load_elf_binary(&ctx);
     if (error != 0) {
-        sprint("Failed to load init binary: %d\n", error);
+        kprintf("Failed to load init binary: %d\n", error);
         goto out;
     }
 
     // Load debug information if needed
     load_debug_information(&ctx);
 
-    sprint("Init binary loaded successfully, entry point: 0x%lx\n", 
+    kprintf("Init binary loaded successfully, entry point: 0x%lx\n", 
            init_task->trapframe->epc);
 
 out:

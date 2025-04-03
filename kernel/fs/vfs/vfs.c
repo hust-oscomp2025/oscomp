@@ -61,7 +61,7 @@ struct vfsmount* vfs_kern_mount(struct fstype* fstype, int32 flags, const char* 
 	if (device_path && *device_path) {
 		int32 ret = lookup_dev_id(device_path, &dev_id);
 		if (ret < 0) {
-			sprint("VFS: Failed to get device ID for %s\n", device_path);
+			kprintf("VFS: Failed to get device ID for %s\n", device_path);
 			return ERR_PTR(ret);
 		}
 	}
@@ -117,30 +117,30 @@ int32 vfs_init(void) {
 	mcache_init();
 
 	/* Initialize the dcache subsystem */
-	sprint("VFS: Initializing dentry cache...\n");
+	kprintf("VFS: Initializing dentry cache...\n");
 	err = init_dentry_hashtable();
 	if (err < 0) {
-		sprint("VFS: Failed to initialize dentry cache\n");
+		kprintf("VFS: Failed to initialize dentry cache\n");
 		return err;
 	}
 
 	/* Initialize the inode subsystem */
-	sprint("VFS: Initializing inode cache...\n");
+	kprintf("VFS: Initializing inode cache...\n");
 	err = icache_init();
 	if (err < 0) {
-		sprint("VFS: Failed to initialize inode cache\n");
+		kprintf("VFS: Failed to initialize inode cache\n");
 		return err;
 	}
 
 	/* Register built-in filesystems */
-	sprint("VFS: Registering built-in filesystems...\n");
+	kprintf("VFS: Registering built-in filesystems...\n");
 	err = fstype_register_all();
 	if (err < 0) {
-		sprint("VFS: Failed to register filesystems\n");
+		kprintf("VFS: Failed to register filesystems\n");
 		return err;
 	}
 
-	sprint("VFS: Initialization complete\n");
+	kprintf("VFS: Initialization complete\n");
 	return 0;
 }
 

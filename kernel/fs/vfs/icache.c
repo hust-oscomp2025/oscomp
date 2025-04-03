@@ -12,16 +12,16 @@
 int32 icache_init(void) {
 	int32 err;
 
-	sprint("Initializing inode cache\n");
+	kprintf("Initializing inode cache\n");
 
 	/* Initialize hash table with our callbacks */
 	err = hashtable_setup(&inode_hashtable, 1024, 75, icache_hash, icache_getkey, icache_equal);
 	if (err != 0) {
-		sprint("Failed to initialize inode hashtable: %d\n", err);
+		kprintf("Failed to initialize inode hashtable: %d\n", err);
 		return err;
 	}
 
-	sprint("Inode cache initialized\n");
+	kprintf("Inode cache initialized\n");
 	return 0;
 }
 

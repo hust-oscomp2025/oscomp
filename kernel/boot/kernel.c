@@ -3,23 +3,20 @@
  */
 
 #include <kernel/elf.h>
-#include <kernel/mm/kmalloc.h>
-#include <kernel/mm/mm_struct.h>
-#include <kernel/mm/mmap.h>
-#include <kernel/mm/pagetable.h>
+#include <kernel/mmu.h>
 #include <kernel/riscv.h>
-#include <kernel/sched/process.h>
-#include <kernel/sched/sched.h>
-#include <kernel/util/print.h>
+#include <kernel/sched.h>
+#include <kernel/syscall/syscall.h>
 #include <kernel/types.h>
 #include <kernel/util.h>
 #include <kernel/vfs.h>
-#include <kernel/syscall/syscall.h>
+#include <kernel/device/sbi.h>
+#include <kernel/boot/dtb.h>
 
 __attribute__((aligned(16))) char stack0[PAGE_SIZE * NCPU];
 
 static void kernel_vm_init(void) {
-	sprint("kernel_vm_init: start\n");
+	kprintf("kernel_vm_init: start\n");
 	// extern struct mm_struct init_mm;
 	//  映射内核代码段和只读段
 	g_kernel_pagetable = (pagetable_t)alloc_page()->paddr;
@@ -28,7 +25,7 @@ static void kernel_vm_init(void) {
 	memset(g_kernel_pagetable, 0, PAGE_SIZE);
 
 	extern char _ftext[], _etext[], _fdata[], _end[];
-	// sprint("_etext=%lx,_ftext=%lx\n", _etext, _ftext);
+	// kprintf("_etext=%lx,_ftext=%lx\n", _etext, _ftext);
 
 	pgt_map_pages(g_kernel_pagetable, (uint64)_ftext, (uint64)_ftext, (uint64)(_etext - _ftext), prot_to_type(PROT_READ | PROT_EXEC, 0));
 
@@ -56,7 +53,7 @@ static void kernel_vm_init(void) {
 	// // 6. 映射MMIO区域（如果有需要）
 	// // 例如UART、PLIC等外设的内存映射IO区域
 
-	sprint("kern_vm_init: complete\n");
+	kprintf("kern_vm_init: complete\n");
 }
 
 /**
@@ -77,8 +74,8 @@ int32 setup_init_fds(struct task_struct* init_task) {
 
 	// Set up stdin, stdout, stderr
 	for (fd = 0; fd < 3; fd++) {
-		if(fd != do_open("/dev/console", O_RDWR, 0)) {
-			sprint("Failed to open /dev/console for fd %d\n", fd);
+		if (fd != do_open("/dev/console", O_RDWR, 0)) {
+			kprintf("Failed to open /dev/console for fd %d\n", fd);
 			set_current_task(saved_task);
 			return -1;
 		}
@@ -124,17 +121,50 @@ fail_fs:
 	return error;
 }
 
+void start_trap() { while (1); }
+
 //
 // s_start: S-mode entry point of riscv-pke OS kernel.
 //
 volatile static int32 sig = 1;
-int32 s_start(void) {
+volatile static int counter = 0;
+void s_start(uintptr_t hartid, uintptr_t dtb) {
+	SBI_PUTCHAR('0' + hartid);
+	SBI_PUTCHAR('M');
+	SBI_PUTCHAR('_');
+	SBI_PUTCHAR('S');
+	SBI_PUTCHAR('T');
+	SBI_PUTCHAR('A');
+	SBI_PUTCHAR('R');
+	SBI_PUTCHAR('T');
+	SBI_PUTCHAR('\n');
+
+	if (hartid == 0) {
+		// spike_file_init(); //TODO: 将文件系统迁移到 QEMU
+		// init_dtb(dtb);
+		parseDtb(dtb);
+	}
+	if (NCPU > 1) sync_barrier(&counter, NCPU);
+	write_csr(sie, read_csr(sie) | SIE_SEIE | SIE_STIE); // 不启用核间中断（暂时） TODO
+
+	// init timing. added @lab1_3
+	// lab1_challenge1 为了调试便利，禁用了外部时钟中断：
+	// timerinit(hartid);
+
+	// switch to supervisor mode (S mode) and jump to s_start(), i.e., set pc to
+	// mepc
+	// asm volatile("mret");
+
+	kprintf("In m_start, hartid:%d\n", hartid);
+	write_tp(hartid);
+
+	write_csr(stvec, (uint64)start_trap);
+
 	extern void init_idle_task(void);
 
-	sprint("Enter supervisor mode...\n");
+	kprintf("Enter supervisor mode...\n");
 	write_csr(satp, 0);
 
-	int32 hartid = read_tp();
 	if (hartid == 0) {
 		init_page_manager();
 		kernel_vm_init();
@@ -151,7 +181,8 @@ int32 s_start(void) {
 		vfs_init();
 		sig = 0;
 	} else {
-		while (sig) {}
+		while (sig) {
+		}
 		pagetable_activate(g_kernel_pagetable);
 	}
 
@@ -160,11 +191,11 @@ int32 s_start(void) {
 	//  写入satp寄存器并刷新tlb缓存
 	//    从这里开始，所有内存访问都通过MMU进行虚实转换
 
-	sprint("Switch to user mode...\n");
+	kprintf("Switch to user mode...\n");
 	// the application code (elf) is first loaded into memory, and then put into
 	// execution added @lab3_1
 	create_init_process();
 
 	// we should never reach here.
-	return 0;
+	return;
 }

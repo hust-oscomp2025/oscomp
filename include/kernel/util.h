@@ -9,3 +9,5 @@
 #include <kernel/util/sync_utils.h>
 #include <kernel/util/misc.h>
 #include <kernel/util/print.h>
+#include <kernel/util/terminal.h>
+#include <kernel/util/vprint.h>

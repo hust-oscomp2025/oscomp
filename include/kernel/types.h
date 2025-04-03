@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <stddef.h>
 #include <fcntl.h>
+#include <sys/cdefs.h>
 //#include <kernel/riscv.h>
 
 /* 关于指针和数据类型的说明

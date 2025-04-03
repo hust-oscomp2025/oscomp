@@ -71,7 +71,7 @@ static struct char_device_operations console_ops = {
 };
 ```
 
-### 2. Console Buffer Management for `sprint`
+### 2. Console Buffer Management for `kprintf`
 
 ```c
 /**
@@ -134,18 +134,18 @@ static void console_putchar(char c) {
 }
 ```
 
-### 4. Implementing `sprint` Function
+### 4. Implementing `kprintf` Function
 
 ```c
 /**
- * sprint - Format and output a message to the console
+ * kprintf - Format and output a message to the console
  * @fmt: Format string
  * @...: Arguments for formatting
  *
  * This is the main kernel logging function, similar to Linux's printk
  * Outputs to both the console buffer and directly to hardware
  */
-int sprint(const char* fmt, ...) {
+int kprintf(const char* fmt, ...) {
     char buf[256];
     va_list args;
     int printed;
@@ -194,7 +194,7 @@ int console_init(void) {
     /* Register the character device */
     /* In a complete implementation, you'd register with your device system */
     
-    sprint("Console initialized\n");
+    kprintf("Console initialized\n");
     return 0;
 }
 ```

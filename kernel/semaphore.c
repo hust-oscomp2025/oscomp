@@ -12,7 +12,7 @@ int32 sem_new(int32 initial_value) {
     if (sem_pool[i].isActive == 0) {
       sem_pool[i].isActive = 1;
       sem_pool[i].value = initial_value;
-			//sprint("sem %d initialvalue %d\n",i,initial_value);
+			//kprintf("sem %d initialvalue %d\n",i,initial_value);
       // sem_pool[i].pid = pid;
       sem_pool[i].wait_queue = NULL;
       return i;
@@ -31,7 +31,7 @@ void sem_free(int32 sem_index) {
 }
 
 int32 sem_P(int32 sem_index) {
-  // //sprint("Received calling sem_P index = %d\n", sem_index);
+  // //kprintf("Received calling sem_P index = %d\n", sem_index);
   // if (sem_index < 0 || sem_index >= NSEM || !sem_pool[sem_index].isActive) {
   //   panic("invalid sem_index!");
   // }
@@ -40,7 +40,7 @@ int32 sem_P(int32 sem_index) {
   // if (sem->value > 0) {
   //   return sem->value--;
   // } else {
-  //   // sprint("BLOCK!\n");
+  //   // kprintf("BLOCK!\n");
   //   int32 hartid = read_tp();
   //   struct task_struct *cur = CURRENT;
   //   cur->state = TASK_INTERRUPTIBLE;
@@ -49,7 +49,7 @@ int32 sem_P(int32 sem_index) {
 
   //   schedule();
 
-  //   // sprint("return from blocking!\n");
+  //   // kprintf("return from blocking!\n");
   //   return 0;
   //   // 直接嵌入保存内核上下文到process->ktrapframe的汇编代码
   // }

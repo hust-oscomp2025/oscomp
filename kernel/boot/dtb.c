@@ -1,6 +1,6 @@
 #include <kernel/boot/dtb.h>
 // #include <kernel/util/log.h>
-// #include "lib/printf.h"
+// #include "lib/kprintf.h"
 #include <kernel/mmu.h>
 #include <kernel/types.h>
 #include <kernel/util.h>
@@ -167,8 +167,7 @@ static void* parseFdtNode(struct FDTHeader* fdtHeader, void* node, char* parent)
 	return node + 4;
 }
 
-void parseDtb() {
-	extern uint64_t dtbEntry;
+void parseDtb(uint64 dtbEntry) {
 	// log(LEVEL_GLOBAL, "Find dtbEntry address at 0x%08lx\n", dtbEntry);
 
 	struct FDTHeader* fdt_h = (struct FDTHeader*)dtbEntry;

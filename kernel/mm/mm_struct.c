@@ -1,14 +1,9 @@
 #include <kernel/types.h>
 
-#include <kernel/mm/kmalloc.h>
-#include <kernel/mm/mm_struct.h>
-#include <kernel/mm/mmap.h>
-#include <kernel/mm/page.h>
-#include <kernel/mm/vma.h>
-#include <kernel/sched/process.h>
-#include <kernel/util/print.h>
-#include <kernel/util/atomic.h>
-#include <kernel/util/string.h>
+#include <kernel/mmu.h>
+#include <kernel/sched.h>
+#include <kernel/util.h>
+
 
 // user_alloc_mm
 struct mm_struct *user_alloc_mm(void) {
@@ -25,7 +20,7 @@ struct mm_struct *user_alloc_mm(void) {
   // 记录页表的内核虚拟地址
   mm->pagetable = (pagetable_t)kmalloc(PAGE_SIZE);
   if (unlikely(mm->pagetable == NULL)) {
-    sprint("alloc_mm: kmalloc failed\n");
+    kprintf("alloc_mm: kmalloc failed\n");
     return NULL;
   }
   memset(mm->pagetable, 0, PAGE_SIZE);
@@ -52,7 +47,7 @@ struct mm_struct *user_alloc_mm(void) {
 
   // 分配并映射初始栈页
   if (unlikely(stack_vma == NULL)) {
-    sprint("alloc_mm: failed to allocate initial stack page\n");
+    kprintf("alloc_mm: failed to allocate initial stack page\n");
     return NULL;
   }
 

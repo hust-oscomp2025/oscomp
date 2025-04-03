@@ -26,7 +26,7 @@ static void handle_syscall(struct trapframe *tf) {
 // added @lab1_3
 //
 void handle_mtimer_trap() {
-  sprint("Ticks %d\n", jiffies);
+  kprintf("Ticks %d\n", jiffies);
   int32 hartid = read_tp();
   if(hartid == 0){
 	jiffies++;
@@ -48,7 +48,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 	struct task_struct *proc = CURRENT;
 	uint64 addr = stval;
 	
-	sprint("sepc=%lx, handle_page_fault: %lx\n", sepc, addr);
+	kprintf("sepc=%lx, handle_page_fault: %lx\n", sepc, addr);
 	
 	// 标记访问类型
 	int32 fault_prot = 0;
@@ -67,7 +67,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 			if (vma) {
 					// 确认访问权限
 					if ((fault_prot & vma->vm_prot) != fault_prot) {
-							sprint("权限不足: 需要 %d, VMA允许 %d\n", fault_prot, vma->vm_prot);
+							kprintf("权限不足: 需要 %d, VMA允许 %d\n", fault_prot, vma->vm_prot);
 							goto error;
 					}
 					
@@ -77,7 +77,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 					// 计算页索引
 					int32 page_idx = (page_va - vma->vm_start) / PAGE_SIZE;
 					if (page_idx < 0 || page_idx >= vma->page_count) {
-							sprint("页索引越界: %d\n", page_idx);
+							kprintf("页索引越界: %d\n", page_idx);
 							goto error;
 					}
 					
@@ -150,7 +150,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 	
 error:
 	// 不能处理的页错误
-	sprint("无法处理的页错误: addr=%lx, mcause=%lx\n", stval, mcause);
+	kprintf("无法处理的页错误: addr=%lx, mcause=%lx\n", stval, mcause);
 	panic("This address is not available!");
 }
 
@@ -194,7 +194,7 @@ void smode_trap_handler(void) {
   switch (cause) {
   case CAUSE_USER_ECALL:
     handle_syscall(CURRENT->trapframe);
-    // sprint("coming back from syscall\n");
+    // kprintf("coming back from syscall\n");
     break;
   case CAUSE_MTIMER_S_TRAP:
     handle_mtimer_trap();
@@ -208,12 +208,12 @@ void smode_trap_handler(void) {
     handle_user_page_fault(cause, read_csr(sepc), read_csr(stval));
     break;
   default:
-    sprint("smode_trap_handler(): unexpected scause %p\n", read_csr(scause));
-    sprint("            sepc=%p stval=%p\n", read_csr(sepc), read_csr(stval));
+    kprintf("smode_trap_handler(): unexpected scause %p\n", read_csr(scause));
+    kprintf("            sepc=%p stval=%p\n", read_csr(sepc), read_csr(stval));
     panic("unexpected exception happened.\n");
     break;
   }
-  // sprint("calling switch_to, current = 0x%x\n", current);
+  // kprintf("calling switch_to, current = 0x%x\n", current);
   // continue (come back to) the execution of current process.
   switch_to(CURRENT);
 }

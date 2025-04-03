@@ -32,7 +32,7 @@ extern struct mm_struct init_mm;
 
 // 在kernel初始化中被调用
 void kmem_init(void) {
-  sprint("Initializing kernel memory allocator...\n");
+  kprintf("Initializing kernel memory allocator...\n");
 
   // Initialize spinlock
   spinlock_init(&kmalloc_lock);
@@ -40,7 +40,7 @@ void kmem_init(void) {
   slab_init();
   pagetable_server_init();
 
-  sprint("Kernel memory allocator initialized\n");
+  kprintf("Kernel memory allocator initialized\n");
 }
 
 /**
@@ -61,7 +61,7 @@ void kmem_init(void) {
  * @brief Allocate kernel memory
  */
  void *kmalloc(size_t size) {
-  //sprint("kmalloc: start\n");
+  //kprintf("kmalloc: start\n");
   if (size == 0)
     return NULL;
 
@@ -75,7 +75,7 @@ void kmem_init(void) {
 
   // For small allocations (up to 2048 bytes), use slab allocator
   if (total_size <= 2048) {
-    //sprint("kmalloc: small\n");
+    //kprintf("kmalloc: small\n");
 
     struct kmalloc_header *header = slab_alloc(total_size);
     if (header) {
@@ -84,7 +84,7 @@ void kmem_init(void) {
       mem = header_to_ptr(header);
     }
   } else {
-    //sprint("kmalloc: large\n");
+    //kprintf("kmalloc: large\n");
     // For large allocations, use page allocator without headers
     paddr_t ret = mmap_file(&init_mm, 0, size, PROT_READ | PROT_WRITE,
                         MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, NULL, 0);
@@ -97,7 +97,7 @@ void kmem_init(void) {
       mem = (void*)page->paddr;
     }
   }
-  //sprint("kmalloc: end\n");
+  //kprintf("kmalloc: end\n");
 
   return mem;
 }
@@ -109,7 +109,7 @@ void kmem_init(void) {
   if (!ptr)
     return;
 
-  sprint("calling kfree with ptr=%lx\n", ptr);
+  kprintf("calling kfree with ptr=%lx\n", ptr);
 
   // Check if this is a page allocation (page-aligned pointer)
   if (((uint64)ptr & (PAGE_SIZE - 1)) == 0) {
@@ -248,13 +248,13 @@ void *kcalloc(size_t n, size_t size)
  * @brief Print memory allocator statistics
  */
 void kmalloc_stats(void) {
-  sprint("Kernel memory allocator statistics:\n");
+  kprintf("Kernel memory allocator statistics:\n");
 
   // Print slab statistics
   slab_stats();
 
   // Print page statistics
-  sprint("Free page count: %d\n", get_free_page_count());
+  kprintf("Free page count: %d\n", get_free_page_count());
 }
 
 void* alloc_kernel_stack(){

@@ -43,7 +43,7 @@ void free_block_device(struct block_device *bdev) {
         return;
     
     if (atomic_read(&bdev->bd_refcnt) > 0) {
-        sprint("Warning: freeing block device with active references\n");
+        kprintf("Warning: freeing block device with active references\n");
     }
     
     kfree(bdev);

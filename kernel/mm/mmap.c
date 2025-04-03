@@ -1,11 +1,6 @@
 #include <kernel/types.h>
-
-#include <kernel/mm/mm_struct.h>
-#include <kernel/mm/mmap.h>
-#include <kernel/mm/vma.h>
-#include <kernel/mm/kmalloc.h>
-#include <kernel/util/string.h>			//memset
-#include <kernel/util/print.h>
+#include <kernel/mmu.h>
+#include <kernel/util.h>			//memset
 
 /**
  * 将保护标志(PROT_*)转换为页表项标志
@@ -287,7 +282,7 @@ uint64 do_brk(struct mm_struct *mm, uint64 new_brk) {
 	if (new_brk > old_brk) {
 			// Check if any existing VMA overlaps with the expansion area
 			if (find_vma_intersection(mm, old_brk, new_brk)) {
-					sprint("mm_brk: expansion area overlaps with existing VMA\n");
+					kprintf("mm_brk: expansion area overlaps with existing VMA\n");
 					return -ENOMEM;
 			}
 			
@@ -301,7 +296,7 @@ uint64 do_brk(struct mm_struct *mm, uint64 new_brk) {
 														PROT_READ | PROT_WRITE, 
 														VM_GROWSUP | VM_PRIVATE | VM_USER);
 					if (!vma) {
-							sprint("mm_brk: failed to create new heap VMA\n");
+							kprintf("mm_brk: failed to create new heap VMA\n");
 							return -ENOMEM;
 					}
 			} else {
@@ -317,7 +312,7 @@ uint64 do_brk(struct mm_struct *mm, uint64 new_brk) {
 							struct page **new_pages = 
 									kmalloc(new_npages * sizeof(struct page *));
 							if (!new_pages) {
-									sprint("mm_brk: failed to allocate pages array\n");
+									kprintf("mm_brk: failed to allocate pages array\n");
 									vma->vm_end = old_brk;  // Restore old size
 									return -ENOMEM;
 							}

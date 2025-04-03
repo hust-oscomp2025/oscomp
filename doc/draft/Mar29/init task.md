@@ -43,12 +43,12 @@ int32 setup_init_fds(struct task_struct *init_task) {
     // Try to open the console device
     error = kern_open("/dev/console", O_RDWR, 0, &console_file);
     if (error < 0) {
-        sprint("Failed to open /dev/console: %d\n", error);
+        kprintf("Failed to open /dev/console: %d\n", error);
         
         // Fallback to a kernel console
         error = create_kernel_console(&console_file);
         if (error < 0) {
-            sprint("Failed to create kernel console: %d\n", error);
+            kprintf("Failed to create kernel console: %d\n", error);
             set_current_task(saved_task);
             return error;
         }
@@ -60,7 +60,7 @@ int32 setup_init_fds(struct task_struct *init_task) {
         error = fd_install(fd, f);
         if (error < 0) {
             put_file(console_file); // Release the reference we just took
-            sprint("Failed to set up fd %d: %d\n", fd, error);
+            kprintf("Failed to set up fd %d: %d\n", fd, error);
             // Close already opened fds
             for (int i = 0; i < fd; i++) {
                 sys_close(i);

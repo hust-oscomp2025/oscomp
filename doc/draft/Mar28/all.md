@@ -1452,7 +1452,7 @@ int do_send_signal(pid_t pid, int sig)
         
         // For SIGKILL, terminate the process immediately
         if (sig == SIGKILL) {
-            sprint("Process %d killed by signal %d\n", p->pid, sig);
+            kprintf("Process %d killed by signal %d\n", p->pid, sig);
             // Implement process termination logic
             // do_exit(p, sig);
             return 0;
@@ -1460,7 +1460,7 @@ int do_send_signal(pid_t pid, int sig)
         
         // For SIGSTOP, stop the process
         if (sig == SIGSTOP) {
-            sprint("Process %d stopped by signal %d\n", p->pid, sig);
+            kprintf("Process %d stopped by signal %d\n", p->pid, sig);
             // Implement process stop logic
             // p->state = TASK_STOPPED;
             return 0;
@@ -1636,7 +1636,7 @@ void do_signal_delivery(void)
                     case SIGQUIT:
                     case SIGABRT:
                         // Default is to terminate the process
-                        sprint("Process %d terminated by signal %d\n", p->pid, sig);
+                        kprintf("Process %d terminated by signal %d\n", p->pid, sig);
                         // Implement termination here
                         // do_exit(p, sig);
                         break;
@@ -1646,7 +1646,7 @@ void do_signal_delivery(void)
                     case SIGTTIN:
                     case SIGTTOU:
                         // Default is to stop the process
-                        sprint("Process %d stopped by signal %d\n", p->pid, sig);
+                        kprintf("Process %d stopped by signal %d\n", p->pid, sig);
                         // Implement stop logic here
                         // p->state = TASK_STOPPED;
                         break;
@@ -1664,7 +1664,7 @@ void do_signal_delivery(void)
             } 
             else {
                 // Custom handler - set up the stack frame and jump to the handler
-                sprint("Process %d: delivering signal %d to handler\n", p->pid, sig);
+                kprintf("Process %d: delivering signal %d to handler\n", p->pid, sig);
                 // This needs architecture-specific code to set up a signal frame
                 // setup_signal_frame(p, sig);
                 break;
@@ -3745,7 +3745,7 @@ void create_device_nodes(void) {
     list_for_each_entry(bdev, &all_block_devices, bd_list) {
         char name[32];
         // Format name based on device type
-        sprintf(name, "hd%c", 'a' + (bdev->bd_dev & 0xFF)); 
+        ksprintf(name, "hd%c", 'a' + (bdev->bd_dev & 0xFF)); 
         
         // Create device node
         vfs_mknod(dev_dir, name, S_IFBLK | 0600, bdev->bd_dev);
@@ -4259,19 +4259,19 @@ int extract_initramfs(const char *initramfs_data, size_t size, struct vfsmount *
         
         /* Check magic */
         if (memcmp(hdr->magic, CPIO_MAGIC, CPIO_MAGIC_LEN) != 0) {
-            sprint("InitramFS: Invalid CPIO header magic\n");
+            kprintf("InitramFS: Invalid CPIO header magic\n");
             return -EINVAL;
         }
         
         /* Parse header fields */
         if (parse_cpio_header(hdr, &mode, &filesize, &namesize) != 0) {
-            sprint("InitramFS: Failed to parse CPIO header\n");
+            kprintf("InitramFS: Failed to parse CPIO header\n");
             return -EINVAL;
         }
         
         /* Get filename */
         if (namesize >= PATH_MAX || ptr + namesize > end) {
-            sprint("InitramFS: Filename too long or beyond archive end\n");
+            kprintf("InitramFS: Filename too long or beyond archive end\n");
             return -EINVAL;
         }
         
@@ -4290,7 +4290,7 @@ int extract_initramfs(const char *initramfs_data, size_t size, struct vfsmount *
         if (S_ISREG(mode)) {
             /* Regular file */
             if (ptr + filesize > end) {
-                sprint("InitramFS: File data extends beyond archive end\n");
+                kprintf("InitramFS: File data extends beyond archive end\n");
                 return -EINVAL;
             }
             
@@ -4301,7 +4301,7 @@ int extract_initramfs(const char *initramfs_data, size_t size, struct vfsmount *
             create_directory(root, filename, mode);
         } else {
             /* Skip other types for now (symlinks, devices, etc.) */
-            sprint("InitramFS: Skipping non-regular file: %s\n", filename);
+            kprintf("InitramFS: Skipping non-regular file: %s\n", filename);
             ptr += filesize;
         }
         
@@ -4309,7 +4309,7 @@ int extract_initramfs(const char *initramfs_data, size_t size, struct vfsmount *
         ptr = (const char *)(((unsigned long)ptr + 3) & ~3);
     }
     
-    sprint("InitramFS: Extraction complete\n");
+    kprintf("InitramFS: Extraction complete\n");
     return 0;
 }
 
@@ -5063,7 +5063,7 @@ static int32 __lookup_dev_id(const char* dev_name, dev_t* dev_id) {
     /* Look up the path in the VFS */
     ret = path_create(dev_name, LOOKUP_FOLLOW, &path);
     if (ret < 0) {
-        sprint("VFS: Cannot find device path %s, error=%d\n", dev_name, ret);
+        kprintf("VFS: Cannot find device path %s, error=%d\n", dev_name, ret);
         return ret;
     }
         
@@ -5071,20 +5071,20 @@ static int32 __lookup_dev_id(const char* dev_name, dev_t* dev_id) {
     inode = path.dentry->d_inode;
     if (!inode) {
         path_destroy(&path);
-        sprint("VFS: No inode for %s\n", dev_name);
+        kprintf("VFS: No inode for %s\n", dev_name);
         return -ENODEV;
     }
     
     /* Make sure it's a block device */
     if (!S_ISBLK(inode->i_mode)) {
         path_destroy(&path);
-        sprint("VFS: %s is not a block device (mode=%x)\n", dev_name, inode->i_mode);
+        kprintf("VFS: %s is not a block device (mode=%x)\n", dev_name, inode->i_mode);
         return -ENOTBLK;
     }
     
     /* Get the device ID from the inode */
     *dev_id = inode->i_rdev;
-    sprint("VFS: Found device %s with ID %lx\n", dev_name, *dev_id);
+    kprintf("VFS: Found device %s with ID %lx\n", dev_name, *dev_id);
     
     /* Clean up */
     path_destroy(&path);
@@ -5099,7 +5099,7 @@ For this to work, you need a proper device registry system. Here's how to set it
 ```c
 #include <kernel/vfs.h>
 #include <kernel/device/block_device.h>
-#include <kernel/sprint.h>
+#include <kernel/kprintf.h>
 
 /**
  * Create device nodes in the /dev directory
@@ -5114,7 +5114,7 @@ int32 create_device_nodes(void) {
     /* Create /dev directory if it doesn't exist */
     dev_dir = vfs_mkdir(NULL, "/dev", 0755);
     if (IS_ERR(dev_dir)) {
-        sprint("Failed to create /dev directory: %d\n", PTR_ERR(dev_dir));
+        kprintf("Failed to create /dev directory: %d\n", PTR_ERR(dev_dir));
         return PTR_ERR(dev_dir);
     }
     
@@ -5125,20 +5125,20 @@ int32 create_device_nodes(void) {
     list_for_each_entry(bdev, &all_block_devices, bd_list) {
         /* Format device name based on device type */
         if (MAJOR(bdev->bd_dev) == RAMDISK_MAJOR)
-            sprintf(name, "ram%d", MINOR(bdev->bd_dev));
+            ksprintf(name, "ram%d", MINOR(bdev->bd_dev));
         else if (MAJOR(bdev->bd_dev) == SCSI_DISK0_MAJOR)
-            sprintf(name, "sd%c%d", 'a' + (MINOR(bdev->bd_dev) / 16), 
+            ksprintf(name, "sd%c%d", 'a' + (MINOR(bdev->bd_dev) / 16), 
                     MINOR(bdev->bd_dev) % 16);
         else
-            sprintf(name, "blk%d_%d", MAJOR(bdev->bd_dev), MINOR(bdev->bd_dev));
+            ksprintf(name, "blk%d_%d", MAJOR(bdev->bd_dev), MINOR(bdev->bd_dev));
         
         /* Create the device node */
         ret = vfs_mknod(dev_dir, name, mode, bdev->bd_dev);
         if (ret < 0) {
-            sprint("Failed to create device node /dev/%s: %d\n", name, ret);
+            kprintf("Failed to create device node /dev/%s: %d\n", name, ret);
             /* Continue with other devices */
         } else {
-            sprint("Created device node /dev/%s (dev=0x%x)\n", name, bdev->bd_dev);
+            kprintf("Created device node /dev/%s (dev=0x%x)\n", name, bdev->bd_dev);
         }
     }
     
@@ -5159,7 +5159,7 @@ void device_init(void) {
     /* Create device nodes in /dev */
     create_device_nodes();
     
-    sprint("Device initialization complete\n");
+    kprintf("Device initialization complete\n");
 }
 ```
 
@@ -5285,7 +5285,7 @@ Now include this header in your device.c file:
 #include <kernel/vfs.h>
 #include <kernel/device/block_device.h>
 #include <kernel/device/dev_t.h>   /* Add this include */
-#include <kernel/sprint.h>
+#include <kernel/kprintf.h>
 #include <kernel/util.h>
 
 /* Rest of your code... */
@@ -5430,7 +5430,7 @@ static void register_platform_devices(void) {
         list_add(&ram_dev->bd_list, &block_device_list);
         spinlock_unlock(&block_device_list_lock);
         
-        sprint("Registered RAM disk device (major=%d, minor=%d)\n", 
+        kprintf("Registered RAM disk device (major=%d, minor=%d)\n", 
               MAJOR(ram_dev->bd_dev), MINOR(ram_dev->bd_dev));
     }
     
@@ -5470,7 +5470,7 @@ void block_dev_init(void) {
     /* Register platform-specific devices */
     register_platform_devices();
     
-    sprint("Block device subsystem initialized\n");
+    kprintf("Block device subsystem initialized\n");
 }
 ```
 
@@ -5678,7 +5678,7 @@ int32 create_device_nodes(void) {
     /* Create /dev directory if it doesn't exist */
     ret = vfs_mkdir_path(NULL, "/dev", 0755);
     if (ret < 0 && ret != -EEXIST) {
-        sprint("Failed to create /dev directory: %d\n", ret);
+        kprintf("Failed to create /dev directory: %d\n", ret);
         return ret;
     }
     
@@ -5689,20 +5689,20 @@ int32 create_device_nodes(void) {
     list_for_each_entry(bdev, &block_device_list, bd_list) {
         /* Format device name based on device type */
         if (MAJOR(bdev->bd_dev) == RAMDISK_MAJOR)
-            sprintf(name, "/dev/ram%d", MINOR(bdev->bd_dev));
+            ksprintf(name, "/dev/ram%d", MINOR(bdev->bd_dev));
         else if (MAJOR(bdev->bd_dev) == SCSI_DISK0_MAJOR)
-            sprintf(name, "/dev/sd%c%d", 'a' + (MINOR(bdev->bd_dev) / 16), 
+            ksprintf(name, "/dev/sd%c%d", 'a' + (MINOR(bdev->bd_dev) / 16), 
                    MINOR(bdev->bd_dev) % 16);
         else
-            sprintf(name, "/dev/blk%d_%d", MAJOR(bdev->bd_dev), MINOR(bdev->bd_dev));
+            ksprintf(name, "/dev/blk%d_%d", MAJOR(bdev->bd_dev), MINOR(bdev->bd_dev));
         
         /* Create the device node */
         ret = vfs_mknod_path(NULL, name, mode, bdev->bd_dev);
         if (ret < 0 && ret != -EEXIST) {
-            sprint("Failed to create device node %s: %d\n", name, ret);
+            kprintf("Failed to create device node %s: %d\n", name, ret);
             /* Continue with other devices */
         } else {
-            sprint("Created device node %s (dev=0x%x)\n", name, bdev->bd_dev);
+            kprintf("Created device node %s (dev=0x%x)\n", name, bdev->bd_dev);
         }
     }
     
@@ -5932,12 +5932,12 @@ int32 create_device_nodes(void) {
         
         /* Format name based on device type */
         if (MAJOR(bdev->bd_dev) == RAMDISK_MAJOR)
-            sprintf(name, "/dev/ram%d", MINOR(bdev->bd_dev));
+            ksprintf(name, "/dev/ram%d", MINOR(bdev->bd_dev));
         else if (MAJOR(bdev->bd_dev) == SCSI_DISK0_MAJOR)
-            sprintf(name, "/dev/sd%c%d", 'a' + (MINOR(bdev->bd_dev) / 16), 
+            ksprintf(name, "/dev/sd%c%d", 'a' + (MINOR(bdev->bd_dev) / 16), 
                    MINOR(bdev->bd_dev) % 16);
         else
-            sprintf(name, "/dev/blk%d_%d", MAJOR(bdev->bd_dev), MINOR(bdev->bd_dev));
+            ksprintf(name, "/dev/blk%d_%d", MAJOR(bdev->bd_dev), MINOR(bdev->bd_dev));
         
         /* Create the device node */
         vfs_mknod_path(name, S_IFBLK | 0600, bdev->bd_dev);

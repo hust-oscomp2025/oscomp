@@ -1,7 +1,7 @@
 #include "dev/dtb.h"
 #include "lib/error.h"
 #include "lib/log.h"
-#include "lib/printf.h"
+#include "lib/kprintf.h"
 #include "lib/string.h"
 #include "mm/memlayout.h"
 #include "param.h"
@@ -123,10 +123,10 @@ static void *parseFdtNode(struct FDTHeader *fdtHeader, void *node, char *parent)
 				// values需要以info形式输出
 				if (len == 4 || len == 8 || len == 16 || len == 32) {
 					const char pre[] = "values: ";
-					sprintf(strBuf, pre);
+					ksprintf(strBuf, pre);
 					value = (void *)node;
 					for (int i = 0; i < len; i++) {
-						sprintf(strBuf + sizeof(pre) - 1 + 3 * i, "%02x ",
+						ksprintf(strBuf + sizeof(pre) - 1 + 3 * i, "%02x ",
 							*(uint8_t *)(node + i));
 					}
 					log(LEVEL_MODULE, "%s\n", strBuf);

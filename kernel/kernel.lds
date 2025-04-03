@@ -13,11 +13,18 @@ SECTIONS
 
   /* Begining of code and text segment, starts from DRAM_BASE to be effective before enabling paging */
   . = 0x80200000;
-  _ftext = .;
+    /* 将.text.init节放在最前面，这通常包含启动代码 */
+	_ftext = .;
+	/* 首先放置入口点段 */
+  .text.entry : {
+    *(.text.entry)
+  }
 
+  
   /* text: Program code section */
   .text : 
   {
+		. = ALIGN(4); /* 4 字节对齐 */
     *(.text)
     *(.text.*)
     *(.gnu.linkonce.t.*)

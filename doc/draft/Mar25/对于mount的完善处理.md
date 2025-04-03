@@ -10,7 +10,7 @@ struct vfsmount* vfs_kern_mount(struct fstype* fstype, int flags, const char* de
     if(device_path && *device_path){
         int ret = lookup_dev_id(device_path, &dev_id);
         if (ret < 0) {
-            sprint("VFS: Failed to get device ID for %s\n", device_path);
+            kprintf("VFS: Failed to get device ID for %s\n", device_path);
             return NULL; // 这里应返回 ERR_PTR(ret)
         }
     }
@@ -53,7 +53,7 @@ struct vfsmount* vfs_kern_mount(struct fstype* fstype, int flags, const char* de
 1. **修复错误处理**:
 ```c
 if (ret < 0) {
-    sprint("VFS: Failed to get device ID for %s\n", device_path);
+    kprintf("VFS: Failed to get device ID for %s\n", device_path);
     return ERR_PTR(ret);  // 使用 ERR_PTR 而非 NULL
 }
 ```

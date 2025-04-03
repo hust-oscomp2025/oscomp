@@ -279,19 +279,19 @@ void filesystem_init(void)
     // Initialize the EXT4 subsystem
     rc = riscv_ext4_init();
     if (rc != EOK) {
-        printf("Failed to initialize EXT4: %d\n", rc);
+        kprintf("Failed to initialize EXT4: %d\n", rc);
         return;
     }
     
     // Mount the filesystem
     rc = riscv_ext4_mount("/", false); // false = not read-only
     if (rc != EOK) {
-        printf("Failed to mount EXT4: %d\n", rc);
+        kprintf("Failed to mount EXT4: %d\n", rc);
         riscv_ext4_cleanup();
         return;
     }
     
-    printf("EXT4 filesystem mounted successfully\n");
+    kprintf("EXT4 filesystem mounted successfully\n");
     
     // Example file operation
     rc = riscv_ext4_fopen(&file_handle, "/test.txt", "r");
@@ -302,7 +302,7 @@ void filesystem_init(void)
         riscv_ext4_fread(&file_handle, buffer, sizeof(buffer) - 1, &read_size);
         buffer[read_size] = '\0';
         
-        printf("File content: %s\n", buffer);
+        kprintf("File content: %s\n", buffer);
         
         riscv_ext4_fclose(&file_handle);
     }

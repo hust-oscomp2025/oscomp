@@ -33,13 +33,13 @@ int32 create_device_nodes(void) {
 	struct dentry* dev_dir;
 	struct block_device* bdev;
 	char name[32];
-	int32 ret;
+	int32 ret = 0;
 	mode_t mode = S_IFBLK | 0600;
 
 	/* Create /dev directory if it doesn't exist */
 	dev_dir = vfs_mkdir(NULL, "/dev", 0755);
 	if (PTR_IS_ERROR(dev_dir)) {
-		sprint("Failed to create /dev directory: %d\n", PTR_ERR(dev_dir));
+		kprintf("Failed to create /dev directory: %d\n", PTR_ERR(dev_dir));
 		return PTR_ERR(dev_dir);
 	}
 
@@ -59,10 +59,10 @@ int32 create_device_nodes(void) {
 		/* Create the device node */
 		struct dentry* nod_dentry = vfs_mknod(dev_dir, name, mode, bdev->bd_dev);
 		if (ERR_PTR(nod_dentry)) {
-			sprint("Failed to create device node /dev/%s: %d\n", name, ret);
+			kprintf("Failed to create device node /dev/%s: %d\n", name, ret);
 			/* Continue with other devices */
 		} else {
-			sprint("Created device node /dev/%s (dev=0x%x)\n", name, bdev->bd_dev);
+			kprintf("Created device node /dev/%s (dev=0x%x)\n", name, bdev->bd_dev);
 		}
 		dentry_unref(nod_dentry);
 	}
@@ -85,7 +85,7 @@ void device_init(void) {
 	/* Create device nodes in /dev */
 	create_device_nodes();
 
-	sprint("Device initialization complete\n");
+	kprintf("Device initialization complete\n");
 }
 
 /**
@@ -106,7 +106,7 @@ static void __register_platform_devices(void) {
 		list_add(&ram_dev->bd_list, &block_device_list);
 		spinlock_unlock(&block_device_list_lock);
 
-		sprint("Registered RAM disk device (major=%d, minor=%d)\n", MAJOR(ram_dev->bd_dev), MINOR(ram_dev->bd_dev));
+		kprintf("Registered RAM disk device (major=%d, minor=%d)\n", MAJOR(ram_dev->bd_dev), MINOR(ram_dev->bd_dev));
 	}
 
 	/* Register virtual disk for disk images (if applicable) */
@@ -148,7 +148,7 @@ int32 lookup_dev_id(const char* dev_name, dev_t* dev_id) {
 	/* Look up the path in the VFS */
 	ret = path_create(dev_name, LOOKUP_FOLLOW, &path);
 	if (ret < 0) {
-		sprint("VFS: Cannot find device path %s, error=%d\n", dev_name, ret);
+		kprintf("VFS: Cannot find device path %s, error=%d\n", dev_name, ret);
 		return ret;
 	}
 
@@ -156,20 +156,20 @@ int32 lookup_dev_id(const char* dev_name, dev_t* dev_id) {
 	inode = path.dentry->d_inode;
 	if (!inode) {
 		path_destroy(&path);
-		sprint("VFS: No inode for %s\n", dev_name);
+		kprintf("VFS: No inode for %s\n", dev_name);
 		return -ENODEV;
 	}
 
 	/* Make sure it's a block device */
 	if (!S_ISBLK(inode->i_mode)) {
 		path_destroy(&path);
-		sprint("VFS: %s is not a block device (mode=%x)\n", dev_name, inode->i_mode);
+		kprintf("VFS: %s is not a block device (mode=%x)\n", dev_name, inode->i_mode);
 		return -ENOTBLK;
 	}
 
 	/* Get the device ID from the inode */
 	*dev_id = inode->i_rdev;
-	sprint("VFS: Found device %s with ID %lx\n", dev_name, *dev_id);
+	kprintf("VFS: Found device %s with ID %lx\n", dev_name, *dev_id);
 
 	/* Clean up */
 	path_destroy(&path);
