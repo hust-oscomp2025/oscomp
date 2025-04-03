@@ -42,6 +42,38 @@ void* memset(void* dest, int byte, size_t len) {
 	return dest;
 }
 
+/**
+ * 比较两个字符串的前n个字符
+ * @param s1 第一个字符串
+ * @param s2 第二个字符串
+ * @param n 要比较的字符数量
+ * @return 如果s1和s2的前n个字符相同，则返回0；
+ *         如果s1小于s2，则返回小于0的值；
+ *         如果s1大于s2，则返回大于0的值
+ */
+int strncmp(const char *s1, const char *s2, size_t n) {
+    // 如果n为0，则不需要比较，直接返回0
+    if (n == 0) {
+        return 0;
+    }
+    
+    // 比较字符直到遇到不同的字符或者到达n个字符或者某个字符串结束
+    while (n-- > 0) {
+        // 如果当前字符不同或者到达字符串结尾，返回差值
+        if (*s1 != *s2 || *s1 == '\0' || *s2 == '\0') {
+            // 返回当前字符的ASCII差值
+            return (*(unsigned char *)s1) - (*(unsigned char *)s2);
+        }
+        s1++;
+        s2++;
+    }
+    
+    // 如果前n个字符都相同，返回0
+    return 0;
+}
+
+
+
 size_t strlen(const char* s) {
 	const char* p = s;
 	while (*p) p++;

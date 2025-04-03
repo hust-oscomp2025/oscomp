@@ -178,6 +178,25 @@ static int32 EXT4_dir_open(struct file* file, int32 flags)
 	 
 	 return bytes_read;
  }
+
+ static ssize_t EXT4_file_write(struct file *file, const char *buf, size_t count, loff_t *pos)
+ {
+	 struct ext4_file *ext4_file = (struct ext4_file *)file->f_private;
+	 size_t bytes_written;
+	 
+	 /* Set file position */
+	 int ret = ext4_fseek(ext4_file, *pos, SEEK_SET);
+	 if (ret != 0)
+		 return -EIO;
+	 
+	 /* Write to file */
+	 ret = ext4_fwrite(ext4_file, buf, count, &bytes_written);
+	 if (ret != 0)
+		 return -EIO;
+	
+	 
+	 return bytes_written;
+ }
  
 
 

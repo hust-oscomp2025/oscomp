@@ -43,7 +43,7 @@ int64 do_read(int32 fd, void* buf, size_t count) {
  * @return Number of bytes read, or negative error code
  */
 ssize_t file_read(struct file *filp, char *buf, size_t count, loff_t *ppos) {
-    ssize_t ret = -EINVAL;
+    //ssize_t ret = -EINVAL;
     
     // Check if file is valid and has read operation
     if (!filp || !filp->f_op)
@@ -55,7 +55,7 @@ ssize_t file_read(struct file *filp, char *buf, size_t count, loff_t *ppos) {
     
     // If the file has a read method, call it
     if (filp->f_op->read)
-        ret = filp->f_op->read(filp, buf, count, ppos);
+        return filp->f_op->read(filp, buf, count, ppos);
     // Otherwise, try using read_iter if available
     else {
 		return -ENOSYS;
@@ -67,5 +67,5 @@ ssize_t file_read(struct file *filp, char *buf, size_t count, loff_t *ppos) {
     //     update_atime(filp);
     // }
     
-    return ret;
+    //return ret;
 }

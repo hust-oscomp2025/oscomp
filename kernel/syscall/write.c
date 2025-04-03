@@ -33,3 +33,26 @@ ssize_t do_write(int32 fd, const void* buf, size_t count) {
 	file_unref(filp);
 	return ret;
 }
+
+
+ssize_t file_write(struct file *filp, const char *buf, size_t count, loff_t *ppos) {
+	ssize_t ret = -EINVAL;
+
+	// Check if file is valid and has write operation
+	if (!filp || !filp->f_op)
+		return -EBADF;
+
+	// Check write permission
+	if (!(filp->f_mode & FMODE_WRITE))
+		return -EBADF;
+
+	// If the file has a write method, call it
+	if (filp->f_op->write)
+		ret = filp->f_op->write(filp, buf, count, ppos);
+	else {
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+

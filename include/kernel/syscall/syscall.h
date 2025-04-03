@@ -78,5 +78,6 @@ ssize_t do_write(int32 fd, const void *buf, size_t count);
 
 uint64 mmap_file(struct mm_struct* mm, uint64 addr, size_t length, int32 prot, uint64 flags, struct file* file, off_t pgoff);
 ssize_t file_read(struct file *filp, char* buf, size_t count, loff_t *ppos);
+ssize_t file_write(struct file*, const char*, size_t, loff_t*);
 
 #endif /* _SYSCALL_H_ */

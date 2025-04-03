@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <stddef.h>
 #include <fcntl.h>
+//#include <kernel/riscv.h>
 
 /* 关于指针和数据类型的说明
  * uint64: 切实的数据值，不可能用作内存/内存运算

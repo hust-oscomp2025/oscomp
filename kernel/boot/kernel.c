@@ -16,6 +16,8 @@
 #include <kernel/vfs.h>
 #include <kernel/syscall/syscall.h>
 
+__attribute__((aligned(16))) char stack0[PAGE_SIZE * NCPU];
+
 static void kernel_vm_init(void) {
 	sprint("kernel_vm_init: start\n");
 	// extern struct mm_struct init_mm;

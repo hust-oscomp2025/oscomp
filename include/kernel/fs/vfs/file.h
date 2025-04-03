@@ -50,7 +50,6 @@ struct dir_context {
 int32 file_open(struct file* file, int32 flags);
 int32 file_close(struct file* file);
 int32 file_iterate(struct file*, struct dir_context*);
-ssize_t file_write(struct file*, const char*, size_t, loff_t*);
 loff_t file_llseek(struct file*, loff_t, int32);
 /**
  * File operation structure - provides methods for file manipulation
@@ -65,7 +64,7 @@ struct file_operations {
 
 	// /* Basic I/O */
 	ssize_t (*read)(struct file*, char*, size_t, loff_t*);
-	// ssize_t (*write)(struct file*, const char*, size_t, loff_t*);
+	ssize_t (*write)(struct file*, const char*, size_t, loff_t*);
 
 	// /* Vectored I/O */
 	// ssize_t (*read_iter)(struct kiocb*, struct io_vector_iterator*);
@@ -125,7 +124,7 @@ int32 file_setModified(struct file* file);
 
 // pos的变化与查询统一接口,setpos和getpos都支持
 int32 file_sync(struct file*, int32);
-ssize_t file_writev(struct file* file, const struct io_vector* vec, uint64 vlen, loff_t* pos);
+//ssize_t file_writev(struct file* file, const struct io_vector* vec, uint64 vlen, loff_t* pos);
 
 
 bool file_isReadable(struct file* file);

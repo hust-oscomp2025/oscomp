@@ -6,7 +6,8 @@ set(CMAKE_CXX_COMPILER riscv64-linux-gnu-g++)
 set(CMAKE_ASM_COMPILER riscv64-linux-gnu-gcc)
 
 # 设置编译标志，使其与内核编译标志兼容
-set(CMAKE_C_FLAGS "-Wall -fno-builtin -nostdlib -mcmodel=medany -g -Og -std=gnu99 -fno-delete-null-pointer-checks")
+# 修改 CMAKE_C_FLAGS，添加更多限制标准库的标志
+set(CMAKE_C_FLAGS "-Wall -fno-builtin -nostdlib -nodefaultlibs -nostartfiles -mcmodel=medany -g -Og -std=gnu99 -fno-delete-null-pointer-checks")
 
 # 项目声明
 project(lwext4 C)
@@ -28,7 +29,15 @@ add_definitions(-DVERSION="${VERSION}")
 add_definitions(-DCONFIG_HAVE_OWN_OFLAGS=1)
 add_definitions(-DCONFIG_BLOCK_DEV_CACHE_SIZE=0)
 add_definitions(-DCONFIG_BLOCK_DEV_ENABLE_STATS=0)
-add_definitions(-DCONFIG_EXT4_BLOCKDEVS=0)
+# 添加以下定义来禁用标准库依赖
+add_definitions(-DCONFIG_HAVE_OWN_ERRNO=0)
+add_definitions(-DCONFIG_DEBUG_ASSERT=0)
+add_definitions(-DCONFIG_HAVE_OWN_ASSERT=0)
+add_definitions(-DCONFIG_DEBUG_PRINTF=0)
+add_definitions(-DCONFIG_DEBUG=0)
+# 禁用fortify source
+add_definitions(-U_FORTIFY_SOURCE)
+add_definitions(-D_FORTIFY_SOURCE=0)
 
 # 禁用不需要的功能
 option(LWEXT4_BUILD_EXAMPLES "Build examples" OFF)

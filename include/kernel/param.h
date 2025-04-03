@@ -7,14 +7,6 @@
 #error NCPU not defined
 #endif	       // !NCPU
 
-#ifdef FEATURE_LESS_MEMORY
-#define NPROC 480		  // FarmOS 支持的最大进程数
-#define MAX_DIRENT 160000
-#else
-#define NPROC 10240		  // maximum number of processes
-#define MAX_DIRENT 160000
-#endif
-
 #define MAXARG 256		  // max exec arguments
 #define MAXARGLEN 256		  // max exec argument length
 #define MAXPATH 128		  // maximum file path name
