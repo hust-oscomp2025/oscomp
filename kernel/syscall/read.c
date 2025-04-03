@@ -4,6 +4,11 @@
 #include <kernel/mmu.h>
 #include <kernel/util.h>
 
+/**
+ * 需要注意的是，read动作会自动修改文件中的f_pos偏移量，需要在下层实现中体现出来。
+ * 
+ */
+
 int64 sys_read(int32 fd, void* buf, size_t count) {
 	void* kbuf = kmalloc(count);
 	if (!kbuf) return -ENOMEM;
@@ -56,11 +61,11 @@ ssize_t file_read(struct file *filp, char *buf, size_t count, loff_t *ppos) {
 		return -ENOSYS;
     }
     
-    // Update access time if read was successful
-    if (ret > 0) {
-        fsnotify_access(filp);
-        update_atime(filp);
-    }
+    // TODO: Update access time if read was successful
+    // if (ret > 0) {
+    //     fsnotify_access(filp);
+    //     update_atime(filp);
+    // }
     
     return ret;
 }

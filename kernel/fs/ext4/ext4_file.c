@@ -157,16 +157,41 @@ static int32 EXT4_dir_open(struct file* file, int32 flags)
 }
 
 
+ /**
+  * Read from a file
+  */
+ static ssize_t EXT4_file_read(struct file *file, char *buf, size_t count, loff_t *pos)
+ {
+	 struct ext4_file *ext4_file = (struct ext4_file *)file->f_private;
+	 size_t bytes_read;
+	 
+	 /* Set file position */
+	 int ret = ext4_fseek(ext4_file, *pos, SEEK_SET);
+	 if (ret != 0)
+		 return -EIO;
+	 
+	 /* Read from file */
+	 ret = ext4_fread(ext4_file, buf, count, &bytes_read);
+	 if (ret != 0)
+		 return -EIO;
+	
+	 
+	 return bytes_read;
+ }
+ 
+
+
 /**
  * Ext4 file operations structure
  */
 const struct file_operations ext4_file_operations = {
     .open = EXT4_file_open,
-
+	.read = EXT4_file_read,
+	//.write = ext4_file_write,
 
     // .llseek = ext4_file_llseek,
-    // .read = ext4_file_read,
-    // .write = ext4_file_write,
+    // 
+    // 
     // .read_iter = NULL,  // Could implement with ext4_file_read
     // .write_iter = NULL, // Could implement with ext4_file_write
     // .flush = NULL, // Optional
