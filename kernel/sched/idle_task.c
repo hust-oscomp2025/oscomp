@@ -7,7 +7,7 @@
  *   - Idle 进程负责在系统无其他可运行任务时，进入低功耗状态。
  */
 
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 // printk、KERN_INFO 等
 #include <kernel/sched/sched.h> // task_struct 定义，TASK_RUNNING, PF_KTHREAD 等
 //#include <linux/init.h>         // __init 宏

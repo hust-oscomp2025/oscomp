@@ -8,7 +8,7 @@ struct list_head mount_list;
 spinlock_t mount_lock;
 
 /* Mount point hash table */
-static struct hashtable mount_hashtable;
+struct hashtable mount_hashtable;
 /* Forward declarations */
 static uint32 mount_hash_func(const void* key);
 static void* mount_get_key(struct list_head* node);
@@ -69,9 +69,9 @@ static int32 mount_key_equals(const void* k1, const void* k2) {
 }
 
 /**
- * vfsmount_init - Initialize the mount subsystem
+ * mcache_init - Initialize the mount subsystem
  */
-void vfsmount_init(void) {
+void mcache_init(void) {
 	/* Initialize global mount list */
 	INIT_LIST_HEAD(&mount_list);
 	spinlock_init(&mount_lock);

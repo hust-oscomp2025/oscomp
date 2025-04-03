@@ -2,7 +2,7 @@
 #ifndef _PARAM_H
 #define _PARAM_H
 #include <kernel/feature.h>
-
+#define NCPU 1
 #ifndef NCPU
 #error NCPU not defined
 #endif	       // !NCPU

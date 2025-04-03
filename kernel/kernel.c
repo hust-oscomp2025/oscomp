@@ -10,7 +10,7 @@
 #include <kernel/riscv.h>
 #include <kernel/sched/process.h>
 #include <kernel/sched/sched.h>
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 #include <kernel/types.h>
 #include <kernel/util.h>
 #include <kernel/vfs.h>

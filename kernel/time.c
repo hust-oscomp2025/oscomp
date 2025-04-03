@@ -3,7 +3,7 @@
 
 /* System time variables */
 static struct timespec system_time;
-static uint64 system_jiffies;
+uint64 jiffies;
 
 /**
  * current_time - Get current system time
@@ -143,7 +143,7 @@ void time_init(void)
     update_sys_time_from_hw();
     
     /* Initialize system jiffies */
-    system_jiffies = 0;
+    jiffies = 0;
 }
 
 /**

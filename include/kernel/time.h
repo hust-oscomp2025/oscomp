@@ -4,6 +4,8 @@
 #include <kernel/sched/signal.h>
 #include <kernel/types.h>
 
+extern uint64 jiffies; /* Current system time in jiffies */
+
 /** defined in <sys/time.h>
  * struct timezone;
  * struct itimerval;
@@ -34,10 +36,9 @@ struct timerange {
 	uint32 granularity; /* Time granularity in nanoseconds (e.g., 1 for ns, 1000 for us) */
 };
 
-int32 do_gettimeofday(struct timeval* tv);
-int32 do_clock_gettime(clockid_t which_clock, struct timespec* tp);
+
 void update_sys_time_from_hw(void);
-time_t do_time(time_t* timer);
+
 
 /* Time comparison and manipulation functions */
 static inline void timespec_to_timeval(struct timeval* tv, const struct timespec* ts);

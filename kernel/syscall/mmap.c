@@ -11,11 +11,12 @@ int64 sys_mmap(void* addr, size_t length, int32 prot, int32 flags, int32 fd, off
 
 int64 do_mmap(void* addr, size_t length, int32 prot, int32 flags, int32 fd, off_t offset) {
 	struct mm_struct* mm = current_task()->mm;
-	
+	struct file* file = fdtable_getFile(current->fdtable, fd);
+	CHECK_PTR_VALID(file,-EBADF);
 
 
 	/* Implementation here */
-	return do_mmap(addr, length, prot, flags, fd, offset);
+	return mmap_file(mm, (uint64)addr, length, prot, flags,file,  offset);
 }
 
 
@@ -33,7 +34,7 @@ int64 do_mmap(void* addr, size_t length, int32 prot, int32 flags, int32 fd, off_
  * @param pgoff File offset in pages or physical address for direct mapping
  * @return Mapped virtual address or negative error code
  */
-uint64 file_mmap(struct mm_struct* mm, uint64 addr, size_t length, int32 prot, uint64 flags, struct file* file, uint64 pgoff) {
+uint64 mmap_file(struct mm_struct* mm, uint64 addr, size_t length, int32 prot, uint64 flags, struct file* file, off_t pgoff) {
 	if (!mm || length == 0) return -EINVAL;
 
 	// Round length to page boundary

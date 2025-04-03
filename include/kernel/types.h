@@ -10,7 +10,6 @@
 #include <unistd.h>
 #include <stddef.h>
 #include <fcntl.h>
-#include <kernel/types/mm_types.h>
 
 /* 关于指针和数据类型的说明
  * uint64: 切实的数据值，不可能用作内存/内存运算
@@ -237,3 +236,13 @@ static inline void clear_bit(int nr, volatile uint64 *addr) {
 
 #define DYNAMIC_MAJOR_MIN 128  /* Reserve first 128 majors for fixed assignments */
 
+typedef unsigned int vm_fault_t;
+
+
+/* Encode hstate index for a hwpoisoned large page */
+#define VM_FAULT_SET_HINDEX(x) (( vm_fault_t)((x) << 16))
+#define VM_FAULT_GET_HINDEX(x) ((( uint32)(x) >> 16) & 0xf)
+
+#define VM_FAULT_ERROR (VM_FAULT_OOM | VM_FAULT_SIGBUS |	\
+			VM_FAULT_SIGSEGV | VM_FAULT_HWPOISON |	\
+			VM_FAULT_HWPOISON_LARGE | VM_FAULT_FALLBACK)

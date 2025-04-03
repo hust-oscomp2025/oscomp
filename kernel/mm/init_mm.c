@@ -2,7 +2,7 @@
 #include <kernel/mm/mm_struct.h>
 #include <kernel/mm/pagetable.h>
 #include <kernel/util/string.h>
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 
 struct mm_struct init_mm;
 

@@ -1,6 +1,6 @@
 #include <kernel/mmu.h>
 #include <kernel/sched.h>
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 #include <kernel/time.h>
 #include <kernel/types.h>
 #include <kernel/util.h>
@@ -1054,7 +1054,7 @@ struct vfsmount* dentry_lookupMountpoint(struct dentry* dentry) {
 char* dentry_allocPath2Mount(struct dentry* dentry)
 {
 	#define CONFIG_MAX_PATH_DEPTH 128  /* 定义合理的最大深度 */
-    struct dentry* current = dentry;
+    struct dentry* cur = dentry;
     struct dentry* mount_point = NULL;
     
     /* 临时存储路径组件的栈 */
@@ -1071,28 +1071,28 @@ char* dentry_allocPath2Mount(struct dentry* dentry)
         return NULL;
     
     /* 向上遍历查找挂载点 */
-    while (current) {
+    while (cur) {
         /* 判断当前dentry是否为挂载点 */
-        if (current->d_flags & DCACHE_MOUNTED) {
-            mount_point = current;
+        if (cur->d_flags & DCACHE_MOUNTED) {
+            mount_point = cur;
             break;
         }
         
         /* 如果已经到达文件系统根目录，则该根目录就是挂载点 */
-        if (current->d_parent == current || !current->d_parent) {
-            mount_point = current;
+        if (cur->d_parent == cur || !cur->d_parent) {
+            mount_point = cur;
             break;
         }
         
         /* 将当前dentry名称存入栈中 */
-        if (stack_pos < CONFIG_MAX_PATH_DEPTH && current != dentry->d_parent) {
-            path_stack[stack_pos].name = current->d_name->name;
-            path_stack[stack_pos].len = current->d_name->len;
-            total_len += current->d_name->len + 1;  /* +1 是路径分隔符 '/' */
+        if (stack_pos < CONFIG_MAX_PATH_DEPTH && cur != dentry->d_parent) {
+            path_stack[stack_pos].name = cur->d_name->name;
+            path_stack[stack_pos].len = cur->d_name->len;
+            total_len += cur->d_name->len + 1;  /* +1 是路径分隔符 '/' */
             stack_pos++;
         }
         
-        current = current->d_parent;
+        cur = cur->d_parent;
     }
     
     /* 如果没找到挂载点，返回错误 */

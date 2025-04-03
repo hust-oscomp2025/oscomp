@@ -37,8 +37,7 @@ struct vfsmount {
  */
 
 /* Initialize mount system */
-void init_mount_hash(void);
-
+void mcache_init(void);
 
 struct vfsmount* mount_bind(struct path* source_path, uint64 flags);
 int32 remount(struct path* mount_path, uint64 flags,const void* data);
@@ -57,5 +56,6 @@ int32 iterate_mounts(int32 (*f)(struct vfsmount*, void*), void* arg, struct vfsm
 
 extern struct list_head mount_list;
 extern spinlock_t mount_lock;
+extern struct hashtable mount_hashtable;
 
 #endif

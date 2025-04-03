@@ -1,5 +1,5 @@
 #include <kernel/device/block_device.h>
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 #include <kernel/util.h>
 #include <kernel/vfs.h>
 
@@ -77,7 +77,7 @@ int32 create_device_nodes(void) {
 void device_init(void) {
 	INIT_LIST_HEAD(&block_device_list);
 	/* Initialize block device subsystem */
-	block_dev_init();
+	//block_dev_init();
 
 	/* Register platform-specific devices */
 	__register_platform_devices();

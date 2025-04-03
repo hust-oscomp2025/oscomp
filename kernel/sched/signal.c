@@ -1,7 +1,7 @@
 #include <kernel/sched.h>
 #include <kernel/types.h>
 #include <kernel/util.h>
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 #include <kernel/mmu.h>
 
 /* Global variable to track the signal that caused an interrupt */

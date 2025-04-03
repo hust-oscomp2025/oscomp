@@ -3,7 +3,7 @@
 #include <kernel/types.h>
 #include <kernel/util.h>
 #include <kernel/types.h>
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 
 /* Global block device list */
 struct list_head block_device_list;

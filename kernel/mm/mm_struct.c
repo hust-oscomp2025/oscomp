@@ -6,7 +6,7 @@
 #include <kernel/mm/page.h>
 #include <kernel/mm/vma.h>
 #include <kernel/sched/process.h>
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 #include <kernel/util/atomic.h>
 #include <kernel/util/string.h>
 

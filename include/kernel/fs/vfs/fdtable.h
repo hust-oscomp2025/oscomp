@@ -73,8 +73,8 @@ int32 do_fcntl(struct fdtable* fdt, uint64 fd, uint32 cmd, uint64 arg);
 
 int32 do_close(int32 fd);
 off_t do_lseek(int32 fd, off_t offset, int32 whence);
-ssize_t do_read(int32 fd, void *buf, size_t count);
-ssize_t do_write(int32 fd, const void *buf, size_t count);
+
+
 /**
  * 实现select系统调用逻辑
  *

@@ -1,6 +1,6 @@
 #include <kernel/mmu.h>
 #include <kernel/sched.h>
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 #include <kernel/time.h>
 #include <kernel/types.h>
 #include <kernel/util.h>
@@ -265,28 +265,7 @@ int32 icache_equal(const void* k1, const void* k2) {
 	return (key1->sb == key2->sb && key1->ino == key2->ino);
 }
 
-/**
- * icache_insert - Add an inode to the hash table
- * @inode: The inode to add
- *
- * Adds an inode to the inode hash table for fast lookups.
- */
-void icache_insert(struct inode* inode) {
 
-	if (!inode || !inode->i_superblock) return;
-	/* Insert into hash table */
-	hashtable_insert(&inode_hashtable, &inode->i_hash_node);
-}
-
-/**
- * icache_delete - Remove an inode from the hash table
- * @inode: The inode to remove
- */
-void icache_delete(struct inode* inode) {
-	if (!inode || !inode->i_superblock) return;
-	/* Remove from hash table */
-	hashtable_remove(&inode_hashtable, &inode->i_hash_node);
-}
 
 /**
  * __unlock_new_inode - Unlock a newly allocated inode
@@ -470,34 +449,34 @@ int32 inode_mknod(struct inode* dir, struct dentry* dentry, mode_t mode, dev_t d
 	/* Default implementation for simple filesystems like ramfs */
 	struct inode* inode = inode_acquire(dir->i_superblock, 0);
 	if (PTR_IS_ERROR(inode)) return PTR_ERR(inode);
+	// TODO: 做一个通用的inode_init方法。
+	// /* Set up basic inode attributes */
+	// inode->i_mode = mode;
+	// inode->i_uid = current_task()->uid;
+	// inode->i_gid = current_task()->gid;
+	// inode->i_size = 0;
+	// inode->i_blocks = 0;
+	// inode->i_atime = inode->i_mtime = inode->i_ctime = current_time(dir->i_superblock);
+	// extern const struct file_operations bdFile_operations, chFile_operations, fifoFile_operations, socketFile_operations;
 
-	/* Set up basic inode attributes */
-	inode->i_mode = mode;
-	inode->i_uid = current_task()->uid;
-	inode->i_gid = current_task()->gid;
-	inode->i_size = 0;
-	inode->i_blocks = 0;
-	inode->i_atime = inode->i_mtime = inode->i_ctime = current_time(dir->i_superblock);
-	extern const struct file_operations bdFile_operations, chFile_operations, fifoFile_operations, socketFile_operations;
+	// /* Handle different node types */
+	// if (S_ISBLK(mode) || S_ISCHR(mode)) {
+	// 	inode->i_rdev = dev; /* Store device ID in inode */
 
-	/* Handle different node types */
-	if (S_ISBLK(mode) || S_ISCHR(mode)) {
-		inode->i_rdev = dev; /* Store device ID in inode */
-
-		if (S_ISBLK(mode)) {
-			/* Block device operations */
-			inode->i_fop = &bdFile_operations;
-		} else {
-			/* Character device operations */
-			inode->i_fop = &chFile_operations;
-		}
-	} else if (S_ISFIFO(mode)) {
-		/* FIFO (named pipe) operations */
-		inode->i_fop = &fifoFile_operations;
-	} else if (S_ISSOCK(mode)) {
-		/* Unix socket operations */
-		inode->i_fop = &socketFile_operations;
-	}
+	// 	if (S_ISBLK(mode)) {
+	// 		/* Block device operations */
+	// 		inode->i_fop = &bdFile_operations;
+	// 	} else {
+	// 		/* Character device operations */
+	// 		inode->i_fop = &chFile_operations;
+	// 	}
+	// } else if (S_ISFIFO(mode)) {
+	// 	/* FIFO (named pipe) operations */
+	// 	inode->i_fop = &fifoFile_operations;
+	// } else if (S_ISSOCK(mode)) {
+	// 	/* Unix socket operations */
+	// 	inode->i_fop = &socketFile_operations;
+	// }
 
 	/* Link inode to dentry */
 	dentry_instantiate(dentry, inode);

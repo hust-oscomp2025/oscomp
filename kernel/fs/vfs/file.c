@@ -11,7 +11,7 @@
 #include <kernel/util/string.h>
 #include <kernel/vfs.h>
 
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 #include <asm-generic/fcntl.h>
 
 

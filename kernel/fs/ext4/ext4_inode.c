@@ -5,6 +5,7 @@
 #include <kernel/sched/signal.h>
 #include <kernel/util/string.h>
 #include <kernel/types.h>
+#include <kernel/syscall/syscall.h>
 
 
 
@@ -1622,22 +1623,23 @@ static int32 ext4_vfs_direct_IO(struct kiocb *kiocb, struct io_vector_iterator *
  */
 static vm_fault_t ext4_vfs_page_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
-    struct inode *inode = vma->vm_file->f_inode;
-    struct page *page;
+	// TODO: 处理ext4_page_fault
+    // struct inode *inode = vma->vm_file->f_inode;
+    // struct page *page;
     
-    /* Get page from page cache or read it */
-    page = addrSpace_getPage(inode->i_mapping, vmf->pgoff);
-    if (!page) {
-        page = addrSpace_readPage(inode->i_mapping, vmf->pgoff);
-		CHECK_PTR_VALID(page,VM_FAULT_ERROR);
-    }
+    // /* Get page from page cache or read it */
+    // page = addrSpace_getPage(inode->i_mapping, vmf->pgoff);
+    // if (!page) {
+    //     page = addrSpace_readPage(inode->i_mapping, vmf->pgoff);
+	// 	CHECK_PTR_VALID(page,VM_FAULT_ERROR);
+    // }
     
-    /* Map page to userspace */
-    int32 ret = vm_insert_page(vma, vmf->address, page);
-    if (ret != 0) {
-        addrSpace_putPage(inode->i_mapping, page);
-        return VM_FAULT_ERROR;
-    }
+    // /* Map page to userspace */
+    // int32 ret = vm_insert_page(vma, vmf->address, page);
+    // if (ret != 0) {
+    //     addrSpace_putPage(inode->i_mapping, page);
+    //     return VM_FAULT_ERROR;
+    // }
     
     return VM_FAULT_NOPAGE;
 }

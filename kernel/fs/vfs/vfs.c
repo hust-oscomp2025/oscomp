@@ -1,7 +1,7 @@
 #include <kernel/device/device.h>
 #include <kernel/mm/kmalloc.h>
 #include <kernel/sched.h>
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 #include <kernel/types.h>
 #include <kernel/util/string.h>
 #include <kernel/vfs.h>
@@ -114,7 +114,7 @@ int32 vfs_link(struct dentry* old_dentry, struct inode* dir, struct dentry* new_
  */
 int32 vfs_init(void) {
 	int32 err;
-	init_mount_hash();
+	mcache_init();
 
 	/* Initialize the dcache subsystem */
 	sprint("VFS: Initializing dentry cache...\n");
@@ -126,7 +126,7 @@ int32 vfs_init(void) {
 
 	/* Initialize the inode subsystem */
 	sprint("VFS: Initializing inode cache...\n");
-	err = inode_cache_init();
+	err = icache_init();
 	if (err < 0) {
 		sprint("VFS: Failed to initialize inode cache\n");
 		return err;

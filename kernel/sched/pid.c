@@ -1,6 +1,6 @@
 #include <kernel/sched/pid.h>
 #include <kernel/util/string.h>
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 
 struct pid_manager manager;
 

@@ -5,7 +5,7 @@
 #include <kernel/mm/vma.h>
 #include <kernel/mm/kmalloc.h>
 #include <kernel/util/string.h>			//memset
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 
 /**
  * 将保护标志(PROT_*)转换为页表项标志
@@ -115,7 +115,7 @@ static void update_mm_boundaries(struct mm_struct *mm, struct vm_area_struct *vm
 /**
  * Find a free area of virtual memory of specified size
  */
-static uint64 find_free_area(struct mm_struct *mm, size_t length) {
+uint64 find_free_area(struct mm_struct *mm, size_t length) {
 	uint64 addr = mm->brk;  // Start from heap break
 	
 	while (find_vma_intersection(mm, addr, addr + length)) {

@@ -19,7 +19,7 @@ struct linux_dirent {
 /* Getdents callback structure */
 struct getdents_callback {
 	struct dir_context ctx; /* Must be first */
-	char* current;          /* Current position in the buffer */
+	char* bufpos;          /* Current position in the buffer */
 	size_t count;           /* Remaining buffer space */
 };
 
@@ -52,7 +52,7 @@ static int32 filldir(struct dir_context* ctx, const char* name, int32 namlen, lo
 	if (buf->count < reclen) return 0;
 
 	/* Fill in the Linux dirent structure */
-	dirent = (struct linux_dirent*)(buf->current);
+	dirent = (struct linux_dirent*)(buf->bufpos);
 	dirent->d_ino = ino;
 	dirent->d_off = offset;
 	dirent->d_reclen = reclen;
@@ -61,7 +61,7 @@ static int32 filldir(struct dir_context* ctx, const char* name, int32 namlen, lo
 	dirent->d_name[namlen] = '\0';
 
 	/* Update buffer pointer and remaining count */
-	buf->current += reclen;
+	buf->bufpos += reclen;
 	buf->count -= reclen;
 
 	return 1; /* Continue iteration */
@@ -87,7 +87,7 @@ int32 do_getdents64(int32 fd, struct linux_dirent* dirp, size_t count) {
 	struct getdents_callback buf;
 	buf.ctx.actor = filldir;
 	buf.ctx.pos = file->f_pos;
-	buf.current = (char*)dirp;
+	buf.bufpos = (char*)dirp;
 	buf.count = count;
 
 	

@@ -5,7 +5,7 @@
  */
 
 #include <spike_interface/dts_parse.h>
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 #include <kernel/util/string.h>
 
 static inline __uint32_t bswap(__uint32_t x) {

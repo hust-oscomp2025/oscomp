@@ -16,7 +16,7 @@
 #include <kernel/strap.h>
 #include <kernel/vfs.h>
 
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 #include <kernel/util/string.h>
 
 static void free_kernel_stack(void* kstack);

@@ -2,7 +2,7 @@
 
 OUTPUT_ARCH( "riscv" )
 
-ENTRY( _mentry )
+ENTRY( _entry )
 
 SECTIONS
 {

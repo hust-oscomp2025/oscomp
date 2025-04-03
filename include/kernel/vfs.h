@@ -17,6 +17,7 @@
 #include <kernel/fs/vfs/fdtable.h>
 #include <kernel/fs/vfs/fs_struct.h>
 #include <kernel/fs/vfs/fdtable.h>
+#include <kernel/fs/vfs/icache.h>
 
 
 #include <kernel/types.h>

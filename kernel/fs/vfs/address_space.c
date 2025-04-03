@@ -7,7 +7,6 @@
 #include <kernel/vfs.h>
 
 int32 __addrSpace_writeback(struct addrSpace *mapping, struct writeback_control *wbc);
-static void __init_writeback_control(struct writeback_control *wbc, uint32 sync_mode);
 /**
  * addrSpace_create - Create a new address space for an inode
  * @inode: Inode to associate with the address space
@@ -436,6 +435,20 @@ int32 __addrSpace_writeback(struct addrSpace *mapping, struct writeback_control 
     return ret;
 }
 
+/**
+ * Initialize a writeback_control structure with default values
+ * @wbc: The writeback_control structure to initialize
+ * @sync_mode: Synchronization mode (WB_SYNC_ALL or WB_SYNC_NONE)
+ */
+void init_writeback_control(struct writeback_control *wbc, uint32 sync_mode) {
+    memset(wbc, 0, sizeof(struct writeback_control));
+    wbc->nr_to_write = INT32_MAX;  // Write as many pages as possible
+    wbc->sync_mode = sync_mode;   // Set synchronization mode
+    wbc->range_start = 0;         // Start from beginning
+    wbc->range_end = INT64_MAX;   // To the end
+}
+
+
 
 /**
  * Write back dirty pages in a specific range
@@ -457,15 +470,3 @@ int32 addrSpace_writeback_range(struct addrSpace *mapping, loff_t start, loff_t 
     return __addrSpace_writeback(mapping, &wbc);
 }
 
-/**
- * Initialize a writeback_control structure with default values
- * @wbc: The writeback_control structure to initialize
- * @sync_mode: Synchronization mode (WB_SYNC_ALL or WB_SYNC_NONE)
- */
-static void __init_writeback_control(struct writeback_control *wbc, uint32 sync_mode) {
-    memset(wbc, 0, sizeof(struct writeback_control));
-    wbc->nr_to_write = INT32_MAX;  // Write as many pages as possible
-    wbc->sync_mode = sync_mode;   // Set synchronization mode
-    wbc->range_start = 0;         // Start from beginning
-    wbc->range_end = INT64_MAX;   // To the end
-}

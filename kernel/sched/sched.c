@@ -8,7 +8,7 @@
 #include <kernel/sched/sched.h>
 #include <kernel/sched/process.h>
 #include <kernel/trapframe.h>
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 #include <kernel/util/list.h>
 #include <kernel/util/string.h>
 

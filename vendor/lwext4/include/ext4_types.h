@@ -829,11 +829,11 @@ struct jbd_sb {
 
 #else
 
-#define ext4_malloc  malloc
-#define ext4_calloc  calloc
-#define ext4_realloc realloc
-#define ext4_free    free
-
+#define ext4_malloc  kmalloc
+#define ext4_calloc  kcalloc
+#define ext4_realloc krealloc
+#define ext4_free    kfree
+#include "kmalloc.h"
 #endif
 
 

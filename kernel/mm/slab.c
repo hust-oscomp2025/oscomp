@@ -8,7 +8,7 @@
 
 #include <kernel/mm/page.h>
 #include <kernel/mm/slab.h>
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 #include <kernel/util/atomic.h>
 #include <kernel/util/list.h>
 #include <kernel/util/spinlock.h>

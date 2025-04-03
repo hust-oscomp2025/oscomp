@@ -57,6 +57,7 @@ int64 sys_clock_gettime(clockid_t clk_id, struct timespec* tp);
 /* Misc syscalls */
 int64 sys_getrandom(void* buf, size_t buflen, uint32 flags);
 int64 sys_yield(void);
+int64 sys_time(time_t* tloc);
 
 int32 do_openat(int32 dirfd, const char* pathname, int32 flags, mode_t mode);
 int32 do_open(const char* pathname, int32 flags, mode_t mode);
@@ -67,5 +68,15 @@ int32 do_mount(const char* dev_name, const char* path, const char* fstype, uint6
 int32 do_umount(struct vfsmount* mnt, int32 flags);
 int64 do_exit(int32 status);
 int64 do_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid);
+int64 do_mmap(void* addr, size_t length, int32 prot, int32 flags, int32 fd, off_t offset);
+int64 do_time(time_t* tloc);
+int64 do_read(int32 fd, void *buf, size_t count);
+int32 do_gettimeofday(struct timeval* tv);
+int32 do_clock_gettime(clockid_t which_clock, struct timespec* tp);
+ssize_t do_write(int32 fd, const void *buf, size_t count);
+
+
+uint64 mmap_file(struct mm_struct* mm, uint64 addr, size_t length, int32 prot, uint64 flags, struct file* file, off_t pgoff);
+ssize_t file_read(struct file *filp, char* *buf, size_t count, loff_t *ppos);
 
 #endif /* _SYSCALL_H_ */

@@ -6,7 +6,7 @@
 #include <kernel/util/string.h>
 #include <kernel/vfs.h>
 
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 
 static void __deactivate_super(struct superblock* sb);
 

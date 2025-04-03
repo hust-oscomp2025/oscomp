@@ -1,6 +1,6 @@
 #include <kernel/fs/ext4_adaptor.h>
 #include <kernel/mm/kmalloc.h>
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 #include <kernel/types.h>
 #include <kernel/util/string.h>
 #include <kernel/vfs.h>
@@ -172,7 +172,7 @@ const struct file_operations ext4_file_operations = {
     // .flush = NULL, // Optional
     // .release = ext4_file_release,
     // .fsync = ext4_file_fsync,
-    // .mmap = ext4_file_mmap,
+    // .mmap = ext4_mmap_file,
     // .unlocked_ioctl = NULL, // Optional
     // .fasync = NULL,         // Optional
     // .fallocate = NULL       // Optional

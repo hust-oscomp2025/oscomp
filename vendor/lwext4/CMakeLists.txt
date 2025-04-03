@@ -1,11 +1,9 @@
-# 设置 RISC-V 交叉编译工具链 - 添加在项目声明之前
-set(CMAKE_SYSTEM_NAME Generic)
+# 修改: 切换到 RISC-V Linux GNU 交叉编译工具链
+set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR riscv64)
-set(CMAKE_C_COMPILER riscv64-unknown-elf-gcc)
-set(CMAKE_CXX_COMPILER riscv64-unknown-elf-g++)
-set(CMAKE_AR riscv64-unknown-elf-ar)
-set(CMAKE_RANLIB riscv64-unknown-elf-ranlib)
-set(CMAKE_OBJCOPY riscv64-unknown-elf-objcopy)
+set(CMAKE_C_COMPILER riscv64-linux-gnu-gcc)
+set(CMAKE_CXX_COMPILER riscv64-linux-gnu-g++)
+set(CMAKE_ASM_COMPILER riscv64-linux-gnu-gcc)
 
 # 设置编译标志，使其与内核编译标志兼容
 set(CMAKE_C_FLAGS "-Wall -fno-builtin -nostdlib -mcmodel=medany -g -Og -std=gnu99 -fno-delete-null-pointer-checks")

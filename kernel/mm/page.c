@@ -8,7 +8,7 @@
 #include <kernel/util/string.h>
 #include <kernel/util/sync_utils.h>
 
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 
 // 页结构数组，用于跟踪所有物理页
 static struct page *page_pool = NULL;

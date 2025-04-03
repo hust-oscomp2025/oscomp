@@ -15,7 +15,6 @@
  */
 uint64 copy_to_user(void __user *to, const void *from, uint64 n)
 {
-    struct task_struct *current = current_task();
     if (!current || !current->mm)
         return n;
         
@@ -100,7 +99,6 @@ char *user_to_kernel_str(const char *user_ptr) {
  */
 uint64 copy_from_user(void *to, const void __user *from, uint64 n)
 {
-    struct task_struct *current = current_task();
     if (!current || !current->mm)
         return n;
         
@@ -190,7 +188,6 @@ uint64 clear_user(void __user *to, uint64 n)
  */
 int32 access_ok(const void __user *addr, uint64 size)
 {
-    struct task_struct *current = current_task();
     if (!current || !current->mm){
         return 1;
 	}

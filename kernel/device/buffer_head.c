@@ -5,7 +5,7 @@
 #include <kernel/util/list.h>
 #include <kernel/util/string.h>
 
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 
 // 缓冲区哈希表
 static struct hashtable buffer_hash;

@@ -1,6 +1,6 @@
 #include <kernel/mmu.h>
 #include <kernel/sched.h>
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 #include <kernel/time.h>
 #include <kernel/types.h>
 #include <kernel/util.h>
@@ -56,4 +56,28 @@ uint32 icache_hash(const void* key) {
 	/* Mix the bits for better distribution */
 	val = (val * 11400714819323198485ULL) >> 32; /* Fast hash multiply */
 	return (uint32)val;
+}
+
+
+/**
+ * icache_insert - Add an inode to the hash table
+ * @inode: The inode to add
+ *
+ * Adds an inode to the inode hash table for fast lookups.
+ */
+void icache_insert(struct inode* inode) {
+
+	if (!inode || !inode->i_superblock) return;
+	/* Insert into hash table */
+	hashtable_insert(&inode_hashtable, &inode->i_hash_node);
+}
+
+/**
+ * icache_delete - Remove an inode from the hash table
+ * @inode: The inode to remove
+ */
+void icache_delete(struct inode* inode) {
+	if (!inode || !inode->i_superblock) return;
+	/* Remove from hash table */
+	hashtable_remove(&inode_hashtable, &inode->i_hash_node);
 }

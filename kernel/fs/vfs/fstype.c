@@ -1,5 +1,5 @@
 #include <kernel/mmu.h>
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 #include <kernel/types.h>
 #include <kernel/util.h>
 #include <kernel/vfs.h>
@@ -68,18 +68,19 @@ struct superblock* fstype_mount(struct fstype* type, int32 flags, dev_t dev_id,c
  * called by vfs_init
  */
 int32 fstype_register_all(void) {
+	// TODO: 直接在启动的时候挂载块设备当ext4根目录
 	INIT_LIST_HEAD(&file_systems_list);
 	spinlock_init(&file_systems_lock);
 	int32 err;
 	/* Register ramfs - our initial root filesystem */
-	extern struct fstype ramfs_fstype;
-	err = fstype_register(&ramfs_fstype);
-	if (err < 0) return err;
+	// extern struct fstype ramfs_fstype;
+	// err = fstype_register(&ramfs_fstype);
+	// if (err < 0) return err;
 
 	/* Register other built-in filesystems */
-	extern struct fstype hostfs_fstype;
-	err = fstype_register(&hostfs_fstype);
-	if (err < 0) return err;
+	// extern struct fstype hostfs_fstype;
+	// err = fstype_register(&hostfs_fstype);
+	// if (err < 0) return err;
 
 	return 0;
 }

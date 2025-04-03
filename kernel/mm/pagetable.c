@@ -6,7 +6,7 @@
 #include <kernel/mm/page.h>
 #include <kernel/mm/pagetable.h>
 
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 
 #include <kernel/util/spinlock.h>
 #include <kernel/util/string.h>

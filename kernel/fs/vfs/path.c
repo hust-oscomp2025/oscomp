@@ -1,6 +1,6 @@
 #include <kernel/mmu.h>
 #include <kernel/sched.h>
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 #include <kernel/types.h>
 #include <kernel/util.h>
 #include <kernel/vfs.h>
@@ -93,7 +93,6 @@ void path_destroy(struct path* path) {
  * Returns 0 on success, negative error code on failure.
  */
 int32 filename_lookup(int32 dfd, const char* name, uint32 flags, struct path* path, struct path* started) {
-	struct task_struct* current;
 	struct dentry* start_dentry;
 	struct vfsmount* start_mnt;
 	int32 error;
@@ -104,20 +103,18 @@ int32 filename_lookup(int32 dfd, const char* name, uint32 flags, struct path* pa
 	/* Check for absolute path */
 	if (name[0] == '/') {
 		/* Absolute path - always starts at root directory */
-		current = CURRENT;
 		start_dentry = current->fs->root.dentry;
 		start_mnt = current->fs->root.mnt;
 	} else {
 		/* Relative path - get the starting directory */
 		if (dfd == AT_FDCWD) {
 			/* Use current working directory */
-			current = CURRENT;
 			start_dentry = current->fs->pwd.dentry;
 			start_mnt = current->fs->pwd.mnt;
 		} else {
 			/* Use the directory referenced by the file descriptor */
 			// struct file* file = get_file(dfd, CURRENT);
-			struct file* file = fdtable_getFile(CURRENT->fdtable, dfd);
+			struct file* file = fdtable_getFile(current->fdtable, dfd);
 
 			if (!file) return -EBADF;
 

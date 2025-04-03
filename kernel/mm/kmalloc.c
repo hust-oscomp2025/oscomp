@@ -7,17 +7,11 @@
  * allocations.
  */
 
-#include <kernel/mm/kmalloc.h>
-#include <kernel/mm/mm_struct.h>
-#include <kernel/mm/page.h>
-#include <kernel/mm/pagetable.h>
-#include <kernel/mm/slab.h>
+#include <kernel/mmu.h>
 
-#include <kernel/sprint.h>
-#include <kernel/util/atomic.h>
-#include <kernel/util/list.h>
-#include <kernel/util/spinlock.h>
-#include <kernel/util/string.h>
+#include <kernel/util/print.h>
+#include <kernel/util.h>
+#include <kernel/syscall/syscall.h>
 
 /**
  * Memory allocation header structure
@@ -92,7 +86,7 @@ void kmem_init(void) {
   } else {
     //sprint("kmalloc: large\n");
     // For large allocations, use page allocator without headers
-    paddr_t ret = do_mmap(&init_mm, 0, size, PROT_READ | PROT_WRITE,
+    paddr_t ret = mmap_file(&init_mm, 0, size, PROT_READ | PROT_WRITE,
                         MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, NULL, 0);
 
     struct page *page = addr_to_page(ret);
@@ -142,6 +136,35 @@ void kmem_init(void) {
     }
   }
 }
+
+
+void *kcalloc(size_t n, size_t size)
+{
+    size_t total_size;
+    void *ret;
+
+    // 检查乘法溢出
+    if (size && n > (~(size_t)0) / size)
+        return NULL;
+
+    total_size = n * size;
+
+    // 如果总大小为0，返回一个特殊值或NULL
+    if (total_size == 0)
+        return NULL;  // 或者返回一个特殊的非NULL值，取决于您的需求
+
+    // 使用您的kmalloc分配内存
+    ret = kmalloc(total_size);
+    if (!ret)
+        return NULL;
+
+    // 将分配的内存清零
+    memset(ret, 0, total_size);
+
+    return ret;
+}
+
+
 
 /**
  * @brief Allocate and zero kernel memory

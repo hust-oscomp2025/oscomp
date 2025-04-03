@@ -3,7 +3,7 @@
 
 #include <sys/types.h>
 #include <kernel/types.h>
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 
 #define FDT_MAGIC 0xd00dfeed
 #define FDT_VERSION 17

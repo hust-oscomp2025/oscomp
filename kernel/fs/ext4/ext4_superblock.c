@@ -181,7 +181,7 @@ int32 ext4_fill_super(struct superblock* sb, void* data, int32 silent) {
 
     /* Set up the superblock */
     sb->s_blocksize = ext4_sb_get_block_size(&e_fs->sb);
-    sb->s_blocksize_bits = __builtin_ffs(sb->s_blocksize) - 1;
+    sb->s_blocksize_bits = ffs(sb->s_blocksize) - 1;
     sb->s_magic = EXT4_SUPERBLOCK_MAGIC;
     sb->s_operations = &ext4_superblock_operations;
     sb->s_fs_info = e_fs;
@@ -214,7 +214,7 @@ int32 ext4_fill_super(struct superblock* sb, void* data, int32 silent) {
 // }
 
 /* Filesystem type registration structure */
-static struct fstype ext4_fs_type = {
+struct fstype ext4_fs_type = {
     .fs_name = "ext4",
     .fs_flags = FS_REQUIRES_DEV,
     //.fs_mount = ext4_mount_adapter,

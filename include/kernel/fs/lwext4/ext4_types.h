@@ -830,7 +830,7 @@ struct jbd_sb {
 #else
 
 #define ext4_malloc  kmalloc
-#define ext4_calloc  kzalloc
+#define ext4_calloc  kcalloc
 #define ext4_realloc krealloc
 #define ext4_free    kfree
 

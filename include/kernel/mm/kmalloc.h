@@ -47,30 +47,14 @@ void kmem_init(void);
  * @return void* Pointer to allocated memory, or NULL if failed
  */
 void* kmalloc(size_t size);
-
-/**
- * @brief Free previously allocated kernel memory
- *
- * @param ptr Pointer to memory allocated by kmalloc
- */
-void kfree(void* ptr);
-
-/**
- * @brief Allocate kernel memory and zero it
- *
- * @param size Size in bytes to allocate
- * @return void* Pointer to allocated and zeroed memory, or NULL if failed
- */
 void* kzalloc(size_t size);
 
-/**
- * @brief Resize an allocated memory block
- *
- * @param ptr Pointer to memory previously allocated by kmalloc, or NULL
- * @param new_size New size in bytes
- * @return void* Pointer to the resized memory block, or NULL if failed
- */
+// 形式上的calloc，实际内部用的是kmalloc
+void *kcalloc(size_t n, size_t size);
 void* krealloc(void* ptr, size_t new_size);
+
+void kfree(void* ptr);
+
 
 /**
  * @brief Get the allocated size of a memory block

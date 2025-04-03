@@ -1,7 +1,7 @@
 #include <kernel/mm/kmalloc.h>
 #include <kernel/mm/uaccess.h>
 #include <kernel/sched/process.h>
-#include <kernel/sprint.h>
+#include <kernel/util/print.h>
 #include <kernel/syscall/syscall.h>
 #include <kernel/types.h>
 #include <kernel/util/string.h>
@@ -15,35 +15,9 @@ int64 sys_close(int32 fd) {
 	return do_close(fd);
 }
 
-int64 sys_read(int32 fd, void* buf, size_t count) {
-	void* kbuf = kmalloc(count);
-	if (!kbuf) return -ENOMEM;
-	int ret = do_read(fd, kbuf, count);
-	if (ret < 0) {
-		kfree(kbuf);
-		return ret;
-	}
-	copy_to_user((void __user*)buf, kbuf, ret);
-	/* Implementation here */
-	return ret;
-}
 
-int64 sys_write(int32 fd, const void* buf, size_t count) {
-	void* kbuf = kmalloc(count);
-	if (!kbuf) return -ENOMEM;
-	if (copy_from_user(kbuf, buf, count)) {
-		kfree(kbuf);
-		return -EFAULT;
-	}
-	int ret = do_write(fd, kbuf, count);
-	if (ret < 0) {
-		kfree(kbuf);
-		return ret;
-	}
-	kfree(kbuf);
-	/* Implementation here */
-	return ret;
-}
+
+
 
 int64 sys_lseek(int32 fd, off_t offset, int32 whence) {
 	/* Implementation here */
@@ -65,24 +39,6 @@ int64 sys_getpid(void) {
 
 
 
-
-int64 sys_time(time_t __user* tloc) {
-    time_t ktime;
-    int64 ret = do_time(&ktime);  // 假设 do_time 填充内核时间到 ktime
-
-    if (ret < 0) {
-        return ret;  // 错误直接返回
-    }
-
-    // 如果用户传递的 tloc 非空，需要将 ktime 写回用户空间
-    if (tloc) {
-        if (copy_to_user(tloc, &ktime, sizeof(time_t)) != 0) {
-            return -EFAULT;  // 用户指针无效或不可写
-        }
-    }
-
-    return ktime;  // 返回时间值（兼容 tloc==NULL 的场景）
-}
 
 /* Complete syscall table using function pointers directly */
 typedef int64 (*syscall_fn_t)(int64, int64, int64, int64, int64, int64);
