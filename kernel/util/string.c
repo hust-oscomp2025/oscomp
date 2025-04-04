@@ -33,8 +33,8 @@ void* memset(void* dest, int byte, size_t len) {
 		word |= word << 16;
 		word |= word << 16 << 16;
 
-		uintptr_t* d = dest;
-		while (d < (uintptr_t*)(dest + len)) *d++ = word;
+		char* d = dest;
+		while ((uintptr_t)d < (uintptr_t)(dest + len)) *d++ = word;
 	} else {
 		char* d = dest;
 		while (d < (char*)(dest + len)) *d++ = byte;

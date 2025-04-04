@@ -1,0 +1,6 @@
+target remote localhost:1234
+file build/bin/riscv-pke
+# 如果有 OpenSBI 的 ELF 文件，取消下面的注释并修改路径
+add-symbol-file /root/workspace/oscomp-dev/vendor/opensbi/build/platform/generic/firmware/fw_jump.elf 0x80000000
+# b s_start
+b sbi_init

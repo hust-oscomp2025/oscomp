@@ -2,27 +2,87 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "RISC-V GDB Debug",
+            "name": "RISC-V PKE Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/bin/riscv-pke",
+            "args": [],
+            "stopAtEntry": true,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "riscv64-unknown-elf-gdb",
+            "miDebuggerServerAddress": "localhost:1234",
+            "setupCommands": [
+				{
+                    "description": "Set RISC-V architecture",
+                    "text": "set architecture riscv",
+                    "ignoreFailures": false
+                },
+				{
+					"description": "Turn off pagination",
+					"text": "set pagination off",
+					"ignoreFailures": true
+				},
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Load OpenSBI symbols",
+                    "text": "add-symbol-file /root/workspace/oscomp-dev/vendor/opensbi/build/platform/generic/firmware/fw_jump.elf 0x80000000",
+                    "ignoreFailures": false
+                },
+                {
+                    "description": "Set breakpoint at sbi_init",
+                    "text": "break sbi_init",
+                    "ignoreFailures": false
+                }
+            ],
+            "preLaunchTask": "start-qemu-gdb"
+        },
+		{
+            "name": "RISC-V GDB Server",
             "type": "gdb",
             "request": "attach",
-            "executable": "/root/workspace/oscomp-dev/build/bin/riscv-pke",
-			"target": ":1234",
+            "executable": "${workspaceFolder}/build/bin/riscv-pke",
+            "target": "localhost:1234",
             "remote": true,
-            "cwd": "/root/workspace/oscomp-dev",
-			
+            "cwd": "${workspaceFolder}",
             "gdbpath": "riscv64-unknown-elf-gdb",
-            "stopAtConnect": true,
-            "stopAtEntry": true,
             "autorun": [
-                "monitor system_reset halt",
-                "set remotetimeout 60",
-                "set confirm off",
-                "break s_start",
-                "interrupt",
-                "info threads",
-                "thread 1",
-                "set scheduler-locking on"
-            ]
-        }
+                "set architecture riscv:rv64",
+                "set pagination off",
+                "add-symbol-file /root/workspace/oscomp-dev/vendor/opensbi/build/platform/generic/firmware/fw_jump.elf 0x80000000",
+                "break sbi_init"
+            ],
+            "preLaunchTask": "start-qemu-gdb",
+            "postDebugTask": "kill-qemu"
+        },
+		{
+			"name": "Cortex Debug",
+			"type": "cortex-debug",
+			"request": "launch",
+			"executable": "${workspaceFolder}/build/bin/riscv-pke",
+			"cwd": "${workspaceFolder}",
+			"servertype": "external",
+			"gdbPath": "riscv64-unknown-elf-gdb",
+			"gdbTarget": "localhost:1234",
+			//"stopAtEntry": true,
+			"preLaunchCommands": [
+				"set architecture riscv",
+				"set pagination off",
+				"add-symbol-file /root/workspace/oscomp-dev/vendor/opensbi/build/platform/generic/firmware/fw_jump.elf 0x80000000",
+				"break sbi_init"
+			],
+			"showDevDebugOutput": "parsed",
+			"rttConfig": {
+				"enabled": false
+			},
+			"svdFile": "",
+			"preLaunchTask": "start-qemu-gdb"
+		}
     ]
 }

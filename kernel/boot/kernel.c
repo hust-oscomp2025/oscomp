@@ -199,3 +199,14 @@ void s_start(uintptr_t hartid, uintptr_t dtb) {
 	// we should never reach here.
 	return;
 }
+
+
+// This is a dummy file for RISC-V architecture detection
+// Save this file as dummy_riscv.c in your project root
+
+int main() {
+    return 0;
+}
+
+// Compile with:
+// riscv64-unknown-elf-gcc -o dummy_riscv dummy_riscv.c

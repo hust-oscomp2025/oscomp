@@ -11,11 +11,9 @@ gdb:
 	qemu-system-riscv64 \
   -machine virt \
   -nographic \
-  -bios default \
+  -bios /root/workspace/oscomp-dev/vendor/opensbi/build/platform/generic/firmware/fw_jump.bin \
   -kernel build/bin/riscv-pke \
 	-s -S
 
 gdb-client:
-	riscv64-unknown-elf-gdb -ex "target remote localhost:1234" \
-	-ex "b s_start" \
-	build/bin/riscv-pke -q
+	riscv64-unknown-elf-gdb -x gdbinit.txt build/bin/riscv-pke -q
