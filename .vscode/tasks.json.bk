@@ -1,0 +1,44 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "start-qemu-gdb-server",
+            "type": "shell",
+            "command": "bash ${workspaceFolder}/docker-qemu.sh ${workspaceFolder}/build/bin/riscv-pke",
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "focus": true,
+                "clear": true
+            },
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "."
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "启动QEMU",
+                    "endsPattern": "QEMU 成功启动"
+                }
+            }
+        },
+        {
+            "label": "kill-qemu",
+            "type": "shell",
+            "command": "pkill -f 'qemu-system-riscv64' || true",
+            "presentation": {
+                "reveal": "never"
+            }
+        },
+        {
+            "label": "get-container-ip",
+            "type": "shell",
+            "command": "echo \"容器IP地址: $(hostname -I | awk '{print $1}')\"",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        }
+    ]
+}

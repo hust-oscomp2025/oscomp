@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "RISC-V GDB Debug",
+            "type": "gdb",
+            "request": "attach",
+            "executable": "/root/workspace/oscomp-dev/build/bin/riscv-pke",
+			"target": ":1234",
+            "remote": true,
+            "cwd": "/root/workspace/oscomp-dev",
+			
+            "gdbpath": "riscv64-unknown-elf-gdb",
+            "stopAtConnect": true,
+            "stopAtEntry": true,
+            "autorun": [
+                "monitor system_reset halt",
+                "set remotetimeout 60",
+                "set confirm off",
+                "break s_start",
+                "interrupt",
+                "info threads",
+                "thread 1",
+                "set scheduler-locking on"
+            ]
+        }
+    ]
+}
