@@ -33,7 +33,7 @@ void* memset(void* dest, int byte, size_t len) {
 		word |= word << 16;
 		word |= word << 16 << 16;
 
-		char* d = dest;
+		int32* d = dest;
 		while ((uintptr_t)d < (uintptr_t)(dest + len)) *d++ = word;
 	} else {
 		char* d = dest;
@@ -41,6 +41,14 @@ void* memset(void* dest, int byte, size_t len) {
 	}
 	return dest;
 }
+
+// void* memset(void* dest, int byte, size_t len) {
+//     char* d = (char*)dest;
+//     for (size_t i = 0; i < len; i++) {
+//         d[i] = (char)byte;
+//     }
+//     return dest;
+// }
 
 /**
  * 比较两个字符串的前n个字符

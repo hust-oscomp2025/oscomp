@@ -1,0 +1,59 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "start-qemu-gdb",
+            "type": "shell",
+            "command": "qemu-system-riscv64 -machine virt -nographic -bios /root/workspace/oscomp-dev/vendor/opensbi/build/platform/generic/firmware/fw_jump.bin -kernel build/bin/riscv-pke -s -S",
+            "isBackground": true,
+            "problemMatcher": [
+                {
+                    "pattern": [
+                        {
+                            "regexp": ".",
+                            "file": 1,
+                            "location": 2,
+                            "message": 3
+                        }
+                    ],
+                    "background": {
+                        "activeOnStart": true,
+                        "beginsPattern": "^.*QEMU.*version.*$",
+                        "endsPattern": "^.*$"
+                    }
+                }
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": false
+            },
+            "options": {
+                "env": {
+                    "QEMU_LAUNCHED": "1"
+                }
+            },
+            "dependsOn": ["check-and-kill-qemu"]
+        },
+        {
+            "label": "check-and-kill-qemu",
+            "type": "shell",
+            "command": "pkill -f 'qemu-system-riscv64.*-s -S' || exit 0",
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "kill-qemu",
+            "type": "shell",
+            "command": "pkill -f 'qemu-system-riscv64.*-s -S'",
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        }
+    ]
+}

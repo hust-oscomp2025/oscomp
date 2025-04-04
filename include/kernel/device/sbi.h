@@ -1,7 +1,7 @@
 #ifndef _SBI_H
 #define _SBI_H
 #include <kernel/types.h>
-
+#include <kernel/device/sbi_ecall_interface.h>
 struct sbiret {
 	uint64 error;
 	uint64 value;
@@ -48,6 +48,9 @@ struct sbiret {
 			     : "memory");                                                          \
 		(struct sbiret){error, value};                                                     \
 	})
+// 使用DBCN接口写入一整行
+#define SBI_CONSOLE_WRITE(buffer, size) \
+    SBI_ECALL(SBI_EXT_DBCN, SBI_EXT_DBCN_CONSOLE_WRITE, buffer, size, 0, 0, 0)
 
 #define SBI_TIMER_EID 0x54494D45
 #define SBI_SET_TIMER_FID 0

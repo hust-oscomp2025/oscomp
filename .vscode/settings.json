@@ -70,7 +70,8 @@
 		"forward_types.h": "c",
 		"stdlib.h": "c",
 		"vprint.h": "c",
-		"pagetable.h": "c"
+		"pagetable.h": "c",
+		"kmalloc.h": "c"
 	},
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyFunction": true,
     "C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyType": true,

@@ -9,7 +9,7 @@
 
 // 建立一个printf的锁，保证同一个printf中的数据都能在一次输出完毕
 // mutex_t pr_lock;
-
+spinlock_t pr_lock = SPINLOCK_INIT;
 void printInit() {
 	// mtx_init(&pr_lock, "kprintf", false, MTX_SPIN); // 此处禁止调试信息输出！否则会递归获取锁
 }
@@ -43,7 +43,9 @@ void kprintf(const char *fmt, ...) {
 	va_start(ap, fmt);
 
 	// mtx_lock(&pr_lock); // todo lock
+	spinlock_lock(&pr_lock);
 	vprintfmt(output, NULL, fmt, ap);
+	spinlock_unlock(&pr_lock);
 	// mtx_unlock(&pr_lock);
 
 	va_end(ap);

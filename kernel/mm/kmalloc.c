@@ -61,7 +61,7 @@ void kmem_init(void) {
  * @brief Allocate kernel memory
  */
  void *kmalloc(size_t size) {
-  //kprintf("kmalloc: start\n");
+  kprintf("kmalloc: request mem size = %d\n",size);
   if (size == 0)
     return NULL;
 
@@ -86,19 +86,23 @@ void kmem_init(void) {
   } else {
     //kprintf("kmalloc: large\n");
     // For large allocations, use page allocator without headers
-    paddr_t ret = mmap_file(&init_mm, 0, size, PROT_READ | PROT_WRITE,
+    vaddr_t ret = mmap_file(&init_mm, 0, size, PROT_READ | PROT_WRITE,
                         MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, NULL, 0);
-
+					
+	kprintf("kmalloc:mmap_file ret=%lx\n", ret);
     struct page *page = addr_to_page(ret);
 
     if (page) {
       page->kmalloc_size = size;
       // Store the actual requested size in the page's mapping field
-      mem = (void*)page->paddr;
-    }
+      //mem = (void*)page->paddr;
+	  mem = (void*)ret;
+    }else{
+		return NULL;
+	}
   }
   //kprintf("kmalloc: end\n");
-
+  kprintf("kmalloc: allocated %d bytes at %lx\n", size, mem);
   return mem;
 }
 

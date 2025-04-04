@@ -40,8 +40,8 @@
                     "text": "break sbi_init",
                     "ignoreFailures": false
                 }
-            ],
-            "preLaunchTask": "start-qemu-gdb"
+            ]
+            //"preLaunchTask": "start-qemu-gdb"
         },
 		{
             "name": "RISC-V GDB Server",

@@ -1,6 +1,7 @@
 #ifndef _MEMLAYOUT_H
 #define _MEMLAYOUT_H
 #include <kernel/param.h>
+//#include <kernel/riscv.h>
 /**
  * FarmOS 的虚拟内存布局：
  *
@@ -22,8 +23,8 @@
  */
 
 // FarmOS 物理页说明
-#define PAGE_SHIFT (12ull)	    // 基页大小为 4KB
-#define PAGE_SIZE (1 << PAGE_SHIFT) // 基页大小为 4KB
+//#define PAGE_SHIFT (12ull)	    // 基页大小为 4KB
+//#define PAGE_SIZE (1 << PAGE_SHIFT) // 基页大小为 4KB
 
 // 舍入到更大的页对齐地址
 #define PGROUNDUP(a) (((a) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1))
@@ -115,7 +116,7 @@
 #define RTC_BASE 0x101000ul
 
 // core local interruptor (CLINT), which contains the timer.
-#define CLINT 0x2000000ul
+//#define CLINT 0x2000000ul
 #define CLINT_MTIMECMP(hartid) (CLINT + 0x4000 + 8 * (hartid))
 #define CLINT_MTIME (CLINT + 0xBFF8) // cycles since boot.
 

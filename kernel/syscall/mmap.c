@@ -92,7 +92,7 @@ uint64 mmap_file(struct mm_struct* mm, uint64 addr, size_t length, int32 prot, u
 		if (mm->start_data == 0 || addr < mm->start_data) mm->start_data = addr;
 		if (addr + length > mm->end_data) mm->end_data = addr + length;
 	}
-
+	flush_tlb();
 	// Return mapped address
 	return addr;
 }

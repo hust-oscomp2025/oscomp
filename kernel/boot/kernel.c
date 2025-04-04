@@ -2,6 +2,8 @@
  * Supervisor-mode startup codes
  */
 
+#include <kernel/boot/dtb.h>
+#include <kernel/device/sbi.h>
 #include <kernel/elf.h>
 #include <kernel/mmu.h>
 #include <kernel/riscv.h>
@@ -10,13 +12,28 @@
 #include <kernel/types.h>
 #include <kernel/util.h>
 #include <kernel/vfs.h>
-#include <kernel/device/sbi.h>
-#include <kernel/boot/dtb.h>
 
-__attribute__((aligned(16))) char stack0[PAGE_SIZE * NCPU];
+// 分配 (NCPU + 1) 个保护页 + NCPU 个实际栈页
+__attribute__((aligned(PAGE_SIZE))) char stack0[PAGE_SIZE * (NCPU + 1 + NCPU)];
+
+__attribute__((aligned(PAGE_SIZE))) char emergency_stack_top[PAGE_SIZE];
+
+void setup_stack_guard_pages(void) {
+    // 计算保护页的起始地址
+    for (int i = 0; i <= NCPU; i++) {
+        void *guard_page = stack0 + (i * 2 - 1) * (PAGE_SIZE);
+        
+        // 标记为不可访问
+        pgt_map_pages(g_kernel_pagetable,(vaddr_t)guard_page,(paddr_t)guard_page, PAGE_SIZE, 0); // 无权限
+    }
+	kprintf("setup_stack_guard_pages: complete\n");
+    
+    // 刷新TLB
+    flush_tlb();
+}
 
 static void kernel_vm_init(void) {
-	kprintf("kernel_vm_init: start\n");
+	kprintf("kernel_vm_init: start, membase = %lx, memsize=%lx\n",memInfo.start, memInfo.size);
 	// extern struct mm_struct init_mm;
 	//  映射内核代码段和只读段
 	g_kernel_pagetable = (pagetable_t)alloc_page()->paddr;
@@ -37,14 +54,13 @@ static void kernel_vm_init(void) {
 	// 映射内核数据段
 	pgt_map_pages(g_kernel_pagetable, (uint64)_fdata, (uint64)_fdata, (uint64)(_end - _fdata), prot_to_type(PROT_READ | PROT_WRITE, 0));
 
-	extern uint64 mem_size;
 	// 对于剩余的物理内存空间做直接映射
-	pgt_map_pages(g_kernel_pagetable, (uint64)_end, (uint64)_end, DRAM_BASE + mem_size, prot_to_type(PROT_READ | PROT_WRITE, 0));
+	pgt_map_pages(g_kernel_pagetable, (uint64)_end, (uint64)_end, DRAM_BASE + memInfo.size - (uint64)_end, prot_to_type(PROT_READ | PROT_WRITE, 0));
 	// // satp不通过这层映射找g_kernel_pagetable，但是为了维护它，也需要做一个映射
 	// pgt_map_pages(g_kernel_pagetable, (uint64)g_kernel_pagetable,
 	//               (uint64)g_kernel_pagetable, PAGE_SIZE,
 	//               prot_to_type(PROT_READ | PROT_WRITE, 0));
-
+	setup_stack_guard_pages();
 	// 映射内核栈
 	// pgt_map_pages(init_mm.pagetable, (uint64)init_mm.pagetable, )
 
@@ -129,6 +145,11 @@ void start_trap() { while (1); }
 volatile static int32 sig = 1;
 volatile static int counter = 0;
 void s_start(uintptr_t hartid, uintptr_t dtb) {
+	// 最重要！先把中断服务程序挂上去，不然崩溃都不知道怎么死的。
+	extern char smode_trap_vector[];
+	write_csr(sstatus, read_csr(sstatus) | SSTATUS_SIE);
+	write_csr(stvec, (uint64)smode_trap_vector);
+
 	SBI_PUTCHAR('0' + hartid);
 	SBI_PUTCHAR('M');
 	SBI_PUTCHAR('_');
@@ -154,11 +175,17 @@ void s_start(uintptr_t hartid, uintptr_t dtb) {
 	// switch to supervisor mode (S mode) and jump to s_start(), i.e., set pc to
 	// mepc
 	// asm volatile("mret");
-
-	kprintf("In m_start, hartid:%d\n", hartid);
+	// 在内核初始化早期添加
+	// kprintf("Current privilege level: %ld\n", (read_csr(mstatus) >> 11) & 3);
+	// kprintf("stvec: 0x%lx\n", read_csr(stvec));
+	// kprintf("medeleg: 0x%lx\n", read_csr(medeleg));
+	// kprintf("mideleg: 0x%lx\n", read_csr(mideleg));
+	// kprintf("sstatus: 0x%lx\n", read_csr(sstatus));
+	// kprintf("sie: 0x%lx\n", read_csr(sie));
+	// kprintf("In m_start, hartid:%d\n", hartid);
 	write_tp(hartid);
 
-	write_csr(stvec, (uint64)start_trap);
+	//write_csr(stvec, (uint64)start_trap);
 
 	extern void init_idle_task(void);
 
@@ -177,7 +204,7 @@ void s_start(uintptr_t hartid, uintptr_t dtb) {
 		// kmalloc在形式上需要使用init_mm的“用户虚拟空间分配器”
 		// 所以我们在启用kmalloc之前，需要先初始化0号进程
 
-		init_scheduler();
+		// init_scheduler();
 		vfs_init();
 		sig = 0;
 	} else {
@@ -200,13 +227,10 @@ void s_start(uintptr_t hartid, uintptr_t dtb) {
 	return;
 }
 
-
 // This is a dummy file for RISC-V architecture detection
 // Save this file as dummy_riscv.c in your project root
 
-int main() {
-    return 0;
-}
+int main() { return 0; }
 
 // Compile with:
 // riscv64-unknown-elf-gcc -o dummy_riscv dummy_riscv.c
