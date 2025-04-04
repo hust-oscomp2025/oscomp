@@ -465,19 +465,19 @@ int extract_initramfs(const char *initramfs_data, size_t size, struct vfsmount *
         
         /* Check magic */
         if (memcmp(hdr->magic, CPIO_MAGIC, CPIO_MAGIC_LEN) != 0) {
-            sprint("InitramFS: Invalid CPIO header magic\n");
+            kprintf("InitramFS: Invalid CPIO header magic\n");
             return -EINVAL;
         }
         
         /* Parse header fields */
         if (parse_cpio_header(hdr, &mode, &filesize, &namesize) != 0) {
-            sprint("InitramFS: Failed to parse CPIO header\n");
+            kprintf("InitramFS: Failed to parse CPIO header\n");
             return -EINVAL;
         }
         
         /* Get filename */
         if (namesize >= PATH_MAX || ptr + namesize > end) {
-            sprint("InitramFS: Filename too long or beyond archive end\n");
+            kprintf("InitramFS: Filename too long or beyond archive end\n");
             return -EINVAL;
         }
         
@@ -496,7 +496,7 @@ int extract_initramfs(const char *initramfs_data, size_t size, struct vfsmount *
         if (S_ISREG(mode)) {
             /* Regular file */
             if (ptr + filesize > end) {
-                sprint("InitramFS: File data extends beyond archive end\n");
+                kprintf("InitramFS: File data extends beyond archive end\n");
                 return -EINVAL;
             }
             
@@ -507,7 +507,7 @@ int extract_initramfs(const char *initramfs_data, size_t size, struct vfsmount *
             create_directory(root, filename, mode);
         } else {
             /* Skip other types for now (symlinks, devices, etc.) */
-            sprint("InitramFS: Skipping non-regular file: %s\n", filename);
+            kprintf("InitramFS: Skipping non-regular file: %s\n", filename);
             ptr += filesize;
         }
         
@@ -515,7 +515,7 @@ int extract_initramfs(const char *initramfs_data, size_t size, struct vfsmount *
         ptr = (const char *)(((unsigned long)ptr + 3) & ~3);
     }
     
-    sprint("InitramFS: Extraction complete\n");
+    kprintf("InitramFS: Extraction complete\n");
     return 0;
 }
 

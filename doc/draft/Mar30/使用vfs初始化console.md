@@ -40,7 +40,7 @@ int32 setup_init_fds(struct task_struct *init_task) {
     // Open console device using standard VFS path
     console_fd = vfs_open("/dev/console", O_RDWR);
     if (console_fd < 0) {
-        sprint("Failed to open /dev/console: %d\n", console_fd);
+        kprintf("Failed to open /dev/console: %d\n", console_fd);
         set_current_task(saved_task);
         return console_fd;
     }

@@ -23,8 +23,7 @@ struct MemInfo {
 
 extern struct MemInfo memInfo;
 
-extern uint64_t  dtbEntry;
-void parseDtb();
+void parseDtb(uint64 dtbEntry);
 
 #define FDT_BEGIN_NODE 0x00000001
 #define FDT_END_NODE 0x00000002

@@ -2,24 +2,38 @@
  * Supervisor-mode startup codes
  */
 
+#include <kernel/boot/dtb.h>
+#include <kernel/device/sbi.h>
 #include <kernel/elf.h>
-#include <kernel/mm/kmalloc.h>
-#include <kernel/mm/mm_struct.h>
-#include <kernel/mm/mmap.h>
-#include <kernel/mm/pagetable.h>
+#include <kernel/mmu.h>
 #include <kernel/riscv.h>
-#include <kernel/sched/process.h>
-#include <kernel/sched/sched.h>
-#include <kernel/util/print.h>
+#include <kernel/sched.h>
+#include <kernel/syscall/syscall.h>
 #include <kernel/types.h>
 #include <kernel/util.h>
 #include <kernel/vfs.h>
-#include <kernel/syscall/syscall.h>
 
-__attribute__((aligned(16))) char stack0[PAGE_SIZE * NCPU];
+// 分配 (NCPU + 1) 个保护页 + NCPU 个实际栈页
+__attribute__((aligned(PAGE_SIZE))) char stack0[PAGE_SIZE * (NCPU + 1 + NCPU)];
+
+__attribute__((aligned(PAGE_SIZE))) char emergency_stack_top[PAGE_SIZE];
+
+void setup_stack_guard_pages(void) {
+    // 计算保护页的起始地址
+    for (int i = 0; i <= NCPU; i++) {
+        void *guard_page = stack0 + (i * 2 - 1) * (PAGE_SIZE);
+        
+        // 标记为不可访问
+        pgt_map_pages(g_kernel_pagetable,(vaddr_t)guard_page,(paddr_t)guard_page, PAGE_SIZE, 0); // 无权限
+    }
+	kprintf("setup_stack_guard_pages: complete\n");
+    
+    // 刷新TLB
+    flush_tlb();
+}
 
 static void kernel_vm_init(void) {
-	sprint("kernel_vm_init: start\n");
+	kprintf("kernel_vm_init: start, membase = %lx, memsize=%lx\n",memInfo.start, memInfo.size);
 	// extern struct mm_struct init_mm;
 	//  映射内核代码段和只读段
 	g_kernel_pagetable = (pagetable_t)alloc_page()->paddr;
@@ -28,7 +42,7 @@ static void kernel_vm_init(void) {
 	memset(g_kernel_pagetable, 0, PAGE_SIZE);
 
 	extern char _ftext[], _etext[], _fdata[], _end[];
-	// sprint("_etext=%lx,_ftext=%lx\n", _etext, _ftext);
+	// kprintf("_etext=%lx,_ftext=%lx\n", _etext, _ftext);
 
 	pgt_map_pages(g_kernel_pagetable, (uint64)_ftext, (uint64)_ftext, (uint64)(_etext - _ftext), prot_to_type(PROT_READ | PROT_EXEC, 0));
 
@@ -40,14 +54,13 @@ static void kernel_vm_init(void) {
 	// 映射内核数据段
 	pgt_map_pages(g_kernel_pagetable, (uint64)_fdata, (uint64)_fdata, (uint64)(_end - _fdata), prot_to_type(PROT_READ | PROT_WRITE, 0));
 
-	extern uint64 mem_size;
 	// 对于剩余的物理内存空间做直接映射
-	pgt_map_pages(g_kernel_pagetable, (uint64)_end, (uint64)_end, DRAM_BASE + mem_size, prot_to_type(PROT_READ | PROT_WRITE, 0));
+	pgt_map_pages(g_kernel_pagetable, (uint64)_end, (uint64)_end, DRAM_BASE + memInfo.size - (uint64)_end, prot_to_type(PROT_READ | PROT_WRITE, 0));
 	// // satp不通过这层映射找g_kernel_pagetable，但是为了维护它，也需要做一个映射
 	// pgt_map_pages(g_kernel_pagetable, (uint64)g_kernel_pagetable,
 	//               (uint64)g_kernel_pagetable, PAGE_SIZE,
 	//               prot_to_type(PROT_READ | PROT_WRITE, 0));
-
+	setup_stack_guard_pages();
 	// 映射内核栈
 	// pgt_map_pages(init_mm.pagetable, (uint64)init_mm.pagetable, )
 
@@ -56,7 +69,7 @@ static void kernel_vm_init(void) {
 	// // 6. 映射MMIO区域（如果有需要）
 	// // 例如UART、PLIC等外设的内存映射IO区域
 
-	sprint("kern_vm_init: complete\n");
+	kprintf("kern_vm_init: complete\n");
 }
 
 /**
@@ -77,8 +90,8 @@ int32 setup_init_fds(struct task_struct* init_task) {
 
 	// Set up stdin, stdout, stderr
 	for (fd = 0; fd < 3; fd++) {
-		if(fd != do_open("/dev/console", O_RDWR, 0)) {
-			sprint("Failed to open /dev/console for fd %d\n", fd);
+		if (fd != do_open("/dev/console", O_RDWR, 0)) {
+			kprintf("Failed to open /dev/console for fd %d\n", fd);
 			set_current_task(saved_task);
 			return -1;
 		}
@@ -124,17 +137,61 @@ fail_fs:
 	return error;
 }
 
+void start_trap() { while (1); }
+
 //
 // s_start: S-mode entry point of riscv-pke OS kernel.
 //
 volatile static int32 sig = 1;
-int32 s_start(void) {
+volatile static int counter = 0;
+void s_start(uintptr_t hartid, uintptr_t dtb) {
+	// 最重要！先把中断服务程序挂上去，不然崩溃都不知道怎么死的。
+	extern char smode_trap_vector[];
+	write_csr(sstatus, read_csr(sstatus) | SSTATUS_SIE);
+	write_csr(stvec, (uint64)smode_trap_vector);
+
+	SBI_PUTCHAR('0' + hartid);
+	SBI_PUTCHAR('M');
+	SBI_PUTCHAR('_');
+	SBI_PUTCHAR('S');
+	SBI_PUTCHAR('T');
+	SBI_PUTCHAR('A');
+	SBI_PUTCHAR('R');
+	SBI_PUTCHAR('T');
+	SBI_PUTCHAR('\n');
+
+	if (hartid == 0) {
+		// spike_file_init(); //TODO: 将文件系统迁移到 QEMU
+		// init_dtb(dtb);
+		parseDtb(dtb);
+	}
+	if (NCPU > 1) sync_barrier(&counter, NCPU);
+	write_csr(sie, read_csr(sie) | SIE_SEIE | SIE_STIE); // 不启用核间中断（暂时） TODO
+
+	// init timing. added @lab1_3
+	// lab1_challenge1 为了调试便利，禁用了外部时钟中断：
+	// timerinit(hartid);
+
+	// switch to supervisor mode (S mode) and jump to s_start(), i.e., set pc to
+	// mepc
+	// asm volatile("mret");
+	// 在内核初始化早期添加
+	// kprintf("Current privilege level: %ld\n", (read_csr(mstatus) >> 11) & 3);
+	// kprintf("stvec: 0x%lx\n", read_csr(stvec));
+	// kprintf("medeleg: 0x%lx\n", read_csr(medeleg));
+	// kprintf("mideleg: 0x%lx\n", read_csr(mideleg));
+	// kprintf("sstatus: 0x%lx\n", read_csr(sstatus));
+	// kprintf("sie: 0x%lx\n", read_csr(sie));
+	// kprintf("In m_start, hartid:%d\n", hartid);
+	write_tp(hartid);
+
+	//write_csr(stvec, (uint64)start_trap);
+
 	extern void init_idle_task(void);
 
-	sprint("Enter supervisor mode...\n");
+	kprintf("Enter supervisor mode...\n");
 	write_csr(satp, 0);
 
-	int32 hartid = read_tp();
 	if (hartid == 0) {
 		init_page_manager();
 		kernel_vm_init();
@@ -147,11 +204,12 @@ int32 s_start(void) {
 		// kmalloc在形式上需要使用init_mm的“用户虚拟空间分配器”
 		// 所以我们在启用kmalloc之前，需要先初始化0号进程
 
-		init_scheduler();
+		// init_scheduler();
 		vfs_init();
 		sig = 0;
 	} else {
-		while (sig) {}
+		while (sig) {
+		}
 		pagetable_activate(g_kernel_pagetable);
 	}
 
@@ -160,11 +218,19 @@ int32 s_start(void) {
 	//  写入satp寄存器并刷新tlb缓存
 	//    从这里开始，所有内存访问都通过MMU进行虚实转换
 
-	sprint("Switch to user mode...\n");
+	kprintf("Switch to user mode...\n");
 	// the application code (elf) is first loaded into memory, and then put into
 	// execution added @lab3_1
 	create_init_process();
 
 	// we should never reach here.
-	return 0;
+	return;
 }
+
+// This is a dummy file for RISC-V architecture detection
+// Save this file as dummy_riscv.c in your project root
+
+int main() { return 0; }
+
+// Compile with:
+// riscv64-unknown-elf-gcc -o dummy_riscv dummy_riscv.c

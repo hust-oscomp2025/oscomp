@@ -58,7 +58,7 @@ int32 file_free(struct file* filp) {
 		/* Call the file-specific release operation */
 		error = filp->f_op->release(filp);
 		if (error) {
-			sprint("Error when fs releasing file: %d\n", error);
+			kprintf("Error when fs releasing file: %d\n", error);
 			return error;
 		}
 	}
@@ -349,7 +349,7 @@ int32 file_close(struct file* file) {
 
 	// For logging/debugging
 	if (file->f_path.dentry && file->f_path.dentry->d_name->name) {
-		// sprint("Closing file: %s\n", file->f_path.dentry->d_name.name);
+		// kprintf("Closing file: %s\n", file->f_path.dentry->d_name.name);
 	}
 
 	// Just delegate to file_unref which handles reference counting

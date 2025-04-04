@@ -68,7 +68,7 @@ static bool open_linux(void)
 	file_dev_name_set(input_name);
 	bd = file_dev_get();
 	if (!bd) {
-		printf("open_filedev: fail\n");
+		kprintf("open_filedev: fail\n");
 		return false;
 	}
 	return true;
@@ -80,12 +80,12 @@ static bool open_windows(void)
 	file_windows_name_set(input_name);
 	bd = file_windows_dev_get();
 	if (!bd) {
-		printf("open_winpartition: fail\n");
+		kprintf("open_winpartition: fail\n");
 		return false;
 	}
 	return true;
 #else
-	printf("open_winpartition: this mode should be used only under windows "
+	kprintf("open_winpartition: this mode should be used only under windows "
 	       "!\n");
 	return false;
 #endif
@@ -126,7 +126,7 @@ static bool parse_opt(int argc, char **argv)
 			exit(0);
 			break;
 		default:
-			printf("%s", usage);
+			kprintf("%s", usage);
 			return false;
 		}
 	}
@@ -138,39 +138,39 @@ int main(int argc, char **argv)
 {
 	int r;
 	if (!parse_opt(argc, argv)){
-		printf("parse_opt error\n");
+		kprintf("parse_opt error\n");
 		return EXIT_FAILURE;
 	}
 
 	if (!open_filedev()) {
-		printf("open_filedev error\n");
+		kprintf("open_filedev error\n");
 		return EXIT_FAILURE;
 	}
 
 	if (verbose)
 		ext4_dmask_set(DEBUG_ALL);
 
-	printf("ext4_mbr\n");
+	kprintf("ext4_mbr\n");
 	struct ext4_mbr_bdevs bdevs;
 	r = ext4_mbr_scan(bd, &bdevs);
 	if (r != EOK) {
-		printf("ext4_mbr_scan error\n");
+		kprintf("ext4_mbr_scan error\n");
 		return EXIT_FAILURE;
 	}
 
 	int i;
-	printf("ext4_mbr_scan:\n");
+	kprintf("ext4_mbr_scan:\n");
 	for (i = 0; i < 4; i++) {
-		printf("mbr_entry %d:\n", i);
+		kprintf("mbr_entry %d:\n", i);
 		if (!bdevs.partitions[i].bdif) {
-			printf("\tempty/unknown\n");
+			kprintf("\tempty/unknown\n");
 			continue;
 		}
 
-		printf("\toffeset: 0x%"PRIx64", %"PRIu64"MB\n",
+		kprintf("\toffeset: 0x%"PRIx64", %"PRIu64"MB\n",
 			bdevs.partitions[i].part_offset,
 			bdevs.partitions[i].part_offset / (1024 * 1024));
-		printf("\tsize:    0x%"PRIx64", %"PRIu64"MB\n",
+		kprintf("\tsize:    0x%"PRIx64", %"PRIu64"MB\n",
 			bdevs.partitions[i].part_size,
 			bdevs.partitions[i].part_size / (1024 * 1024));
 	}

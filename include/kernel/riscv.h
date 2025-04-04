@@ -25,7 +25,7 @@
 #define MIP_STIP (1 << IRQ_S_TIMER) // s-mode timer interrupt pending
 #define MIP_MSIP (1 << IRQ_M_SOFT)  // m-mode software interrupt pending
 
-// pysical memory protection choices
+// physical memory protection choices
 #define PMP_R 0x01
 #define PMP_W 0x02
 #define PMP_X 0x04

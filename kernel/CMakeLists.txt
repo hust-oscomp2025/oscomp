@@ -1,15 +1,22 @@
 cmake_minimum_required(VERSION 3.10)
 project(riscv-pke C ASM)
 
-# 修改: 切换到 RISC-V Linux GNU 交叉编译工具链
-set(CMAKE_SYSTEM_NAME Linux)
+# # 修改: 切换到 RISC-V Linux GNU 交叉编译工具链
+# set(CMAKE_SYSTEM_NAME Linux)
+# set(CMAKE_SYSTEM_PROCESSOR riscv64)
+# set(CMAKE_C_COMPILER riscv64-linux-gnu-gcc)
+# set(CMAKE_CXX_COMPILER riscv64-linux-gnu-g++)
+# set(CMAKE_ASM_COMPILER riscv64-linux-gnu-gcc)
+
+# 设置 RISC-V 交叉编译工具链
+set(CMAKE_SYSTEM_NAME Generic)
 set(CMAKE_SYSTEM_PROCESSOR riscv64)
-set(CMAKE_C_COMPILER riscv64-linux-gnu-gcc)
-set(CMAKE_CXX_COMPILER riscv64-linux-gnu-g++)
-set(CMAKE_ASM_COMPILER riscv64-linux-gnu-gcc)
+set(CMAKE_C_COMPILER riscv64-unknown-elf-gcc)
+set(CMAKE_CXX_COMPILER riscv64-unknown-elf-g++)
+set(CMAKE_ASM_COMPILER riscv64-unknown-elf-gcc)
 
 # 修改: 调整编译标志以适应新工具链
-set(CMAKE_C_FLAGS "-Wall -Werror -gdwarf-3 -fno-builtin -nostdlib -nostdinc -ffreestanding -D__NO_INLINE__ -mcmodel=medany -g -Og -std=gnu99 -Wno-unused -Wno-attributes -fno-delete-null-pointer-checks -fno-PIE -fno-omit-frame-pointer")
+set(CMAKE_C_FLAGS "-Wall -Werror -gdwarf-3 -fno-builtin -nostdlib -nostartfiles -nostdinc -ffreestanding -T ${CMAKE_SOURCE_DIR}/kernel/kernel.lds -D__NO_INLINE__ -mcmodel=medany -g -Og -std=gnu99 -Wno-unused -Wno-attributes -Wl,--no-relax -Wl,-z,notext -fno-delete-null-pointer-checks -fno-PIE -fno-omit-frame-pointer")
 
 # 设置特殊的包含路径，确保使用工具链中的标准 POSIX 头文件
 set(GNU_INCLUDE_PATH "/usr/riscv64-linux-gnu/include")
@@ -48,8 +55,7 @@ set_target_properties(lwext4 PROPERTIES IMPORTED_LOCATION ${CMAKE_SOURCE_DIR}/ke
 # 链接 lwext4 静态库
 target_link_libraries(riscv-pke PRIVATE lwext4)
 
-# 设置链接脚本
-set_target_properties(riscv-pke PROPERTIES LINK_FLAGS "-T ${CMAKE_SOURCE_DIR}/kernel/kernel.lds -nostartfiles -nodefaultlibs -nostdlib")
+
 
 set(DEBUG_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/debug)
 # ✅ 生成 objdump 和 ELF 解析文件 - 也更新工具

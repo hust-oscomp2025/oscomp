@@ -107,7 +107,7 @@ struct inode* inode_acquire(struct superblock* sb, uint64 ino) {
 			sb->s_operations->read_inode(inode);
 			// inode 初始化完成后的解锁动作由具体文件系统负责
 		} else {
-			sprint("No read_inode method for superblock\n");
+			kprintf("No read_inode method for superblock\n");
 			return ERR_PTR(-EINVAL);
 		}
 	}

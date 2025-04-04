@@ -108,7 +108,7 @@ struct dentry* dentry_ref(struct dentry* dentry) {
  * 初始化dentry缓存
  */
 int32 init_dentry_hashtable(void) {
-	sprint("Initializing dentry hashtable\n");
+	kprintf("Initializing dentry hashtable\n");
 
 	/* 初始化dentry哈希表 */
 	return hashtable_setup(&dentry_hashtable, 1024, /* 初始桶数 */

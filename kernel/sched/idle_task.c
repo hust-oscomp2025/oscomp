@@ -11,10 +11,8 @@
 // printk、KERN_INFO 等
 #include <kernel/sched/sched.h> // task_struct 定义，TASK_RUNNING, PF_KTHREAD 等
 //#include <linux/init.h>         // __init 宏
-#include <kernel/util/spinlock.h>      // 锁相关函数
-#include <kernel/mm/kmalloc.h>
-#include <kernel/util/string.h>
-#include <kernel/util/list.h>
+#include <kernel/mmu.h>
+#include <kernel/util.h>
 
 /* 外部声明 */
 extern void schedule(void);
@@ -61,12 +59,12 @@ struct task_struct idle_task;
  * 
  */
 void init_idle_task(void) {
-	sprint("Initializing idle process (PID 0)...\n");
+	kprintf("Initializing idle process (PID 0)...\n");
 	idle_task.kstack = (uint64)alloc_kernel_stack();
 	idle_task.trapframe = NULL;
 
 	idle_task.ktrapframe = kmalloc(sizeof(struct trapframe));
-	sprint("idle_task.ktrapframe: %p\n",idle_task.ktrapframe);
+	kprintf("idle_task.ktrapframe: %p\n",idle_task.ktrapframe);
 	memset(idle_task.ktrapframe,0,sizeof(struct trapframe));
   idle_task.ktrapframe->epc = (uint64)idle_loop;
 
@@ -92,7 +90,7 @@ void init_idle_task(void) {
   /* 将 idle 进程注册到调度器中 */
   insert_to_ready_queue(&idle_task);
 
-  sprint("Idle process (PID 0) initialized and registered.\n");
+  kprintf("Idle process (PID 0) initialized and registered.\n");
 }
 
 

@@ -1,15 +1,12 @@
-#include <kernel/mm/page.h>
-#include <kernel/mm/mm_struct.h>
-#include <kernel/mm/pagetable.h>
-#include <kernel/util/string.h>
-#include <kernel/util/print.h>
+#include <kernel/mmu.h>
+#include <kernel/util.h>
 
 struct mm_struct init_mm;
 
 
 // 在s_start中调用
 void create_init_mm() {
-	//sprint("create_init_mm: start\n");
+	//kprintf("create_init_mm: start\n");
   memset(&init_mm, 0, sizeof(init_mm));
 	init_mm.is_kernel_mm = 1;
   //init_mm.pagetable = alloc_page()->paddr;
@@ -42,7 +39,7 @@ void create_init_mm() {
 	spinlock_init(&init_mm.mm_lock);
 	atomic_set(&init_mm.mm_users,0);
 	atomic_set(&init_mm.mm_count,0);
-	sprint("create_init_mm: complete.\n");
+	kprintf("create_init_mm: complete.\n");
 }
 
 // /*

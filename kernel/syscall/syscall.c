@@ -78,7 +78,7 @@ int64 do_syscall(int64 syscall_num, int64 a0, int64 a1, int64 a2, int64 a3, int6
 
 	/* Validate syscall number */
 	if (syscall_num < 0 || syscall_num >= SYSCALL_TABLE_SIZE || !syscall_table[syscall_num].func) {
-		sprint("Invalid syscall: %ld\n", syscall_num);
+		kprintf("Invalid syscall: %ld\n", syscall_num);
 		return -ENOSYS;
 	}
 
@@ -86,7 +86,7 @@ int64 do_syscall(int64 syscall_num, int64 a0, int64 a1, int64 a2, int64 a3, int6
 
 #if SYSCALL_DEBUG
 	/* Debug output before syscall */
-	sprint("SYSCALL: %s(%ld, %ld, ...)\n", entry->name, a0, a1);
+	kprintf("SYSCALL: %s(%ld, %ld, ...)\n", entry->name, a0, a1);
 #endif
 
 	/* Execute syscall through the function pointer with type casting */
@@ -94,7 +94,7 @@ int64 do_syscall(int64 syscall_num, int64 a0, int64 a1, int64 a2, int64 a3, int6
 
 #if SYSCALL_DEBUG
 	/* Debug output after syscall */
-	sprint("SYSCALL: %s returned %ld\n", entry->name, ret);
+	kprintf("SYSCALL: %s returned %ld\n", entry->name, ret);
 #endif
 
 	return ret;

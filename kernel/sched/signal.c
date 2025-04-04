@@ -120,7 +120,7 @@ int32 do_send_signal(pid_t pid, int32 sig)
         
         // For SIGKILL, terminate the process immediately
         if (sig == SIGKILL) {
-            sprint("Process %d killed by signal %d\n", p->pid, sig);
+            kprintf("Process %d killed by signal %d\n", p->pid, sig);
             // Implement process termination logic
             // do_exit(p, sig);
             return 0;
@@ -128,7 +128,7 @@ int32 do_send_signal(pid_t pid, int32 sig)
         
         // For SIGSTOP, stop the process
         if (sig == SIGSTOP) {
-            sprint("Process %d stopped by signal %d\n", p->pid, sig);
+            kprintf("Process %d stopped by signal %d\n", p->pid, sig);
             // Implement process stop logic
             // p->state = TASK_STOPPED;
             return 0;
@@ -304,7 +304,7 @@ void do_signal_delivery(void)
                     case SIGQUIT:
                     case SIGABRT:
                         // Default is to terminate the process
-                        sprint("Process %d terminated by signal %d\n", p->pid, sig);
+                        kprintf("Process %d terminated by signal %d\n", p->pid, sig);
                         // Implement termination here
                         // do_exit(p, sig);
                         break;
@@ -314,7 +314,7 @@ void do_signal_delivery(void)
                     case SIGTTIN:
                     case SIGTTOU:
                         // Default is to stop the process
-                        sprint("Process %d stopped by signal %d\n", p->pid, sig);
+                        kprintf("Process %d stopped by signal %d\n", p->pid, sig);
                         // Implement stop logic here
                         // p->state = TASK_STOPPED;
                         break;
@@ -332,7 +332,7 @@ void do_signal_delivery(void)
             } 
             else {
                 // Custom handler - set up the stack frame and jump to the handler
-                sprint("Process %d: delivering signal %d to handler\n", p->pid, sig);
+                kprintf("Process %d: delivering signal %d to handler\n", p->pid, sig);
                 // This needs architecture-specific code to set up a signal frame
                 // setup_signal_frame(p, sig);
                 break;

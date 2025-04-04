@@ -1,5 +1,5 @@
 #include <errno.h>
-#include <kernel/mm/kmalloc.h>
+#include <kernel/mmu.h>
 #include <kernel/util/hashtable.h>
 #include <kernel/util/string.h>
 
@@ -24,9 +24,9 @@ int32 hashtable_setup(struct hashtable* ht, uint32 initial_size, uint32 max_load
 
 	/* 分配桶数组 */
 	ht->buckets = kmalloc(initial_size * sizeof(struct hash_bucket));
-	if (!ht->buckets)
-		return -ENOMEM;
+	if (!ht->buckets) return -ENOMEM;
 
+	check_address_mapping(g_kernel_pagetable, (vaddr_t)ht->buckets);
 	/* 初始化每个桶的链表头 */
 	for (i = 0; i < initial_size; i++) {
 		INIT_LIST_HEAD(&ht->buckets[i].head);

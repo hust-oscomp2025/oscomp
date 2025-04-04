@@ -110,7 +110,7 @@ int32 fstype_register(struct fstype* fs) {
 		if (strcmp(p->fs_name, fs->fs_name) == 0) {
 			/* Already registered */
 			spinlock_unlock(&file_systems_lock);
-			sprint("VFS: Filesystem %s already registered\n", fs->fs_name);
+			kprintf("VFS: Filesystem %s already registered\n", fs->fs_name);
 			return -EBUSY;
 		}
 	}
@@ -119,7 +119,7 @@ int32 fstype_register(struct fstype* fs) {
 	list_add(&fs->fs_globalFsListNode, &file_systems_list);
 
 	spinlock_unlock(&file_systems_lock);
-	sprint("VFS: Registered filesystem %s\n", fs->fs_name);
+	kprintf("VFS: Registered filesystem %s\n", fs->fs_name);
 	return 0;
 }
 
@@ -144,13 +144,13 @@ int32 fstype_unregister(struct fstype* fs) {
 			/* Found it - remove from the list */
 			list_del(&p->fs_globalFsListNode);
 			spinlock_unlock(&file_systems_lock);
-			sprint("VFS: Unregistered filesystem %s\n", p->fs_name);
+			kprintf("VFS: Unregistered filesystem %s\n", p->fs_name);
 			return 0;
 		}
 	}
 
 	spinlock_unlock(&file_systems_lock);
-	sprint("VFS: Filesystem %s not registered\n", fs->fs_name);
+	kprintf("VFS: Filesystem %s not registered\n", fs->fs_name);
 	return -ENOENT;
 }
 

@@ -1,9 +1,9 @@
 # 修改: 切换到 RISC-V Linux GNU 交叉编译工具链
-set(CMAKE_SYSTEM_NAME Linux)
+set(CMAKE_SYSTEM_NAME Generic)
 set(CMAKE_SYSTEM_PROCESSOR riscv64)
-set(CMAKE_C_COMPILER riscv64-linux-gnu-gcc)
-set(CMAKE_CXX_COMPILER riscv64-linux-gnu-g++)
-set(CMAKE_ASM_COMPILER riscv64-linux-gnu-gcc)
+set(CMAKE_C_COMPILER riscv64-unknown-elf-gcc)
+set(CMAKE_CXX_COMPILER riscv64-unknown-elf-g++)
+set(CMAKE_ASM_COMPILER riscv64-unknown-elf-gcc)
 
 # 设置编译标志，使其与内核编译标志兼容
 # 修改 CMAKE_C_FLAGS，添加更多限制标准库的标志

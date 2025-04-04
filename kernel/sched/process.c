@@ -63,7 +63,7 @@ struct task_struct* alloc_process() {
 	// Default signal actions
 	for (int32 i = 0; i < _NSIG; i++) { ps->sighand[i].sa_handler = SIG_DFL; }
 
-	sprint("alloc_process: end.\n");
+	kprintf("alloc_process: end.\n");
 	return ps;
 }
 
@@ -75,31 +75,31 @@ int32 free_process(struct task_struct* proc) {
 }
 
 ssize_t do_wait(int32 pid) {
-	// sprint("DEBUG LINE, pid = %d\n",pid);
+	// kprintf("DEBUG LINE, pid = %d\n",pid);
 	extern struct task_struct* procs[NPROC];
 	int32 hartid = read_tp();
 	// int32 child_found_flag = 0;
 	if (pid == -1) {
 		while (1) {
 			for (int32 i = 0; i < NPROC; i++) {
-				// sprint("DEBUG LINE\n");
+				// kprintf("DEBUG LINE\n");
 
 				struct task_struct* p = procs[i];
-				// sprint("p = 0x%lx,\n",p);
+				// kprintf("p = 0x%lx,\n",p);
 				if (p->parent != NULL && p->parent->pid == CURRENT->pid && p->state & TASK_DEAD) {
-					// sprint("DEBUG LINE\n");
+					// kprintf("DEBUG LINE\n");
 
 					free_process(p);
 					return i;
 				}
 			}
-			// sprint("current->sem_index = %d\n",current->sem_index);
+			// kprintf("current->sem_index = %d\n",current->sem_index);
 			//sem_P(CURRENT->sem_index);
-			// sprint("wait:return from blocking!\n");
+			// kprintf("wait:return from blocking!\n");
 		}
 	}
 	if (0 < pid && pid < NPROC) {
-		// sprint("DEBUG LINE\n");
+		// kprintf("DEBUG LINE\n");
 
 		struct task_struct* p = procs[pid];
 		if (p->parent != CURRENT) {
@@ -109,7 +109,7 @@ ssize_t do_wait(int32 pid) {
 			return pid;
 		} else {
 			//sem_P(p->sem_index);
-			// sprint("return from blocking!\n");
+			// kprintf("return from blocking!\n");
 
 			return pid;
 		}
@@ -127,13 +127,13 @@ void print_proc_memory_layout(struct task_struct* proc) {
 
 	struct mm_struct* mm = proc->mm;
 
-	sprint("Process %d memory layout:\n", proc->pid);
-	sprint("  code: 0x%lx - 0x%lx\n", mm->start_code, mm->end_code);
-	sprint("  data: 0x%lx - 0x%lx\n", mm->start_data, mm->end_data);
-	sprint("  heap: 0x%lx - 0x%lx\n", mm->start_brk, mm->brk);
-	sprint("  stack: 0x%lx - 0x%lx\n", mm->start_stack, mm->end_stack);
+	kprintf("Process %d memory layout:\n", proc->pid);
+	kprintf("  code: 0x%lx - 0x%lx\n", mm->start_code, mm->end_code);
+	kprintf("  data: 0x%lx - 0x%lx\n", mm->start_data, mm->end_data);
+	kprintf("  heap: 0x%lx - 0x%lx\n", mm->start_brk, mm->brk);
+	kprintf("  stack: 0x%lx - 0x%lx\n", mm->start_stack, mm->end_stack);
 
-	sprint("  VMAs (%d):\n", mm->map_count);
+	kprintf("  VMAs (%d):\n", mm->map_count);
 
 	struct vm_area_struct* vma;
 	list_for_each_entry(vma, &mm->vma_list, vm_list) {
@@ -167,7 +167,7 @@ void print_proc_memory_layout(struct task_struct* proc) {
 		if (vma->vm_prot & PROT_WRITE) strcat(prot_str, "w");
 		if (vma->vm_prot & PROT_EXEC) strcat(prot_str, "x");
 
-		sprint("    %s: 0x%lx - 0x%lx [%s] pages:%d\n", type_str, vma->vm_start, vma->vm_end, prot_str, vma->page_count);
+		kprintf("    %s: 0x%lx - 0x%lx [%s] pages:%d\n", type_str, vma->vm_start, vma->vm_end, prot_str, vma->page_count);
 	}
 }
 
