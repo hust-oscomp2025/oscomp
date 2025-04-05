@@ -19,6 +19,8 @@ __attribute__((aligned(PAGE_SIZE))) char stack0[PAGE_SIZE * (NCPU + 1 + NCPU)];
 __attribute__((aligned(PAGE_SIZE))) char emergency_stack_top[PAGE_SIZE];
 
 void setup_stack_guard_pages(void) {
+	pgt_map_pages(g_kernel_pagetable,(vaddr_t)0,(paddr_t)0, PAGE_SIZE, 0);
+	// 设置空指针保护页
     // 计算保护页的起始地址
     for (int i = 0; i <= NCPU; i++) {
         void *guard_page = stack0 + (i * 2 - 1) * (PAGE_SIZE);
@@ -139,26 +141,37 @@ fail_fs:
 
 void start_trap() { while (1); }
 
+struct task_struct boot_task;
+
+
+struct trapframe boot_trapframe;
+// 这个boot_trapframe应该给每个核都发一个
+void boot_trap_setup(void){
+	current_percpu[read_tp()] = &boot_task;
+	boot_task.trapframe = &boot_trapframe;
+
+	extern char smode_trap_vector[];
+	write_csr(sstatus, read_csr(sstatus) | SSTATUS_SIE);
+	write_csr(stvec, (uint64)smode_trap_vector);
+	write_csr(sscratch, (uint64)&boot_trapframe);
+	uint64 ksp = read_reg(sp);
+	boot_trapframe.kernel_sp = ROUNDUP(ksp, PAGE_SIZE);
+	boot_trapframe.kernel_schedule = (uint64)schedule;
+
+	return;
+}
+
+
 //
 // s_start: S-mode entry point of riscv-pke OS kernel.
 //
 volatile static int32 sig = 1;
 volatile static int counter = 0;
-void s_start(uintptr_t hartid, uintptr_t dtb) {
-	// 最重要！先把中断服务程序挂上去，不然崩溃都不知道怎么死的。
-	extern char smode_trap_vector[];
-	write_csr(sstatus, read_csr(sstatus) | SSTATUS_SIE);
-	write_csr(stvec, (uint64)smode_trap_vector);
 
-	SBI_PUTCHAR('0' + hartid);
-	SBI_PUTCHAR('M');
-	SBI_PUTCHAR('_');
-	SBI_PUTCHAR('S');
-	SBI_PUTCHAR('T');
-	SBI_PUTCHAR('A');
-	SBI_PUTCHAR('R');
-	SBI_PUTCHAR('T');
-	SBI_PUTCHAR('\n');
+void s_start(uintptr_t hartid, uintptr_t dtb) {
+	write_tp(hartid);
+	boot_trap_setup();
+	// 最重要！先把中断服务程序挂上去，不然崩溃都不知道怎么死的。
 
 	if (hartid == 0) {
 		// spike_file_init(); //TODO: 将文件系统迁移到 QEMU
@@ -183,7 +196,6 @@ void s_start(uintptr_t hartid, uintptr_t dtb) {
 	// kprintf("sstatus: 0x%lx\n", read_csr(sstatus));
 	// kprintf("sie: 0x%lx\n", read_csr(sie));
 	// kprintf("In m_start, hartid:%d\n", hartid);
-	write_tp(hartid);
 
 	//write_csr(stvec, (uint64)start_trap);
 
@@ -196,6 +208,7 @@ void s_start(uintptr_t hartid, uintptr_t dtb) {
 		init_page_manager();
 		kernel_vm_init();
 		pagetable_activate(g_kernel_pagetable);
+		boot_trapframe.kernel_satp = MAKE_SATP(g_kernel_pagetable);
 		create_init_mm();
 		kmem_init();
 		init_scheduler();
@@ -222,7 +235,7 @@ void s_start(uintptr_t hartid, uintptr_t dtb) {
 	// the application code (elf) is first loaded into memory, and then put into
 	// execution added @lab3_1
 	create_init_process();
-
+	schedule();
 	// we should never reach here.
 	return;
 }

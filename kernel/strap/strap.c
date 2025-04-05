@@ -158,29 +158,139 @@ error:
 // implements round-robin scheduling. added @lab3_3
 //
 void rrsched() {
-  // TODO (lab3_3): implements round-robin scheduling.
-  // hint: increase the tick_count member of current process by one, if it is
-  // bigger than TIME_SLICE_LEN (means it has consumed its time slice), change
-  // its state into READY, place it in the rear of ready queue, and finally
-  // schedule next process to run.
-  // panic( "You need to further implement the timer handling in lab3_3.\n" );
   int32 hartid = read_tp();
   if (CURRENT->tick_count >= TIME_SLICE_LEN) {
     CURRENT->tick_count = 0;
-    //sys_user_yield();
   }
 }
+
+/**
+ * 处理内核模式下的陷阱
+ * 当在内核模式下发生异常或中断时被调用
+ */
+void kernel_trap_handler(struct trapframe *tf) {
+	uint64 cause = read_csr(scause);
+	uint64 epc = read_csr(sepc);
+	uint64 stval = read_csr(stval);
+	printReg(tf);
+	// 检查是否是中断（最高位为1表示中断）
+	if (cause & (1ULL << 63)) {
+	  uint64 interrupt_cause = cause & ~(1ULL << 63); // 去掉最高位获取中断类型
+	  
+	  // 处理不同类型的中断
+	  switch (interrupt_cause) {
+		case IRQ_S_TIMER:
+		  kprintf("内核中断: IRQ_S_TIMER (S模式计时器中断)\n");
+		  handle_mtimer_trap();
+		  break;
+		case IRQ_S_SOFT:
+		  kprintf("内核中断: IRQ_S_SOFT (S模式软件中断)\n");
+		  // 处理软件中断
+		  break;
+		case IRQ_S_EXT:
+		  kprintf("内核中断: IRQ_S_EXT (S模式外部中断)\n");
+		  // 处理外部中断
+		  break;
+		default:
+		  kprintf("内核中断: 未知类型 (代码: %p)\n", interrupt_cause);
+		  break;
+	  }
+	} else {
+	  // 处理异常（非中断）
+	  switch (cause) {
+		case CAUSE_MISALIGNED_FETCH:
+		  kprintf("内核异常: CAUSE_MISALIGNED_FETCH (取指未对齐)\n");
+		  kprintf("  epc = %p, stval = %p\n", epc, stval);
+		  panic("内核异常: 取指未对齐");
+		  break;
+		case CAUSE_FETCH_ACCESS:
+		  kprintf("内核异常: CAUSE_FETCH_ACCESS (取指访问错误)\n");
+		  kprintf("  epc = %p, stval = %p\n", epc, stval);
+		  panic("内核异常: 取指访问错误");
+		  break;
+		case CAUSE_ILLEGAL_INSTRUCTION:
+		  kprintf("内核异常: CAUSE_ILLEGAL_INSTRUCTION (非法指令)\n");
+		  kprintf("  epc = %p, stval = %p\n", epc, stval);
+		  panic("内核异常: 非法指令");
+		  break;
+		case CAUSE_BREAKPOINT:
+		  kprintf("内核异常: CAUSE_BREAKPOINT (断点)\n");
+		  kprintf("  epc = %p, stval = %p\n", epc, stval);
+		  // 可以选择不panic，而是处理断点
+		  break;
+		case CAUSE_MISALIGNED_LOAD:
+		  kprintf("内核异常: CAUSE_MISALIGNED_LOAD (加载未对齐)\n");
+		  kprintf("  epc = %p, stval = %p\n", epc, stval);
+		  panic("内核异常: 加载未对齐");
+		  break;
+		case CAUSE_LOAD_ACCESS:
+		  kprintf("内核异常: CAUSE_LOAD_ACCESS (加载访问错误)\n");
+		  kprintf("  epc = %p, stval = %p\n", epc, stval);
+		  panic("内核异常: 加载访问错误");
+		  break;
+		case CAUSE_MISALIGNED_STORE:
+		  kprintf("内核异常: CAUSE_MISALIGNED_STORE (存储未对齐)\n");
+		  kprintf("  epc = %p, stval = %p\n", epc, stval);
+		  panic("内核异常: 存储未对齐");
+		  break;
+		case CAUSE_STORE_ACCESS:
+		  kprintf("内核异常: CAUSE_STORE_ACCESS (存储访问错误)\n");
+		  kprintf("  epc = %p, stval = %p\n", epc, stval);
+		  panic("内核异常: 存储访问错误");
+		  break;
+		case CAUSE_USER_ECALL:
+		  kprintf("内核异常: CAUSE_USER_ECALL (用户态系统调用)\n");
+		  kprintf("  epc = %p, stval = %p\n", epc, stval);
+		  // 这通常不应该在内核模式下发生
+		  panic("内核异常: 不应该在内核模式收到用户态系统调用");
+		  break;
+		case CAUSE_SUPERVISOR_ECALL:
+		  kprintf("内核异常: CAUSE_SUPERVISOR_ECALL (内核态系统调用)\n");
+		  kprintf("  epc = %p, stval = %p\n", epc, stval);
+		  // 处理内核态系统调用
+		  break;
+		case CAUSE_MACHINE_ECALL:
+		  kprintf("内核异常: CAUSE_MACHINE_ECALL (机器态系统调用)\n");
+		  kprintf("  epc = %p, stval = %p\n", epc, stval);
+		  panic("内核异常: 机器态系统调用");
+		  break;
+		case CAUSE_FETCH_PAGE_FAULT:
+		  kprintf("内核异常: CAUSE_FETCH_PAGE_FAULT (取指页错误)\n");
+		  kprintf("  epc = %p, stval = %p\n", epc, stval);
+		  panic("内核异常: 取指页错误");
+		  break;
+		case CAUSE_LOAD_PAGE_FAULT:
+		  kprintf("内核异常: CAUSE_LOAD_PAGE_FAULT (加载页错误)\n");
+		  kprintf("  epc = %p, stval = %p\n", epc, stval);
+		  panic("内核异常: 加载页错误");
+		  break;
+		case CAUSE_STORE_PAGE_FAULT:
+		  kprintf("内核异常: CAUSE_STORE_PAGE_FAULT (存储页错误)\n");
+		  kprintf("  epc = %p, stval = %p\n", epc, stval);
+		  panic("内核异常: 存储页错误");
+		  break;
+		default:
+		  kprintf("内核异常: 未知类型 (代码: %p)\n", cause);
+		  kprintf("  epc = %p, stval = %p\n", epc, stval);
+		  panic("内核异常: 未知类型");
+		  break;
+	  }
+	}
+  
+	// 恢复中断
+	write_csr(sstatus, read_csr(sstatus) | SSTATUS_SIE);
+  }
+
 
 //
 // kernel/smode_trap.S will pass control to smode_trap_handler, when a trap
 // happens in S-mode.
 //
-void smode_trap_handler(void) {
+void user_trap_handler(struct trapframe *tf) {
   int32 hartid = read_tp();
   // make sure we are in User mode before entering the trap handling.
   // we will consider other previous case in lab1_3 (interrupt).
-  if ((read_csr(sstatus) & SSTATUS_SPP) != 0)
-    panic("usertrap: not from user mode");
+
 
   assert(CURRENT);
   // save user process counter.
@@ -213,7 +323,18 @@ void smode_trap_handler(void) {
     panic("unexpected exception happened.\n");
     break;
   }
+  write_csr(sstatus, read_csr(sstatus) | SSTATUS_SIE);
+
   // kprintf("calling switch_to, current = 0x%x\n", current);
   // continue (come back to) the execution of current process.
   switch_to(CURRENT);
+}
+
+
+void smode_trap_handler(struct trapframe *tf) {
+	if ((read_csr(sstatus) & SSTATUS_SPP) != 0){
+		kernel_trap_handler(tf);
+	}else{
+		user_trap_handler(tf);
+	}
 }

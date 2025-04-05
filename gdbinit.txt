@@ -4,5 +4,10 @@ file build/bin/riscv-pke
 add-symbol-file /root/workspace/oscomp-dev/vendor/opensbi/build/platform/generic/firmware/fw_jump.elf 0x80000000
 # b s_start
 b sbi_init
-b smode_trap_vector
+# b smode_trap_vector
+# b filename_lookup
+b smode_trap_handler
 awatch *(uint64_t*)0x0
+display /5i $pc
+b init_page_manager
+b boot_trap_setup

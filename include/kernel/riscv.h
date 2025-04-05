@@ -84,23 +84,28 @@
 #define MIE_MTIE (1L << 7)   // timer
 #define MIE_MSIE (1L << 3)   // software
 
-#define read_const_csr(reg)              \
+#define read_reg(reg)              \
   ({                                     \
     uint64 __tmp;                 \
-    asm("csrr %0, " #reg : "=r"(__tmp)); \
+    asm("mv %0, " #reg : "=r"(__tmp)); \
     __tmp;                               \
   })
 
+  #define write_reg(reg, val) ({ asm volatile("mv " #reg ", %0" ::"rK"(val)); })
+
+
+  #define read_csr(reg)                             \
+  ({                                              	\
+    uint64 __tmp;                          			\
+    asm volatile("csrr %0, " #reg : "=r"(__tmp)); 	\
+    __tmp;                                        	\
+  })
+
+
 static inline int32 supports_extension(char ext) {
-  return read_const_csr(misa) & (1 << (ext - 'A'));
+  return read_csr(misa) & (1 << (ext - 'A'));
 }
 
-#define read_csr(reg)                             \
-  ({                                              \
-    uint64 __tmp;                          \
-    asm volatile("csrr %0, " #reg : "=r"(__tmp)); \
-    __tmp;                                        \
-  })
 
 #define write_csr(reg, val) ({ asm volatile("csrw " #reg ", %0" ::"rK"(val)); })
 
