@@ -4,6 +4,7 @@
 
 #include <kernel/util/radix_tree.h>
 #include <kernel/util/spinlock.h>
+#include <kernel/types.h>
 #include "forward_declarations.h"
 
 struct inode;

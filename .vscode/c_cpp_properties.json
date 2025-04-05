@@ -4,8 +4,11 @@
 					"name": "riscv-pke",
 					"includePath": [
 							"${workspaceFolder}/include",
-							"/usr/lib/gcc-cross/riscv64-linux-gnu/13/include/",
-							"/usr/riscv64-linux-gnu/include/"
+							"${workspaceFolder}/vendor/musl/include",
+							"${workspaceFolder}/vendor/musl/arch/generic",
+
+							"${workspaceFolder}/vendor/musl/arch/riscv64",
+							"${workspaceFolder}/vendor/musl/obj/include"
 					],
 					"defines": [
 							"__riscv",

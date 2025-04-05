@@ -5,7 +5,7 @@
 #include <kernel/util/print.h>
 #include <kernel/types.h>
 #include <kernel/util/string.h>
-#include <sys/poll.h>
+
 
 #define FDTABLE_INIT_SIZE 16
 

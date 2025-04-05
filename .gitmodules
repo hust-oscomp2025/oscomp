@@ -9,3 +9,7 @@
 [submodule "vendor/opensbi"]
 	path = vendor/opensbi
 	url = https://github.com/hust-oscomp2025/opensbi.git
+
+[submodule "vendor/musl"]
+	path = vendor/musl
+	url = https://github.com/hust-oscomp2025/musl.git
