@@ -49,8 +49,8 @@ uint32_t timespec64_to_ext4_timestamp(struct timespec *ts)
 	return ts->tv_sec;
 }
 
-void make_fsid_from_uuid(const uint8_t uuid[16], __kernel_fsid_t *fsid) {
+void make_fsid_from_uuid(const uint8_t uuid[16], fsid_t *fsid) {
     const uint32_t *u = (const uint32_t *)uuid;
-    fsid->val[0] = (int32)(u[0] ^ u[1]);
-    fsid->val[1] = (int32)(u[2] ^ u[3]);
+    fsid->__val[0] = (int32)(u[0] ^ u[1]);
+    fsid->__val[1] = (int32)(u[2] ^ u[3]);
 }

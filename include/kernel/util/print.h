@@ -8,7 +8,8 @@
 #define panic(fmt, ...)
 //#define assert(x) if (!(x)) panic("Assertion failed: %s\n", #x)
 #define assert(x)
-
+struct trapframe;
+void printReg(struct trapframe *tf);
 
 void kprintf(const char *fmt, ...);
 

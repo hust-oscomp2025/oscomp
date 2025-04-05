@@ -61,6 +61,7 @@
 - [ ] 加入dentry_automount特性
 - [ ] A more complex data structure for multiple mount tracking (rather than a simple counter)
 - [ ] 重新把mount hash加回来
+- [ ] 研究核间中断
 
 ## 小任务
 - [ ] 把readp和writep分离出去

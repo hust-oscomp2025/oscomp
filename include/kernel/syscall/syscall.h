@@ -2,7 +2,7 @@
 #define _SYSCALL_H_
 
 #include <kernel/types.h>
-#include <asm/unistd.h>
+//#include <asm/unistd.h>
 #include "forward_types.h"
 /* Include syscall numbers */
 
@@ -22,7 +22,7 @@ struct syscall_entry {
 };
 
 /* Syscall dispatcher */
-int64 do_syscall(int64 syscall_num, int64 a0, int64 a1, int64 a2, int64 a3, int64 a4, int64 a5);
+long do_syscall(long syscall_num, long a0, long a1, long a2, long a3, long a4, long a5);
 
 /* File-related syscalls */
 int64 sys_openat(int32 dirfd, const char* pathname, int32 flags, mode_t mode);

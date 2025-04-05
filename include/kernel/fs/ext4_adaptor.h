@@ -29,11 +29,13 @@
 #include <kernel/fs/lwext4/ext4_xattr.h>
 
 #include <kernel/vfs.h>
+#include <kernel/types.h>
 /*helper functions*/
 void ext4_timestamp_to_timespec64(uint32_t timestamp, struct timespec* ts);
 
 uint32_t timespec64_to_ext4_timestamp(struct timespec* ts);
-void make_fsid_from_uuid(const uint8_t uuid[16], __kernel_fsid_t* fsid);
+void make_fsid_from_uuid(const uint8_t uuid[16], fsid_t *fsid);
+
 
 /*global ext4 superblock lock*/
 extern spinlock_t ext4_spinlock;

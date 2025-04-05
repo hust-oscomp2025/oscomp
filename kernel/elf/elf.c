@@ -474,6 +474,7 @@ int32 load_init_binary(struct task_struct *init_task, const char *path) {
         kprintf("Failed to open init binary: %s (error %d)\n", path, fd);
         return fd;
     }
+    kprintf("init binary file successfully open\n");
 
     // Ensure the process has a valid memory layout
     if (!init_task->mm) {

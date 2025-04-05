@@ -1,17 +1,20 @@
 #pragma once
-#include <asm-generic/statfs.h>
-#include <sys/mount.h>
-#include <stdint.h>
-#include <stdbool.h>
+#define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
-#include <sys/stat.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <sys/mount.h>
+#include <sys/statfs.h>
+#include <sys/statvfs.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <stddef.h>
-#include <fcntl.h>
-#include <sys/cdefs.h>
-//#include <kernel/riscv.h>
+#include <poll.h>
+
+// #include <bits/fcntl.h>
+// #include <sys/cdefs.h>
+// #include <kernel/riscv.h>
 
 /* 关于指针和数据类型的说明
  * uint64: 切实的数据值，不可能用作内存/内存运算
@@ -96,7 +99,7 @@ struct itimerspec {
 /*ERRNO TYPES*/
 #define MAX_ERRNO 4095L
 #define IS_ERR_VALUE(x) ((unsigned long)(x) >= (unsigned long)-MAX_ERRNO)
-#define unlikely_if(x) if(unlikely(x))
+#define unlikely_if(x) if (unlikely(x))
 #define ERR_PTR(err) ((void*)((long)(err)))
 #define PTR_ERR(ptr) ((long)(ptr))
 #define PTR_IS_ERROR(ptr) IS_ERR_VALUE((unsigned long)(ptr))
@@ -164,87 +167,102 @@ typedef unsigned long fsblkcnt_t;
 
 /* File permission and type bits */
 typedef unsigned short umode_t;
-#define READ    0
-#define WRITE   1
-
+#define READ 0
+#define WRITE 1
 
 /**
  * 测试位是否被置位（返回1或0）
  * @param nr 位编号（从0开始）
  * @param addr 位图指针
  */
-static inline int test_bit(int nr, const volatile uint64 *addr) {
-    return (addr[nr / (8 * sizeof(uint64))] >> (nr % (8 * sizeof(uint64)))) & 1UL;
-}
+static inline int test_bit(int nr, const volatile uint64* addr) { return (addr[nr / (8 * sizeof(uint64))] >> (nr % (8 * sizeof(uint64)))) & 1UL; }
 
 /**
  * 设置指定位置的位
  * @param nr 位编号（从0开始）
  * @param addr 位图指针
  */
-static inline void set_bit(int nr, volatile uint64 *addr) {
-    addr[nr / (8 * sizeof(uint64))] |= (1UL << (nr % (8 * sizeof(uint64))));
-}
+static inline void set_bit(int nr, volatile uint64* addr) { addr[nr / (8 * sizeof(uint64))] |= (1UL << (nr % (8 * sizeof(uint64)))); }
 
 /**
  * 清除指定位置的位
  * @param nr 位编号（从0开始）
  * @param addr 位图指针
  */
-static inline void clear_bit(int nr, volatile uint64 *addr) {
-    addr[nr / (8 * sizeof(uint64))] &= ~(1UL << (nr % (8 * sizeof(uint64))));
-}
-
-
-
+static inline void clear_bit(int nr, volatile uint64* addr) { addr[nr / (8 * sizeof(uint64))] &= ~(1UL << (nr % (8 * sizeof(uint64)))); }
 
 /*device types*/
 /* Major/minor number manipulation macros */
-#define MINORBITS       20
-#define MINORMASK       ((1U << MINORBITS) - 1)
+#define MINORBITS 20
+#define MINORMASK ((1U << MINORBITS) - 1)
 
 /* Extract major and minor numbers from a device ID */
-#define MAJOR(dev)      ((unsigned int) ((dev) >> MINORBITS))
-#define MINOR(dev)      ((unsigned int) ((dev) & MINORMASK))
+#define MAJOR(dev) ((unsigned int)((dev) >> MINORBITS))
+#define MINOR(dev) ((unsigned int)((dev) & MINORMASK))
 
 /* Create a device ID from major and minor numbers */
-#define MKDEV(major,minor) (((dev_t)(major) << MINORBITS) | (minor))
+#define MKDEV(major, minor) (((dev_t)(major) << MINORBITS) | (minor))
 
 /* Standard Linux device major numbers */
-#define UNNAMED_MAJOR       0
-#define RAMDISK_MAJOR       1
-#define FLOPPY_MAJOR        2
-#define IDE0_MAJOR          3
-#define IDE1_MAJOR          22
-#define IDE2_MAJOR          33
-#define IDE3_MAJOR          34
-#define SCSI_DISK0_MAJOR    8
-#define SCSI_DISK1_MAJOR    65
-#define SCSI_DISK2_MAJOR    66
-#define SCSI_DISK3_MAJOR    67
-#define SCSI_DISK4_MAJOR    68
-#define SCSI_DISK5_MAJOR    69
-#define SCSI_DISK6_MAJOR    70
-#define SCSI_DISK7_MAJOR    71
-#define LOOP_MAJOR          7
-#define MMC_BLOCK_MAJOR     179
-#define VIRTBLK_MAJOR       254
+#define UNNAMED_MAJOR 0
+#define RAMDISK_MAJOR 1
+#define FLOPPY_MAJOR 2
+#define IDE0_MAJOR 3
+#define IDE1_MAJOR 22
+#define IDE2_MAJOR 33
+#define IDE3_MAJOR 34
+#define SCSI_DISK0_MAJOR 8
+#define SCSI_DISK1_MAJOR 65
+#define SCSI_DISK2_MAJOR 66
+#define SCSI_DISK3_MAJOR 67
+#define SCSI_DISK4_MAJOR 68
+#define SCSI_DISK5_MAJOR 69
+#define SCSI_DISK6_MAJOR 70
+#define SCSI_DISK7_MAJOR 71
+#define LOOP_MAJOR 7
+#define MMC_BLOCK_MAJOR 179
+#define VIRTBLK_MAJOR 254
 
 /* Special purpose device majors */
-#define MEM_MAJOR           1       /* /dev/mem etc */
-#define TTY_MAJOR           4
-#define TTYAUX_MAJOR        5
-#define RANDOM_MAJOR        1       /* /dev/random /dev/urandom */
+#define MEM_MAJOR 1 /* /dev/mem etc */
+#define TTY_MAJOR 4
+#define TTYAUX_MAJOR 5
+#define RANDOM_MAJOR 1 /* /dev/random /dev/urandom */
 
-#define DYNAMIC_MAJOR_MIN 128  /* Reserve first 128 majors for fixed assignments */
+#define DYNAMIC_MAJOR_MIN 128 /* Reserve first 128 majors for fixed assignments */
 
 typedef unsigned int vm_fault_t;
 
-
 /* Encode hstate index for a hwpoisoned large page */
-#define VM_FAULT_SET_HINDEX(x) (( vm_fault_t)((x) << 16))
-#define VM_FAULT_GET_HINDEX(x) ((( uint32)(x) >> 16) & 0xf)
+#define VM_FAULT_SET_HINDEX(x) ((vm_fault_t)((x) << 16))
+#define VM_FAULT_GET_HINDEX(x) (((uint32)(x) >> 16) & 0xf)
 
-#define VM_FAULT_ERROR (VM_FAULT_OOM | VM_FAULT_SIGBUS |	\
-			VM_FAULT_SIGSEGV | VM_FAULT_HWPOISON |	\
-			VM_FAULT_HWPOISON_LARGE | VM_FAULT_FALLBACK)
+#define VM_FAULT_ERROR (VM_FAULT_OOM | VM_FAULT_SIGBUS | VM_FAULT_SIGSEGV | VM_FAULT_HWPOISON | VM_FAULT_HWPOISON_LARGE | VM_FAULT_FALLBACK)
+
+
+
+#include <sys/stat.h>
+
+// struct stat {
+// 	dev_t st_dev;
+// 	ino_t st_ino;
+// 	mode_t st_mode;
+// 	nlink_t st_nlink;
+// 	uid_t st_uid;
+// 	gid_t st_gid;
+// 	dev_t st_rdev;
+// 	unsigned long long __pad;
+// 	off_t st_size;
+// 	blksize_t st_blksize;
+// 	int __pad2;
+// 	blkcnt_t st_blocks;
+// 	struct timespec st_atim;
+// 	struct timespec st_mtim;
+// 	struct timespec st_ctim;
+// 	unsigned __unused[2];
+
+// };
+
+
+
+

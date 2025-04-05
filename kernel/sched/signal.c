@@ -6,6 +6,7 @@
 
 /* Global variable to track the signal that caused an interrupt */
 int32 g_signal_pending = 0;
+#define _SIGSET_NWORDS (1024 / (8 * sizeof (unsigned long int)))
 
 /* Sigset operations */
 
@@ -51,7 +52,7 @@ int32 sigaddset(sigset_t *set, int32 signo)
     if (!set || signo <= 0 || signo >= NSIG)
         return -EINVAL;
         
-    set->__val[(signo - 1) / (8 * sizeof(uint64))] |= 
+    set->__bits[(signo - 1) / (8 * sizeof(uint64))] |= 
         1UL << ((signo - 1) % (8 * sizeof(uint64)));
     return 0;
 }
@@ -68,7 +69,7 @@ int32 sigdelset(sigset_t *set, int32 signo)
     if (!set || signo <= 0 || signo >= NSIG)
         return -EINVAL;
         
-    set->__val[(signo - 1) / (8 * sizeof(uint64))] &= 
+    set->__bits[(signo - 1) / (8 * sizeof(uint64))] &= 
         ~(1UL << ((signo - 1) % (8 * sizeof(uint64))));
     return 0;
 }
@@ -85,7 +86,7 @@ int32 sigismember(const sigset_t *set, int32 signo)
     if (!set || signo <= 0 || signo >= NSIG)
         return -EINVAL;
         
-    return !!(set->__val[(signo - 1) / (8 * sizeof(uint64))] & 
+    return !!(set->__bits[(signo - 1) / (8 * sizeof(uint64))] & 
         (1UL << ((signo - 1) % (8 * sizeof(uint64)))));
 }
 
@@ -208,14 +209,14 @@ int32 do_sigprocmask(int32 how, const sigset_t *set, sigset_t *oldset)
             // Block signals in set
             new_blocked = p->blocked;
             for (int32 i = 0; i < _SIGSET_NWORDS; i++)
-                new_blocked.__val[i] |= set->__val[i];
+                new_blocked.__bits[i] |= set->__bits[i];
             break;
             
         case SIG_UNBLOCK:
             // Unblock signals in set
             new_blocked = p->blocked;
             for (int32 i = 0; i < _SIGSET_NWORDS; i++)
-                new_blocked.__val[i] &= ~set->__val[i];
+                new_blocked.__bits[i] &= ~set->__bits[i];
             break;
             
         case SIG_SETMASK:

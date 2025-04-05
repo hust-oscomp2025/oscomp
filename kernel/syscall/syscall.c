@@ -6,6 +6,7 @@
 #include <kernel/types.h>
 #include <kernel/util/string.h>
 #include <kernel/vfs.h>
+#include <syscall.h>
 
 /* Debug flag to enable syscall tracing */
 #define SYSCALL_DEBUG 0
@@ -45,26 +46,26 @@ typedef int64 (*syscall_fn_t)(int64, int64, int64, int64, int64, int64);
 
 static struct syscall_entry syscall_table[] = {
     /* File operations */
-    [__NR_openat] = {(syscall_fn_t)sys_openat, "open", 3},
-    [__NR_close] = {(syscall_fn_t)sys_close, "close", 1},
-    [__NR_read] = {(syscall_fn_t)sys_read, "read", 3},
-    [__NR_write] = {(syscall_fn_t)sys_write, "write", 3},
-    [__NR_lseek] = {(syscall_fn_t)sys_lseek, "lseek", 3},
-    [__NR_mount] = {(syscall_fn_t)sys_mount, "mount", 5},
-    [__NR_getdents64] = {(syscall_fn_t)sys_getdents64, "getdents", 3},
+    [SYS_openat] = {(syscall_fn_t)sys_openat, "open", 3},
+    [SYS_close] = {(syscall_fn_t)sys_close, "close", 1},
+    [SYS_read] = {(syscall_fn_t)sys_read, "read", 3},
+    [SYS_write] = {(syscall_fn_t)sys_write, "write", 3},
+    [SYS_lseek] = {(syscall_fn_t)sys_lseek, "lseek", 3},
+    [SYS_mount] = {(syscall_fn_t)sys_mount, "mount", 5},
+    [SYS_getdents64] = {(syscall_fn_t)sys_getdents64, "getdents", 3},
 
     /* Process operations */
-    [__NR_exit] = {(syscall_fn_t)sys_exit, "exit", 1},
-    [__NR_getpid] = {(syscall_fn_t)sys_getpid, "getpid", 0},
-    [__NR_getppid] = {NULL, "getppid", 0}, // Not implemented yet
-    [__NR_clone] = {(syscall_fn_t)sys_clone, "clone", 5},
+    [SYS_exit] = {(syscall_fn_t)sys_exit, "exit", 1},
+    [SYS_getpid] = {(syscall_fn_t)sys_getpid, "getpid", 0},
+    [SYS_getppid] = {NULL, "getppid", 0}, // Not implemented yet
+    [SYS_clone] = {(syscall_fn_t)sys_clone, "clone", 5},
 
     /* Memory operations */
-    [__NR_mmap] = {(syscall_fn_t)sys_mmap, "mmap", 6},
-    [__NR_brk] = {NULL, "brk", 1}, // Not implemented yet
+    [SYS_mmap] = {(syscall_fn_t)sys_mmap, "mmap", 6},
+    [SYS_brk] = {NULL, "brk", 1}, // Not implemented yet
 
     /* Time operations */
-    //[__NR_time] = {(syscall_fn_t)sys_time, "time", 1},
+    //[SYS_time] = {(syscall_fn_t)sys_time, "time", 1},
 
     /* Add more syscalls as needed */
 };
@@ -74,7 +75,7 @@ static struct syscall_entry syscall_table[] = {
 /**
  * The main syscall dispatcher
  */
-int64 do_syscall(int64 syscall_num, int64 a0, int64 a1, int64 a2, int64 a3, int64 a4, int64 a5) {
+long do_syscall(long syscall_num, long a0, long a1, long a2, long a3, long a4, long a5) {
 
 	/* Validate syscall number */
 	if (syscall_num < 0 || syscall_num >= SYSCALL_TABLE_SIZE || !syscall_table[syscall_num].func) {

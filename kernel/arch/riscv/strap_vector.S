@@ -2,6 +2,7 @@
 #define ERROR_KERNEL_STACK 0x1001
 #define SBI_LEGACY_PUTCHAR_NUM 0x01
 #define SBI_LEGACY_GETCHAR_NUM 0x02
+#define SSTATUS_SIE 0x02 
 .section trapsec
 .globl trap_sec_start
 trap_sec_start:
@@ -20,6 +21,8 @@ trap_sec_start:
 .globl smode_trap_vector
 .align 4
 smode_trap_vector:
+	# 首先关中断。 
+	csrrc t0, sstatus, SSTATUS_SIE
     # 首先保存关键CSR到一些临时寄存器
     csrr     s1, sepc    # 保存sepc到s1
     csrr     s2, scause  # 保存scause到s2
@@ -92,13 +95,10 @@ smode_trap_vector:
     ld t1, 272(a0)
     csrw satp, t1
     sfence.vma zero, zero
-
+	# 存完状态以后再开中断
 	call smode_trap_handler
     # jump to smode_trap_handler() that is defined in kernel/trap.c
     # call t0
-jump_to_handler:
-    li      s11, 0               # 重置计数器
-    j       smode_trap_handler   # 直接跳转到中断处理程序
 #
 # return from Supervisor mode to User mode, transition is made by using a trapframe,
 # which stores the context of a user application.

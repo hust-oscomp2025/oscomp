@@ -11,7 +11,7 @@ struct trapframe {
   // process's "user kernel" stack
   /* offset:248 */ uint64 kernel_sp;
   // pointer to smode_trap_handler
-  /* offset:256 */ uint64 kernel_trap;
+  /* offset:256 */ uint64 kernel_trap;	// 这个字段目前弃用了，中断位置硬编码在汇编里
   // saved user process counter
   /* offset:264 */ uint64 epc;
 
