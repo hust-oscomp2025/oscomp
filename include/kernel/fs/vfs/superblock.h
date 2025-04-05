@@ -3,6 +3,7 @@
 //#include <kernel/fs/vfs/fstype.h>
 #include "forward_declarations.h"
 #include <kernel/fs/vfs/stat.h>
+#include <kernel/types.h>
 #include <kernel/util/list.h>
 #include <kernel/util/spinlock.h>
 
@@ -140,21 +141,6 @@ struct inode* superblock_createInode(struct superblock* sb);
 
 
 // ... existing code ...
-
-
-
-#define ST_RDONLY       0x0001  // 文件系统是只读的
-#define ST_NOSUID       0x0002  // 忽略 SUID 和 SGID 权限位
-#define ST_NODEV        0x0004  // 禁止访问设备文件
-#define ST_NOEXEC       0x0008  // 禁止执行程序
-#define ST_SYNCHRONOUS  0x0010  // 所有写入操作都同步进行
-#define ST_MANDLOCK     0x0040  // 支持强制锁（Mandatory locking）
-#define ST_WRITE        0x0080  // 文件系统当前是可写的（不是标准 POSIX，但有些内核提供）
-#define ST_APPEND       0x0100  // 支持 append-only 文件
-#define ST_IMMUTABLE    0x0200  // 支持 immutable 文件
-#define ST_NOATIME      0x0400  // 不更新访问时间
-#define ST_NODIRATIME   0x0800  // 不更新目录访问时间
-#define ST_RELATIME     0x1000  // 更新访问时间仅在 mtime 变动时
 
 /*
  * Writeback flags

@@ -139,7 +139,7 @@ pte_t* page_walk(pagetable_t pagetable, uint64 va, int32 alloc) {
  * @return 成功返回0，失败返回-1
  */
 int32 pgt_map_page(pagetable_t pagetable, vaddr_t va, paddr_t pa, int32 perm) {
-	kprintf("pgt_map_page: start with pagetable = %lx, va = %lx, pa = %lx, perm = %lx\n", pagetable, va, pa, perm);
+	//kprintf("pgt_map_page: start with pagetable = %lx, va = %lx, pa = %lx, perm = %lx\n", pagetable, va, pa, perm);
 	if (pagetable == NULL) {
 		return -1;
 	}
@@ -178,7 +178,7 @@ int32 pgt_map_page(pagetable_t pagetable, vaddr_t va, paddr_t pa, int32 perm) {
 		}
 	} else {
 		// 创建新映射
-		kprintf("create page=%lx perm: %lx\n", aligned_pa, perm);
+		//kprintf("create page=%lx perm: %lx\n", aligned_pa, perm);
 		*pte = PA2PPN(aligned_pa) | perm | PTE_V;
 		atomic_inc(&pt_stats.mapped_pages);
 	}

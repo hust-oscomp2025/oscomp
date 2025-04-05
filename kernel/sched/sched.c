@@ -132,7 +132,7 @@ void switch_to(struct task_struct *proc) {
   proc->trapframe->kernel_satp = read_csr(satp); // kernel page table
 
   extern char smode_trap_handler[];
-  proc->trapframe->kernel_trap = (uint64)smode_trap_handler;
+  //proc->trapframe->kernel_trap = (uint64)smode_trap_handler;	//这个字段现在硬编码了
   proc->trapframe->kernel_schedule = (uint64)schedule;
 
   // SSTATUS_SPP and SSTATUS_SPIE are defined in kernel/riscv.h
